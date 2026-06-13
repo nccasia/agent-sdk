@@ -7,14 +7,14 @@
 [![Status](https://img.shields.io/badge/status-beta-orange.svg)](#status)
 
 **agent-sdk** is a Python SDK for building AI agents whose **reasoning process you fully control** —
-the context, the prompt, the steps, the control flow, the durable state. Instead of *free-acting*
-(vanilla ReAct: the model picks tool calls turn by turn and the prompt accumulates toward its
-limit), an agent **reasons through a deliberate pipeline you assemble, inspect, and tune** — layered
-**lobes** (what context fires) → reusable **stages** (the reasoning steps) → intent **flows** (the
-path), with **metacognition** supervising. The deterministic core (intent recognition, activation,
-attention/budget, flow resolution) is a pure function of `(spec, context)`; everything that touches
-the outside world (LLM, tools, embeddings, stores, queues) is a narrow protocol with an in-memory
-default.
+the context, the prompt, the steps, the control flow, the durable state. Rather than free-acting
+turn by turn (vanilla ReAct, where the prompt accumulates toward its limit), an agent reasons
+through a deliberate pipeline you assemble, inspect, and tune: **lobes** (what context fires) →
+**stages** (the reasoning steps) → **flows** (the path), with **metacognition** supervising.
+
+The deterministic core — intent recognition, activation, attention/budget, flow resolution — is a
+pure function of `(spec, context)`. Everything that touches the outside world (LLM, tools,
+embeddings, stores, queues) sits behind a narrow protocol with an in-memory default.
 
 ## Why agent-sdk
 
