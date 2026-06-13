@@ -85,23 +85,20 @@ and a `--inspect` routing probe.
   <img src="docs/concepts/the-model.svg" alt="The PreAct model — OY context (lobes) × OX time (stages), with metacognition above both" width="720">
 </p>
 
-PreAct shapes acting *up front*: it decouples **what the agent thinks about** (the OY **context**
-axis — `lobes`) from **how it progresses** (the OX **time** axis — `stages` / `flows`), tunes each
-independently, and runs a **metacognition** layer over both. Each turn an **intent** biases the
-lobes and selects the flow — recognized however you choose: fast deterministic signals, or an **LLM
-classifier** when you want richer routing. New capability is a registry row, not an interpreter branch.
+PreAct splits a turn into two separate, tunable axes — **what the agent thinks about** and **how it
+progresses** — with **metacognition** supervising both:
 
-Concretely, a turn is a deterministic pipeline — recognize the intent, run that flow's stages, shape
-the reply — never a free tool loop:
+- **`lobes` — the context axis (OY).** Small thinking units that fire the right context + local behavior for one slice of the turn.
+- **`stages` / `flows` — the time axis (OX).** A flow is an ordered pipeline; each stage owns its lobe slice, loop mode, and tools. *New capability is a registry row, not an interpreter branch.*
+- **`intent` — the router.** Each turn an intent biases the lobes and selects the flow — recognized however you choose: fast deterministic signals or an **LLM classifier**.
+- **`metacognition` — always on.** `monitor → regulate`: adjust the lobe slice, retry, or skip a step — but never skip a pinned safety step (`cite` / `filter`).
+- **context that funnels.** Re-tiered every hop (inject · hint + fetch · offload) for *useful reasoning per token*, not maximum context.
+
+So a turn is a readable pipeline — recognize the intent, run the flow's stages, shape the reply:
 
 <p align="center">
   <img src="docs/concepts/turn-pipeline.svg" alt="A turn: query → recognize path → select flow → per-stage (context · metacognition · loop) → cite/filter/format → result" width="720">
 </p>
-
-The target is *useful reasoning per token*: context is re-tiered every hop (inject · hint + fetch ·
-offload), so the prompt funnels toward the answer instead of accumulating toward the limit.
-Metacognition (`monitor → regulate`) may adjust the lobe slice, retry, or skip a step — but never
-lets the LLM judge the pipeline, and never skips a pinned safety step (`cite` / `filter`).
 
 Deeper dives: [the OX/OY plane](./docs/concepts/architecture.md) ·
 [intent &amp; paths](./docs/concepts/intent-and-paths.md) ·
@@ -134,23 +131,6 @@ reg.register(PluginWorkspace(driver="virtual"))
 reg.disable("format")                     # turn an extension off
 agent = PreactAgent(client=…, plugins=reg)
 ```
-
-## What's here
-
-| Area | Modules |
-|---|---|
-| Façade + kernel | `agent.py` (`PreactAgent`), `engine.py` (`Engine`) |
-| Building blocks | `activable.py`, `stages.py` (`Stage`), `flow_def.py` (`Flow`), `skill_def.py` (`Skill`), `signals.py` (declarative grammar), `preact/` (built-in network) |
-| Tools | `tools.py` (`@tool`, `FunctionToolRuntime`) |
-| Clients | `clients/` (`AnthropicClient`, `OpenAIClient`, `MiniMaxClient`, `MixedClient`, `FakeClient`) |
-| Results + events | `result.py` (`AgentResult`, `Trace`, `Usage`, …), `events.py` (typed event union + `AgentStream`) |
-| Persistence | `session.py`, `memory/` (`Memory` + the `memory` tool, `Scratchpad`), `stores/` (in-memory / Redis / SQL) |
-| Reasoning control | `metacognition_facade.py` (`Metacognition`) |
-| Core network | `lobes/` (cognition, tools, skills, memory, reply + framework + paths) |
-| Extensions | `plugins/` — first-class plug-and-play units (lobes/stages/flows/skills/tools) + MCP (`mcp.py`); built-ins `SafetyPlugin`/`FormatPlugin`/`TaskPlugin`/`PluginWorkspace`/`PluginMCP`/`PluginOTel`/`PluginGuardrails`/`PluginSupportTriage`, managed via `PluginRegistry` |
-| Serving | `serve.py` (`AgentWorker`, in-process + Redis queue/sink/lock) |
-| Portability | `spec.py` (`PreactSpec` round-trip), `bench.py` (`Harness`/`Scenario`) |
-| Base layers | `contracts/`, `network/`, `flows/`, `react/`, `guards/`, `inspection.py` |
 
 ## Status
 
