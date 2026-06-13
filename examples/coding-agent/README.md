@@ -20,7 +20,7 @@ through.
   prompts stay terse and accuracy stays high.
 - **PreAct** (`funnel=True`) — spent tool observations shrink to hints, so
   long exploration doesn't overflow the window.
-- **High hop budgets** (explore 50 · implement 80 · verify 40 · answer 120).
+- **High hop budgets** (explore 50 · implement 80 · verify 40 · answer 80).
 - **Durable memory** — the agent tracks its plan/goals across turns.
 
 See [`EVALUATION.md`](./EVALUATION.md) for a candid assessment of the SDK
@@ -31,15 +31,26 @@ prioritized improvement suggestions) produced by building this.
 
 ```
 request ──▶ recognize flow (free, deterministic)
-            ├─ question  → explore → answer
-            ├─ quick_fix → explore → implement → verify → summarize
-            └─ feature   → explore → plan → implement → verify → summarize
+            ├─ question   → answer
+            ├─ quick_fix  → explore → implement → verify → summarize
+            ├─ feature    → explore → plan → implement → verify → summarize
+            └─ understand → survey → plan → investigate → document   (writes ARCHITECTURE.md)
 ```
 
-- **Plugin** (`CodingPlugin`, `coding_agent/agent.py`): packages everything below as one installable unit — `install(setup)` calls `add_lobe`/`add_stage`/`add_flow`/`add_tool`/`add_tool_filter`.
-- **Lobes** (`coding_agent/lobes.py`): `triage`, `explore`, `plan`, `implement`, `verify`, `summarize` — the coding disciplines as context workers.
-- **Stages + flows** (`coding_agent/agent.py`): each stage consults a lobe slice + a tool set + a hop budget.
-- **Tools** (`coding_agent/tools.py`): `Read`, `Write`, `Edit`, `LS`, `Glob`, `Grep`, `Bash` — Claude Code's canonical names + schemas, over the real workspace on disk.
+The capability is one installable `CodingPlugin` (`coding_agent/agent.py`) over a few
+focused subpackages — the same `lobes` / `flows`+`stages` / `tools` split the SDK itself uses:
+
+- **`coding_agent/agent.py`** — assembly: `INSTRUCTIONS`, `CodingPlugin` (its `install(setup)`
+  calls `add_lobe`/`add_stage`/`add_flow`/`add_tool`/`add_tool_filter`), and `build_coding_agent`.
+- **`coding_agent/lobes/`** — the coding disciplines as context workers, grouped by network
+  layer: `cognition.py` (`triage`, `explore`, `plan`, `implement`, `surveyor`) and
+  `expression.py` (`verify`, `summarize`, `documenter`).
+- **`coding_agent/flows/`** — `stages.py` (each stage = a lobe slice + tool allowlist + loop +
+  hop budget) and the intents (`feature` / `quick_fix` / `understand` / `question`) in `__init__.py`.
+- **`coding_agent/tools/`** — Claude Code's canonical `Read`/`Write`/`Edit`/`LS`/`Glob`/`Grep`/
+  `Bash` over a sandboxed `Workspace` (`workspace.py`), split into `fs.py` · `search.py` · `shell.py`.
+- **`coding_agent/repomap.py`** — a deterministic repo map injected into the prompt prefix so the
+  agent orients on the *real* tree instead of guessing a conventional layout.
 
 ## Run it
 
