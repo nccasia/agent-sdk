@@ -107,6 +107,12 @@ class Trace:
     # on_demand skills. Empty for the static default (byte-identical).
     tool_selection: list[dict] = field(default_factory=list)
     skill_selection: list[dict] = field(default_factory=list)
+    # Infrastructure-degradation markers (domain-free): a turn that refused or ran
+    # degraded because an upstream dependency was down (e.g. an index store, an MCP
+    # server) records an ALERTABLE marker here, so a wave of degraded turns is
+    # distinguishable from normal refusals. A host appends ``"<area>:<status>"``
+    # strings (e.g. ``"retrieval:no_readers"``). Empty on a healthy turn.
+    degraded: list[str] = field(default_factory=list)
 
     def timeline(self) -> list[dict]:
         """ReAct sub-steps across the run (thinking / tool_use / tool_result / answer)."""
@@ -131,6 +137,7 @@ class Trace:
             "attention": self.attention,
             "tool_selection": self.tool_selection,
             "skill_selection": self.skill_selection,
+            "degraded": self.degraded,
         }
 
 

@@ -608,6 +608,9 @@ class Engine:
         already_read: set[str] = set()
         turn_ctx.retrieved_chunks = retrieved_chunks
         turn_ctx.already_read = already_read
+        # Turn-level infra-degradation markers a host tool appends via current_turn().
+        degraded: list[str] = []
+        turn_ctx.degraded = degraded
 
         base_msgs = state.messages() + [{"role": "user", "content": query}]
         # ``share_history`` threads the running message + tool history across
@@ -759,6 +762,7 @@ class Engine:
             flow,
             usage_before,
             llm_calls,
+            degraded,
         )
         yield stamp(Final(result=result), trace_id)
 
@@ -1156,6 +1160,7 @@ class Engine:
         flow,
         usage_before,
         llm_calls,
+        degraded=None,
     ) -> AgentResult:
         after = self._usage_snapshot()
         diff = ProviderUsage(
@@ -1189,6 +1194,7 @@ class Engine:
             attention=_attention_rollup(flow_stages_trace),
             tool_selection=tool_selection,
             skill_selection=skill_selection,
+            degraded=list(degraded or []),
         )
         # Ground-or-refuse: a grounding flow with citations required but none found.
         if self.require_citations and flow.grounds and not citations:

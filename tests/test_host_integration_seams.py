@@ -75,6 +75,28 @@ async def test_evidence_channel_accumulates_across_hops():
     assert "c0" in kb.observed_already[1]
 
 
+async def test_degraded_markers_surface_on_trace():
+    """A host tool appends an infra-degradation marker via current_turn().degraded."""
+
+    class _DegradingRuntime:
+        def get_tool_specs(self):
+            return [{"name": "kb_search", "description": "d",
+                     "input_schema": {"type": "object", "properties": {}}}]
+
+        async def call_tool(self, name, inp, retrieved_chunks, already_read):
+            current_turn().degraded.append("retrieval:no_readers")
+            return "(no readers)"
+
+    agent = _agentic("kb_search", _DegradingRuntime(), client=FakeClient([
+        {"tools": [{"name": "kb_search", "input": {}}]}, "done",
+    ]))
+    res = await agent.query("go")
+    assert res.status == "answered"
+    assert "retrieval:no_readers" in res.trace.degraded
+    # and it round-trips in the persisted JSON
+    assert res.trace.to_json()["degraded"] == ["retrieval:no_readers"]
+
+
 async def test_evidence_pool_exposed_on_turn_context():
     """A grounding lobe/tool can read the accumulated pool via current_turn()."""
     seen: dict = {}

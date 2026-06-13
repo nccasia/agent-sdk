@@ -66,6 +66,10 @@ class TurnContext:
     # the pool via ``current_turn()``. Empty + ignored by tools that don't ground.
     retrieved_chunks: list[dict] = field(default_factory=list)
     already_read: set[str] = field(default_factory=set)
+    # Infrastructure-degradation markers for the turn (domain-free). A host tool /
+    # runtime appends ``"<area>:<status>"`` (e.g. ``"retrieval:no_readers"``) via
+    # ``current_turn().degraded``; the engine surfaces them on ``Trace.degraded``.
+    degraded: list[str] = field(default_factory=list)
 
 
 @dataclass
