@@ -87,9 +87,9 @@ and a `--inspect` routing probe.
 
 PreAct shapes acting *up front*: it decouples **what the agent thinks about** (the OY **context**
 axis — `lobes`) from **how it progresses** (the OX **time** axis — `stages` / `flows`), tunes each
-independently, and runs a **metacognition** layer over both. Each turn an intent is scored from
-**free signals** — *never an LLM judging the pipeline* — biasing the lobes and selecting the flow.
-New capability is a registry row, not an interpreter branch.
+independently, and runs a **metacognition** layer over both. Each turn an **intent** biases the
+lobes and selects the flow — recognized however you choose: fast deterministic signals, or an **LLM
+classifier** when you want richer routing. New capability is a registry row, not an interpreter branch.
 
 Concretely, a turn is a deterministic pipeline — recognize the intent, run that flow's stages, shape
 the reply — never a free tool loop:
