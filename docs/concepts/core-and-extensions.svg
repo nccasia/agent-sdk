@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 200" width="720" font-family="ui-monospace, 'Geist Mono', SFMono-Regular, Menlo, monospace">
+  <!-- backdrop -->
+  <rect x="0" y="0" width="720" height="200" fill="#FAFAF7"/>
+
+  <!-- title -->
+  <text x="20" y="28" font-size="13" fill="#0E0E0C" font-weight="600">an agent = core + the plugins you pick</text>
+
+  <!-- the agent -->
+  <rect x="20" y="84" width="118" height="56" rx="14" fill="#0E0E0C"/>
+  <text x="79" y="116" text-anchor="middle" font-size="11.5" fill="#FAFAF7" font-weight="600">PreactAgent</text>
+
+  <!-- = -->
+  <text x="152" y="120" text-anchor="middle" font-size="22" fill="#0E0E0C">=</text>
+
+  <!-- core block -->
+  <rect x="170" y="64" width="158" height="96" rx="12" fill="rgba(31,107,74,0.10)" stroke="#1F6B4A" stroke-width="1.5"/>
+  <text x="249" y="84" text-anchor="middle" font-size="12" fill="#1F6B4A" font-weight="600">Core</text>
+  <g font-size="9" fill="#1F6B4A" text-anchor="middle">
+    <rect x="180" y="92" width="44" height="18" rx="5" fill="#fff" stroke="#1F6B4A"/><text x="202" y="105">reason</text>
+    <rect x="228" y="92" width="42" height="18" rx="5" fill="#fff" stroke="#1F6B4A"/><text x="249" y="105">tools</text>
+    <rect x="274" y="92" width="44" height="18" rx="5" fill="#fff" stroke="#1F6B4A"/><text x="296" y="105">skills</text>
+    <rect x="196" y="114" width="50" height="18" rx="5" fill="#fff" stroke="#1F6B4A"/><text x="221" y="127">memory</text>
+    <rect x="250" y="114" width="44" height="18" rx="5" fill="#fff" stroke="#1F6B4A"/><text x="272" y="127">reply</text>
+  </g>
+  <text x="249" y="151" text-anchor="middle" font-size="8.5" fill="#1F6B4A" fill-opacity="0.6">always on</text>
+
+  <!-- + -->
+  <text x="348" y="120" text-anchor="middle" font-size="22" fill="#0E0E0C">+</text>
+
+  <!-- plugin chips -->
+  <g font-size="9.5" text-anchor="middle">
+    <rect x="368" y="74" width="76" height="28" rx="7" fill="#B8845B" stroke="#B8845B"/><text x="406" y="92" fill="#fff">Safety</text>
+    <rect x="450" y="74" width="76" height="28" rx="7" fill="#B8845B" stroke="#B8845B"/><text x="488" y="92" fill="#fff">Format</text>
+    <rect x="532" y="74" width="76" height="28" rx="7" fill="#fff" stroke="#B8845B"/><text x="570" y="92" fill="#7a583b">Task</text>
+    <rect x="614" y="74" width="76" height="28" rx="7" fill="#fff" stroke="#B8845B"/><text x="652" y="92" fill="#7a583b">MCP</text>
+
+    <rect x="368" y="110" width="76" height="28" rx="7" fill="#fff" stroke="#B8845B"/><text x="406" y="128" fill="#7a583b">Workspace</text>
+    <rect x="450" y="110" width="76" height="28" rx="7" fill="#fff" stroke="#B8845B"/><text x="488" y="128" fill="#7a583b">OTel</text>
+    <rect x="532" y="110" width="76" height="28" rx="7" fill="#fff" stroke="#B8845B"/><text x="570" y="128" fill="#7a583b">Guardrails</text>
+    <rect x="614" y="110" width="76" height="28" rx="7" fill="#fff" stroke="#B8845B"/><text x="652" y="128" fill="#7a583b">Triage</text>
+  </g>
+
+  <!-- legend -->
+  <g font-size="9" fill="#0E0E0C" fill-opacity="0.62" text-anchor="start">
+    <rect x="368" y="160" width="12" height="12" rx="3" fill="#B8845B" stroke="#B8845B"/><text x="385" y="170">on by default</text>
+    <rect x="470" y="160" width="12" height="12" rx="3" fill="#fff" stroke="#B8845B"/><text x="487" y="170">opt-in — add what you need</text>
+  </g>
+</svg>

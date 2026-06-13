@@ -6,6 +6,10 @@
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
 [![Status](https://img.shields.io/badge/status-beta-orange.svg)](#status)
 
+<p align="center">
+  <img src="docs/concepts/overview.svg" alt="Overview — you bring tools/instructions/memory/plugins; PreactAgent reasons in clear, inspectable steps (plan → act → answer, with metacognition watching); you get an answer plus a full trace; works with any LLM" width="720">
+</p>
+
 **agent-sdk** is a Python SDK for building AI agents whose **reasoning process you fully control** —
 the context, the prompt, the steps, the control flow, the durable state. Rather than free-acting
 turn by turn (vanilla ReAct, where the prompt accumulates toward its limit), an agent reasons
@@ -18,27 +22,17 @@ embeddings, stores, queues) sits behind a narrow protocol with an in-memory defa
 
 ## Why agent-sdk
 
-Built for developers who want **durable reasoning and fully customized agent behavior, controlled
-from the reasoning process itself** — not a prompt-and-pray wrapper.
+For developers who want durable reasoning and fully customized behavior — controlled from the
+reasoning process itself, not a prompt-and-pray wrapper.
 
-- **Pre-structured reasoning** — every turn runs a deliberate pipeline you can read, reorder, and
-  tune, instead of a turn-by-turn tool loop.
-- **Multi-stage reasoning** — a flow is an ordered sequence of stages (`plan → execute → deliver`),
-  each with its own prompt, context, loop mode, tools, and model. Optimize one step without touching
-  the rest.
-- **Context that funnels, not floods** — the prompt is re-tiered every hop (inject in full · hint +
-  fetch · offload) toward *useful reasoning per token*, not maximum context.
-- **Fully inspectable** — each turn emits a structured trace (path, flow, per-stage prompts, lobe
-  activations, tool calls, metacognition, token cost), renderable to a standalone HTML viewer. No
-  black boxes.
-- **Opt-in plugins** — package a whole capability (lobes, stages, flows, tools, even MCP servers) as
-  one plugin, then mount, disable, or replace it. The core ships domain-free.
-- **Durable, long-rail tasks** — a scoped `memory` tool (`turn → conversation → channel → user →
-  bot`) and a task mode that persists working state and resumes across runs.
-- **Provider-agnostic** — Anthropic, OpenAI-compatible, MiniMax, and a deterministic fake behind one
-  interface; the side-effect-free core ports cleanly to other languages.
-- **Benchmarkable** — live, ground-truth benchmarks (`taskbench`, `coding-agent-bench`) grade real
-  behavior against verifiable outcomes, not stubs.
+- **Pre-structured** — every turn runs a deliberate pipeline you read, reorder, and tune.
+- **Multi-stage** — a flow is an ordered sequence of stages, each with its own prompt, context, loop mode, tools, and model.
+- **Context that funnels, not floods** — the prompt is re-tiered every hop toward *useful reasoning per token*.
+- **Fully inspectable** — each turn emits a structured trace (path, prompts, activations, tools, cost) → HTML viewer.
+- **Opt-in plugins** — package a whole capability (lobes/stages/flows/tools/MCP) as one plugin; the core ships domain-free.
+- **Durable, long-rail tasks** — a scoped `memory` tool and a task mode that persists state across runs.
+- **Provider-agnostic** — Anthropic, OpenAI-compatible, MiniMax, and a deterministic fake behind one interface.
+- **Benchmarkable** — live, ground-truth benches grade real behavior against verifiable outcomes, not stubs.
 
 ## Install
 
@@ -91,22 +85,23 @@ and a `--inspect` routing probe.
   <img src="docs/concepts/the-model.svg" alt="The PreAct model — OY context (lobes) × OX time (stages), with metacognition above both" width="720">
 </p>
 
-Instead of free-acting turn by turn (and accumulating prompt toward the context limit), PreAct
-shapes acting *up front*: it decouples **what the agent thinks about** from **how it progresses**,
-tunes each independently, and runs a metacognition layer over both.
+PreAct shapes acting *up front*: it decouples **what the agent thinks about** (the OY **context**
+axis — `lobes`) from **how it progresses** (the OX **time** axis — `stages` / `flows`), tunes each
+independently, and runs a **metacognition** layer over both. Each turn an intent is scored from
+**free signals** — *never an LLM judging the pipeline* — biasing the lobes and selecting the flow.
+New capability is a registry row, not an interpreter branch.
 
-- **Context axis — `lobes`.** Small thinking units that select context and local behavior for a
-  slice of the turn; they never decide the whole plan.
-- **Time axis — `stages` / `flows`.** A flow is a named execution path; each step owns its lobe
-  slice, loop mode, and tool allowlist. *New capability is a registry row, not an interpreter branch.*
-- **Paths = intent.** Each turn an intent is scored from free signals — **never an LLM judging the
-  pipeline** — biasing the lobes and selecting the flow.
-- **Metacognition.** Always on (`monitor → regulate`): may adjust the lobe slice, retry, or skip a
-  step, but never lets the LLM judge the pipeline and never skips a pinned safety step (`cite` /
-  `filter`).
+Concretely, a turn is a deterministic pipeline — recognize the intent, run that flow's stages, shape
+the reply — never a free tool loop:
+
+<p align="center">
+  <img src="docs/concepts/turn-pipeline.svg" alt="A turn: query → recognize path → select flow → per-stage (context · metacognition · loop) → cite/filter/format → result" width="720">
+</p>
 
 The target is *useful reasoning per token*: context is re-tiered every hop (inject · hint + fetch ·
 offload), so the prompt funnels toward the answer instead of accumulating toward the limit.
+Metacognition (`monitor → regulate`) may adjust the lobe slice, retry, or skip a step — but never
+lets the LLM judge the pipeline, and never skips a pinned safety step (`cite` / `filter`).
 
 Deeper dives: [the OX/OY plane](./docs/concepts/architecture.md) ·
 [intent &amp; paths](./docs/concepts/intent-and-paths.md) ·
@@ -117,28 +112,18 @@ Deeper dives: [the OX/OY plane](./docs/concepts/architecture.md) ·
 
 ## Core vs. extensions
 
-The SDK draws a deliberate line between what *every* agent is and what you *add* to it.
+The SDK draws a deliberate line between what *every* agent is (the domain-free **core** in
+`agent_sdk/lobes/`, not toggleable) and what you *add* to it (folder-per-plugin **extensions** in
+`agent_sdk/plugins/`).
 
-- **Core (`agent_sdk/lobes/`)** — the lobes intrinsic to every PreAct agent: the **cognition**
-  reasoning spine (condense → scope → classify → plan → research → synthesize), **tools** (adaptive
-  exposure), **skills** (progressive disclosure), **memory** (recall), and the **reply** flow
-  (`respond`). Plus the lobe framework and path recognizers. These are not toggleable. *(Core is
-  domain-free — task execution, grounding, and styling are plugins.)*
-- **Extensions (`agent_sdk/plugins/`)** — pluggable, folder-per-plugin capabilities composed onto
-  the core:
-  - **default-on but toggleable:** `SafetyPlugin` (`cite` / `filter` grounding) and `FormatPlugin`
-    (channel / language / tone styling).
-  - **opt-in capabilities:** `TaskPlugin` (todo-driven multi-stage task execution — owns its lobe /
-    path / stages / `todos` tool, each independently tunable), `PluginMCP` (mount MCP servers),
-    `PluginWorkspace` (sandboxed filesystem), `PluginOTel` (OpenTelemetry), `PluginGuardrails`
-    (pre/post checks), and `PluginSupportTriage` (a worked example carrying one capability of every
-    kind).
+<p align="center">
+  <img src="docs/concepts/core-and-extensions.svg" alt="An agent = a domain-free core (reasoning spine, tools, skills, memory, reply) + the plugins you choose: default-on (Safety, Format) and opt-in (Task, MCP, Workspace, OTel, Guardrails, SupportTriage)" width="720">
+</p>
 
 A plugin contributes the **full capacity surface** — lobes, stages, paths/flows, skills, tools, and
-even its own **MCP servers** (connected + discovered at turn start, then registered like any tool).
-Manage them with a `PluginRegistry` (register / override / enable / disable) and pass it straight to
-`PreactAgent(plugins=…)`. An agent with no extra plugins is **byte-identical** to the default
-network. See [`docs/concepts/plugins.md`](./docs/concepts/plugins.md).
+even its own **MCP servers** (discovered at turn start, then registered like any tool). Manage them
+with a `PluginRegistry` (register / override / enable / disable); an agent with no extra plugins is
+**byte-identical** to the default network. See [`docs/concepts/plugins.md`](./docs/concepts/plugins.md).
 
 ```python
 from agent_sdk import PreactAgent
@@ -202,17 +187,16 @@ credentials, then e.g. `python benchmarks/extensionbench/run.py --live` (emits `
 - [`docs/porting.md`](./docs/porting.md) — Rust/Go/JS ports
 - [`docs/building-a-harness.md`](./docs/building-a-harness.md) — benches & evals
 
-For the deeper mental model, the concept docs go axis by axis:
-[`agent-core-overview.md`](./docs/concepts/agent-core-overview.md) (start here),
-[`architecture.md`](./docs/concepts/architecture.md) (the OX/OY plane),
-[`intent-and-paths.md`](./docs/concepts/intent-and-paths.md),
-[`reply-flow.md`](./docs/concepts/reply-flow.md) (collectors → response stage),
-[`plugins.md`](./docs/concepts/plugins.md) (core vs. extensions + MCP),
-[`react-context-management.md`](./docs/concepts/react-context-management.md) (PreAct),
-[`tool-use-at-scale.md`](./docs/concepts/tool-use-at-scale.md),
-[`context-memory.md`](./docs/concepts/context-memory.md),
-[`universal-memory.md`](./docs/concepts/universal-memory.md), and
-[`task-execution-mode.md`](./docs/concepts/task-execution-mode.md).
+**The mental model**, axis by axis (in [`docs/concepts/`](./docs/concepts/)) — start with
+[`agent-core-overview.md`](./docs/concepts/agent-core-overview.md), then
+[`architecture.md`](./docs/concepts/architecture.md) (OX/OY plane) ·
+[`intent-and-paths.md`](./docs/concepts/intent-and-paths.md) ·
+[`plugins.md`](./docs/concepts/plugins.md) (core vs. extensions) ·
+[`react-context-management.md`](./docs/concepts/react-context-management.md) (the funnel) ·
+[`universal-memory.md`](./docs/concepts/universal-memory.md) ·
+[`task-execution-mode.md`](./docs/concepts/task-execution-mode.md) ·
+[`reply-flow.md`](./docs/concepts/reply-flow.md) ·
+[`tool-use-at-scale.md`](./docs/concepts/tool-use-at-scale.md).
 
 ## Contributing
 

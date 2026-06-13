@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 290" width="720" font-family="ui-monospace, 'Geist Mono', SFMono-Regular, Menlo, monospace">
+  <defs>
+    <marker id="big" markerWidth="10" markerHeight="10" refX="3" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8Z" fill="#0E0E0C"/>
+    </marker>
+    <marker id="sm" markerWidth="8" markerHeight="8" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6Z" fill="#1F6B4A"/>
+    </marker>
+  </defs>
+
+  <!-- backdrop -->
+  <rect x="0" y="0" width="720" height="290" fill="#FAFAF7"/>
+
+  <!-- tagline -->
+  <text x="360" y="32" text-anchor="middle" font-size="14.5" fill="#0E0E0C" font-weight="600">an agent whose reasoning you fully control</text>
+
+  <!-- 1 · you bring -->
+  <rect x="24" y="64" width="176" height="158" rx="12" fill="#fff" stroke="#0E0E0C"/>
+  <text x="112" y="86" text-anchor="middle" font-size="11" fill="#0E0E0C" font-weight="600">you bring</text>
+  <g font-size="10" fill="#0E0E0C" text-anchor="middle">
+    <rect x="44" y="98" width="136" height="24" rx="6" fill="#fff" stroke="#0E0E0C"/><text x="112" y="114">tools</text>
+    <rect x="44" y="128" width="136" height="24" rx="6" fill="#fff" stroke="#0E0E0C"/><text x="112" y="144">instructions</text>
+    <rect x="44" y="158" width="136" height="24" rx="6" fill="#fff" stroke="#0E0E0C"/><text x="112" y="174">memory</text>
+    <rect x="44" y="188" width="136" height="24" rx="6" fill="#fff" stroke="#0E0E0C"/><text x="112" y="204">plugins</text>
+  </g>
+
+  <line x1="206" y1="143" x2="262" y2="143" stroke="#0E0E0C" stroke-width="2.4" marker-end="url(#big)"/>
+
+  <!-- 2 · the agent reasons -->
+  <rect x="268" y="52" width="204" height="182" rx="14" fill="rgba(31,107,74,0.07)" stroke="#1F6B4A" stroke-width="1.6"/>
+  <text x="370" y="78" text-anchor="middle" font-size="12.5" fill="#1F6B4A" font-weight="600">PreactAgent</text>
+
+  <!-- metacognition band -->
+  <rect x="286" y="92" width="168" height="20" rx="7" fill="rgba(184,132,91,0.10)" stroke="#B8845B" stroke-dasharray="5 4"/>
+  <text x="370" y="106" text-anchor="middle" font-size="9" fill="#8a5f3c" font-weight="600">metacognition watches</text>
+
+  <!-- mini pipeline: clear steps -->
+  <g font-size="9.5" fill="#1F6B4A" text-anchor="middle">
+    <rect x="286" y="132" width="50" height="24" rx="7" fill="#fff" stroke="#1F6B4A"/><text x="311" y="148">plan</text>
+    <line x1="336" y1="144" x2="350" y2="144" stroke="#1F6B4A" stroke-width="1.5" marker-end="url(#sm)"/>
+    <rect x="352" y="132" width="44" height="24" rx="7" fill="#fff" stroke="#1F6B4A"/><text x="374" y="148">act</text>
+    <line x1="396" y1="144" x2="410" y2="144" stroke="#1F6B4A" stroke-width="1.5" marker-end="url(#sm)"/>
+    <rect x="412" y="132" width="44" height="24" rx="7" fill="#1F6B4A" stroke="#1F6B4A"/><text x="434" y="148" fill="#fff">answer</text>
+  </g>
+  <text x="370" y="186" text-anchor="middle" font-size="9.5" fill="#1F6B4A">clear, inspectable steps —</text>
+  <text x="370" y="200" text-anchor="middle" font-size="9.5" fill="#1F6B4A">not a black box</text>
+
+  <line x1="478" y1="143" x2="534" y2="143" stroke="#0E0E0C" stroke-width="2.4" marker-end="url(#big)"/>
+
+  <!-- 3 · you get -->
+  <rect x="540" y="64" width="156" height="158" rx="12" fill="#fff" stroke="#0E0E0C"/>
+  <text x="618" y="86" text-anchor="middle" font-size="11" fill="#0E0E0C" font-weight="600">you get</text>
+  <rect x="560" y="100" width="116" height="30" rx="7" fill="#0E0E0C"/><text x="618" y="120" text-anchor="middle" font-size="11" fill="#FAFAF7" font-weight="600">answer</text>
+  <rect x="560" y="140" width="116" height="30" rx="7" fill="#fff" stroke="#0E0E0C"/><text x="618" y="160" text-anchor="middle" font-size="11" fill="#0E0E0C" font-weight="600">+ trace</text>
+  <text x="618" y="190" text-anchor="middle" font-size="9" fill="#0E0E0C" fill-opacity="0.65">see &amp; tune every step</text>
+
+  <!-- footer -->
+  <text x="360" y="270" text-anchor="middle" font-size="9.5" fill="#0E0E0C" fill-opacity="0.7">works with any LLM — Anthropic · OpenAI · MiniMax — deterministic core, in-memory by default</text>
+</svg>
