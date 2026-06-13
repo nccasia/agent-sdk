@@ -199,8 +199,18 @@ class PreactAgent:
         self._post_checks = list(setup.post_checks)
         self.workspace = setup.workspace
 
-        # Skills: builtin/explicit + plugin-contributed (Skill façade objects).
-        resolved_skills: list[Any] = list(skills or []) + list(setup.skills)
+        # Skills: builtin/explicit + plugin-contributed (Skill façade objects). An
+        # EXPLICIT skill overrides a plugin-contributed one of the same id (the host's
+        # DB/override layer wins) — dedup by id keeping the first (explicit) occurrence.
+        _seen_skill_ids: set[str] = set()
+        resolved_skills: list[Any] = []
+        for _sk in list(skills or []) + list(setup.skills):
+            _sid = getattr(_sk, "id", None)
+            if _sid is not None and _sid in _seen_skill_ids:
+                continue
+            if _sid is not None:
+                _seen_skill_ids.add(_sid)
+            resolved_skills.append(_sk)
 
         # Recognizer specs for plugin-contributed flows/paths. The default network
         # passes explicit ported recognizers (Engine then ignores flow-derived
