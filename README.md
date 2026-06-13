@@ -91,53 +91,29 @@ and a `--inspect` routing probe.
   <img src="docs/concepts/the-model.svg" alt="The PreAct model — OY context (lobes) × OX time (stages), with metacognition above both" width="720">
 </p>
 
-Vanilla ReAct lets the model free-act: it picks tool calls turn by turn and the prompt
-*accumulates* toward the context limit. PreAct shapes acting up front.
+Instead of free-acting turn by turn (and accumulating prompt toward the context limit), PreAct
+shapes acting *up front*: it decouples **what the agent thinks about** from **how it progresses**,
+tunes each independently, and runs a metacognition layer over both.
 
-**Two axes, plus a watcher.** PreAct decouples *what the agent thinks about* from *how it
-progresses*; both are tuned independently, and a metacognition layer watches the whole plane.
+- **Context axis — `lobes`.** Small thinking units that select context and local behavior for a
+  slice of the turn; they never decide the whole plan.
+- **Time axis — `stages` / `flows`.** A flow is a named execution path; each step owns its lobe
+  slice, loop mode, and tool allowlist. *New capability is a registry row, not an interpreter branch.*
+- **Paths = intent.** Each turn an intent is scored from free signals — **never an LLM judging the
+  pipeline** — biasing the lobes and selecting the flow.
+- **Metacognition.** Always on (`monitor → regulate`): may adjust the lobe slice, retry, or skip a
+  step, but never lets the LLM judge the pipeline and never skips a pinned safety step (`cite` /
+  `filter`).
 
-- **Context axis — `lobes`.** A lobe is a small thinking unit. It selects context and local
-  behavior for a slice of the turn and deliberately does **not** decide the whole execution plan.
-- **Time axis — `stages` / `flows`.** A `Flow` is a named execution path; each step owns its lobe
-  slice, loop mode (`none` / `single` / `agentic`), and tool allowlist. A new flow drops in without
-  rewriting any lobe — *new capability is a registry row, not an interpreter branch.*
+The target is *useful reasoning per token*: context is re-tiered every hop (inject · hint + fetch ·
+offload), so the prompt funnels toward the answer instead of accumulating toward the limit.
 
-**Paths = intent.** Every turn, the recognized intent is scored from free signals (lexical or
-structural) — **never an LLM judging the pipeline.** That path biases the lobes (context) and
-selects the flow (time) through a neutral blackboard. It is a dynamic per-turn guess, not a static
-router or hard-wired lane.
-
-**PreAct.** The optimization target is *useful reasoning per token*, not maximum context.
-Context is exposed by value and re-tiered every hop, so the prompt **funnels toward the answer
-instead of accumulating toward the limit.** Each candidate lands in one of three tiers — inject in
-full, expose as a hint the model can fetch via tool, or offload (large bodies live in the
-`Scratchpad`, re-fetchable on demand).
-
-**Memory: one tool, four scopes.** A single `memory` tool whose `scope` is the durability axis —
-`turn` (RAM, via `Scratchpad`) → `conversation` → `channel` → `user` → `bot`. Scope is resolved
-from injected identity, never trusted from the model, and an always-on memory index means most
-recalls need zero tool calls. *Memory is what the agent chose to remember; context variables are
-facts the engine recomputes every turn.*
-
-**Long-rail task execution (the opt-in `TaskPlugin`).** Todo-driven task execution is a *plugin*,
-not core: it owns the `todos` tool, the `plan → execute → deliver` stages, the render lobe, and the
-path recognizer. The agent plans a checklist, the engine's generic per-item `map` runs **each todo
-as its own scoped sub-execution** (its own prompt / tools / model — *optimize one step at a time*),
-and working state persists to scoped memory across fires (recall → advance → checkpoint → continue).
-Drop the plugin and every task factor is gone. It is a *tuned capability, not a second interpreter.*
-
-**Metacognition.** Always on: `monitor → regulate`. It observes object-level state and may
-`adjust_lobe_slice`, `retry_step`, or `skip_step` — but it **never lets the LLM judge the
-pipeline**, and it can **never skip a pinned safety step** (`cite` / `filter`): *ground-or-refuse
-is never a metacognition decision.*
-
-**Reply flow — collectors → a response stage.** Earlier stages gather (their output carries
-forward as compact *notes*); a dedicated, pinned `respond` lobe on the **terminal stage** renders
-the next message — *continuing* the conversation (never re-greeting) from what was gathered. Prior
-turns render as a trimmed transcript (primacy + recency), and context sections are **XML-tagged by
-default** (`<instructions>`/`<conversation>`/`<memory>`/…) — Claude parses XML-delimited context
-more reliably. See [`docs/concepts/reply-flow.md`](./docs/concepts/reply-flow.md).
+Deeper dives: [the OX/OY plane](./docs/concepts/architecture.md) ·
+[intent &amp; paths](./docs/concepts/intent-and-paths.md) ·
+[context management](./docs/concepts/react-context-management.md) ·
+[memory](./docs/concepts/universal-memory.md) ·
+[long-rail tasks](./docs/concepts/task-execution-mode.md) ·
+[reply flow](./docs/concepts/reply-flow.md).
 
 ## Core vs. extensions
 
