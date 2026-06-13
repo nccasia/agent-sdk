@@ -24,9 +24,9 @@ Every piece of information the agent touches is a MEMORY ENTRY:
 The prompt at any moment is a value-budgeted SELECTION over memory — never the whole of it.
 ```
 
-This is the same PreAct machinery from [ReAct Context Management](./react-context-management.md)
+This is the same PreAct machinery from [ReAct Context Management](./04-react-context-management.md)
 (CDS, the 3-tier router, per-hop tiering, compaction) — generalized from "context nodes" to **all
-information kinds**. [Tool Use at Scale](./tool-use-at-scale.md) is one application (the `tool_result`
+information kinds**. [Tool Use at Scale](./05-tool-use-at-scale.md) is one application (the `tool_result`
 kind).
 
 ## Memory as a thinking space
@@ -238,6 +238,35 @@ LONG-TERM  conversation · channel  session store    durable within a conversati
 Promotion is `long_term.remember(...)` of a flash entry that proved durable (a resolved fact, a
 concluded decision), consolidated against existing long-term entries (dedup/merge by key).
 
+## Scoped durable memory (the long-term scopes)
+
+The long-term tier is itself **scoped by who shares the fact** — the durability ladder, broad →
+specific:
+
+```txt
+  bot           everyone, everywhere        office holiday schedule, org-wide rules
+  user          one person, any channel     "write my reviews in Vietnamese"
+  channel       everyone in one room        "deploy freeze until Monday"
+  conversation  one thread only             a one-off passcode
+```
+
+One model-facing **`memory` tool** spans them — `save` (upsert in place, never a `_v2` duplicate) ·
+`forget` · `recall` (read a key, or list when a fact is over-budget). The agent picks a *scope* (a
+durability); it never resolves *whose* — that's the isolation guarantee:
+
+* **Scope refs are resolved host-side, never by the model.** The harness fills the ref from the turn's
+  injected identity (`user → user_id`, `channel → channel_id`, …). A turn can only read/write its own
+  identity's facts, so user A never sees user B's, and channel X's never leak into Y. A model that
+  invents an id is ignored. (This is the same server-side-ACL principle as retrieval.)
+* **Most-specific wins.** The always-on `## Memory` index renders `bot → user → channel → conversation`
+  (broad → specific) so the most specific fact sits nearest the question and wins on conflict.
+
+The **`## Memory` index** is the always-on Tier-2 surface over durable memory: one capped, newest-first
+line per entry, with values inlined under a token budget so most recalls need **zero tool calls** — the
+fact is already in the prompt; past the budget an entry degrades to a hint with a "recall to read" note.
+This is the [Discoverability](#discoverability--how-the-model-knows-what-it-stored) menu, applied to the
+durable scopes.
+
 ## Efficiency invariants
 
 ```txt
@@ -260,7 +289,7 @@ compaction + value pin (`react/funnel.py`), `DocWorkspace` slicing, durable `Mem
 `Scratchpad`, `ConversationProfile`.
 
 **Built first (the `tool_result` kind):** the result store + dense digest + `read_result`/`grep`/
-`read_section` read-back + engine wiring — see [Tool Use at Scale](./tool-use-at-scale.md). This is the
+`read_section` read-back + engine wiring — see [Tool Use at Scale](./05-tool-use-at-scale.md). This is the
 universal substrate landed for one kind, with the `MemoryEntry` shape and the `remember`/`recall`
 interface generalizing to the rest.
 
@@ -274,7 +303,7 @@ entries), `temp_file` (DocWorkspace-backed file entries), folding `Scratchpad`/`
 ## Benchmarking
 
 The `tool-use-bench` suite gates the `tool_result` slice (tail boundedness, digest fidelity, refetch,
-value pin, catalog leanness — see [Tool Use at Scale](./tool-use-at-scale.md)). As kinds are added, the
+value pin, catalog leanness — see [Tool Use at Scale](./05-tool-use-at-scale.md)). As kinds are added, the
 same harness gates them with the same metrics, because the storage/valuation/read-back is identical
 across kinds:
 
@@ -294,8 +323,8 @@ and pulls the detail back exactly when a step needs it.
 
 ## Related
 
-* [ReAct Context Management](./react-context-management.md) — the CDS / tier / funnel / compaction
+* [ReAct Context Management](./04-react-context-management.md) — the CDS / tier / funnel / compaction
   machinery this generalizes across kinds.
-* [Tool Use at Scale](./tool-use-at-scale.md) — the `tool_result` application (built first).
-* [Scoped Memory](./context-memory.md) — the durable-scope backend (`conversation`/`user`/`bot`).
-* [Task Execution Mode](./task-execution-mode.md) — long-rail work that produces many entries.
+* [Tool Use at Scale](./05-tool-use-at-scale.md) — the `tool_result` application (built first).
+* [Shared Context](./07-shared-context.md) — one handle every component uses to reach these scopes.
+* [Task Execution Mode](./13-task-execution-mode.md) — long-rail work that produces many entries.

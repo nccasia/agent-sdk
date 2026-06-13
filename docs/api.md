@@ -309,7 +309,7 @@ Skill(
 Skills are Standard Operating Procedures the agent runs: the `SKILL.md` standard, the
 folder/section/ToC chunking, the activation strategies, the skill lobe state machine, and
 how a skill's content is injected back into context — full reference in
-[`concepts/skills.md`](concepts/skills.md).
+[`concepts/09-skills.md`](concepts/09-skills.md).
 
 ### Tools — the `@tool` decorator
 
@@ -343,7 +343,7 @@ It may contribute the **full capacity surface** — lobes, stages, paths/flows, 
 — plus event hooks, guardrails, and seam bindings (like a filesystem). It's the single,
 composable extension mechanism: `plugins=[…]`. Enabled (present in the list) ⇒ its capabilities
 are registered/resolvable; absent or `enabled = False` ⇒ not. See the deep-dive at
-[`concepts/plugins.md`](concepts/plugins.md).
+[`concepts/10-plugins.md`](concepts/10-plugins.md).
 
 The **core** network (cognition, tools, skills, task, memory, reply) lives in `agent_sdk/lobes/`
 and is not a plugin. Plugins are the *extension* layer: two default-on but toggleable ones

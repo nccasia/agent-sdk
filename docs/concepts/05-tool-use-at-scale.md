@@ -2,7 +2,7 @@
 
 > The prompt holds the *gist*; the store holds the *detail*; a tool reads it back.
 
-This is the first application of [Universal Memory](./universal-memory.md): a tool result is one
+This is the first application of [Universal Memory](./06-universal-memory.md): a tool result is one
 **kind** of memory entry. The substrate built here (dense digest + offloaded body + read-back tool,
 selected by value) generalizes to every other kind (decisions, notes, temp files, context).
 
@@ -17,7 +17,7 @@ that scale:
 2. **Large single results.** One `read_file`/`grep`/`retrieve_kb` can return thousands of tokens. Even
    one such result, injected whole and carried forward, dominates the window.
 
-The objective is the same as [ReAct Context Management](./react-context-management.md) — *useful
+The objective is the same as [ReAct Context Management](./04-react-context-management.md) — *useful
 reasoning per token* — applied to the **tool-result lifecycle**. The principle:
 
 ```txt
@@ -238,9 +238,11 @@ it needs it.**
 
 ## Related
 
-* [ReAct Context Management](./react-context-management.md) — CDS, the 3-tier router, per-hop tiering,
+* [ReAct Context Management](./04-react-context-management.md) — CDS, the 3-tier router, per-hop tiering,
   compaction (this doc applies them to the tool-result lifecycle; it does not redefine them).
-* [Scoped Memory](./context-memory.md) — durable cross-turn facts; the result store is the in-turn,
+* [Scoped Memory](./06-universal-memory.md) — durable cross-turn facts; the result store is the in-turn,
   re-fetchable analogue for tool bodies.
-* [Task Execution Mode](./task-execution-mode.md) — long-rail execution that drives the high tool-call
+* [Task Execution Mode](./13-task-execution-mode.md) — long-rail execution that drives the high tool-call
   counts this design bounds.
+* [Subagent Fan-out](./12-subagent-fanout.md) — applies this compression across a worker *boundary*: a
+  subagent returns a memo, not its tool-result dump.

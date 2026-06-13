@@ -11,10 +11,9 @@
 > *Messy SOP in → reasoning-driving structure out.*
 
 This doc is the canonical reference for skills. It covers what exists today and, in the
-"implementation status" style of [`react-context-management.md`](./react-context-management.md),
-the forward-looking design. Sections scattered across [`api.md`](../api.md) (§ Skills),
-[`architecture.md`](./architecture.md), and [`agent-core-overview.md`](./agent-core-overview.md)
-should funnel here.
+"implementation status" style of [`react-context-management.md`](./04-react-context-management.md),
+the forward-looking design. Sections scattered across [`api.md`](../api.md) (§ Skills) and
+[`architecture.md`](./01-architecture.md) should funnel here.
 
 ---
 
@@ -61,7 +60,7 @@ Both — but cleanly split.
 The **subsystem is core**: the lobes, tools, and registry live in `agent_sdk/` and are
 always present (see [`api.md`](../api.md): "The **core** network … lives in
 `agent_sdk/lobes/` and is not a plugin"). **Individual skills are content** a plugin
-contributes (`AgentSetup.add_skill`, see [`plugins.md`](./plugins.md)) or that a
+contributes (`AgentSetup.add_skill`, see [`plugins.md`](./10-plugins.md)) or that a
 tenant/bot overlays from the DB.
 
 Layering rule — **later source wins by slug** (`SkillRegistry.from_rows`,
@@ -131,11 +130,11 @@ the module being core:
   (`SkillRegistry.from_rows`, later-wins-by-slug); a host passes DB-loaded skills in and they
   win over defaults of the same slug. The engine is untouched.
 - **Add a domain SOP** — a plugin may still *contribute content* via `setup.add_skill(...)`
-  ([`plugins.md`](./plugins.md)). It feeds the core registry; it does not replace it.
+  ([`plugins.md`](./10-plugins.md)). It feeds the core registry; it does not replace it.
 
 So: **machinery is a core, encapsulated, benchmark-gated module; the SOPs themselves are
 swappable content.** That split is what lets us test and improve the engine while bots
-freely customize their skills. ("Rows, not branches" — see [`architecture.md`](./architecture.md).)
+freely customize their skills. ("Rows, not branches" — see [`architecture.md`](./01-architecture.md).)
 
 ---
 
@@ -308,7 +307,7 @@ instruction-per-stage. `SkillRegistry.active_for_stage(policy, stage_id)` resolv
 
 The `checklist` materializes into `bot_task_todos` and is driven across **many continuation
 fires** by the `task_execute` flow + `task_execution` lobe — see
-[`task-execution-mode.md`](./task-execution-mode.md). Each step has its own
+[`task-execution-mode.md`](./13-task-execution-mode.md). Each step has its own
 `ask`/`title`/instruction. The `context_vars` (checklist / todos / notes) are the
 **per-skill durable workspace**, re-pinned every turn by the `skill_active` lobe and
 persisted under `skill:<id>:<key>` (`render_context_var`, `agent_sdk/skills.py:65`).
@@ -462,8 +461,8 @@ read), so it rides the same context-efficiency machinery as everything else — 
   older section survives a newer-but-off-goal one. Value beats recency.
 
 This maps onto the 3-tier exposure router from
-[`react-context-management.md`](./react-context-management.md) and
-[`tool-use-at-scale.md`](./tool-use-at-scale.md):
+[`react-context-management.md`](./04-react-context-management.md) and
+[`tool-use-at-scale.md`](./05-tool-use-at-scale.md):
 
 ```
 inject-full   high CDS, fits budget        — the live SOP step the model is executing
@@ -492,7 +491,7 @@ stay bounded — see [`agentbench`](../../benchmarks/agentbench/)).
 | Skill content overlay — v2 / DB skills override by slug (no engine change) | **Done** | `SkillRegistry.from_rows`, `agent.py:202-213` |
 | Benchmark-gated improve loop (skillbench activation/uplift; agentbench bounded-context) | **Done** | `benchmarks/skillbench`, `benchmarks/agentbench` |
 | Funnel tiering / compaction / CDS pinning of tool results | **Done** | `agent_sdk/react/funnel.py`, `engine.py` |
-| `checklist` → task rail across fires | **Partial** | `checklist` + `task_execute` exist; scratchpad landed Phase 1 ([`task-execution-mode.md`](./task-execution-mode.md)) |
+| `checklist` → task rail across fires | **Partial** | `checklist` + `task_execute` exist; scratchpad landed Phase 1 ([`task-execution-mode.md`](./13-task-execution-mode.md)) |
 | SOP compile — `CompiledSkill` (section tree + cached index/embeddings) | **Design** | §4a |
 | SOP standardization — prose → procedure graph (phases/steps/branches/checkpoints) | **Design** | §4a |
 | Per-step `instructions` on checklist entries (procedure phases) | **Design** | §4b |
@@ -503,12 +502,14 @@ stay bounded — see [`agentbench`](../../benchmarks/agentbench/)).
 ## 10. See also
 
 - [`api.md`](../api.md) — § Skills, § Tools, § Plugins (the public surface).
-- [`plugins.md`](./plugins.md) — how a plugin contributes skills (`add_skill`).
-- [`react-context-management.md`](./react-context-management.md) — the 3-tier exposure
+- [`reasoning-as-a-tool.md`](./08-reasoning-as-a-tool.md) — the mental model `ActivateSkill` instantiates:
+  a tool that reshapes the agent's own capability (skills are the capability family of reasoning tool).
+- [`plugins.md`](./10-plugins.md) — how a plugin contributes skills (`add_skill`).
+- [`react-context-management.md`](./04-react-context-management.md) — the 3-tier exposure
   router and CDS the injection mechanism (§8) builds on.
-- [`tool-use-at-scale.md`](./tool-use-at-scale.md) — tool-result lifecycle, read-back.
-- [`universal-memory.md`](./universal-memory.md) — the store skill bodies offload to.
-- [`task-execution-mode.md`](./task-execution-mode.md) — the rail that runs multi-stage SOPs.
-- [`intent-and-paths.md`](./intent-and-paths.md) — how a turn's intent biases which skills surface.
+- [`tool-use-at-scale.md`](./05-tool-use-at-scale.md) — tool-result lifecycle, read-back.
+- [`universal-memory.md`](./06-universal-memory.md) — the store skill bodies offload to.
+- [`task-execution-mode.md`](./13-task-execution-mode.md) — the rail that runs multi-stage SOPs.
+- [`intent-and-paths.md`](./02-intent-and-paths.md) — how a turn's intent biases which skills surface.
 - [`agentbench`](../../benchmarks/agentbench/) — the live bench gating bounded context.
 - [`skillbench`](../../../../benchmarks/skillbench/) — skill activation-recall gate.

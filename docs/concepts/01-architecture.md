@@ -26,7 +26,7 @@ state, then decides what the engine should think about next.
 > **Paths vs flows?** A *path* is the turn's recognized intent; it BIASES lobes
 > (OY) and SELECTS the flow (OX). For how recognition, flows, and lobes relate —
 > and why one intent's definition should live in one place — see
-> [`intent-and-paths.md`](./intent-and-paths.md).
+> [`intent-and-paths.md`](./02-intent-and-paths.md).
 
 ## Package layout: the `sdk/` leaf vs the project
 
@@ -159,7 +159,7 @@ the turn.
 Typical lobe examples:
 
 - `memory_recall`: durable memory context (scoped `context_entries` — see
-  [context-memory.md](./context-memory.md))
+  [universal-memory.md](./06-universal-memory.md))
 - `session_recall`: conversation/session context
 - `task_state`: task state and task-related prompt blocks
 - `skill_activate`: skill/tool guidance
@@ -274,6 +274,13 @@ The interpreter records meta decisions additively in trace payloads through
 `meta` and `meta_queue`. The `meta` payload includes the mode and whether the
 decision was applied. Disabled mode is a no-op and should not change legacy turn
 behavior.
+
+> **Direction — metacognition as a capacity module.** The above describes today's
+> kernel-baked, deterministic supervisor. [`metacognition.md`](./11-metacognition.md)
+> develops a forward model: repackage metacognition as a *plugin* contributing a
+> lobe + stage + tool, so the meta level becomes a faculty you can equip on any
+> agent or subagent (and can use LLM reasoning to reshape skills/flow/subagents),
+> while the object-level core stays deterministic.
 
 ## Execution Flow
 

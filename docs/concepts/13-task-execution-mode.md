@@ -28,7 +28,7 @@ This is the `task_execute` flow today (`[task_execute_advance, task_execute_form
 ## The execution turn on the OX/OY surface
 
 A task-execution turn is one point on the same OX/OY surface as an assist turn
-(see [architecture.md](./architecture.md)), entered when the interpreter sees the
+(see [architecture.md](./01-architecture.md)), entered when the interpreter sees the
 `[Scheduled task execution]` fired-prompt header (`fired_prompt` signal) and the
 `task_execute` path is recognized.
 
@@ -42,7 +42,7 @@ rather than a new subsystem:
 
 | Capability | Where it lives | What to build |
 |---|---|---|
-| **Self context-management** (note decisions / variables / intent; read back over a very long task without losing context) | the `memory` tool + `context_entries`, **`conversation` scope** ([context-memory.md](./context-memory.md)) | A task **scratchpad convention**: the `task_execution` lobe encourages `memory{save, scope:"conversation", key:"decision_*/var_*/intent", ttl_days:N}` during `advance`, and the `## Memory` index surfaces them on the next fire. The conversation scope is the natural task-instance bucket (one task ↔ one conversation_id). No new store. |
+| **Self context-management** (note decisions / variables / intent; read back over a very long task without losing context) | the `memory` tool + `context_entries`, **`conversation` scope** ([universal-memory.md](./06-universal-memory.md)) | A task **scratchpad convention**: the `task_execution` lobe encourages `memory{save, scope:"conversation", key:"decision_*/var_*/intent", ttl_days:N}` during `advance`, and the `## Memory` index surfaces them on the next fire. The conversation scope is the natural task-instance bucket (one task ↔ one conversation_id). No new store. |
 | **Long-rail plan / DSL** (a workflow translated into phrases that track on a long rail) | the `bot_task_todos` checklist + the rich `prompt` (Goal/Context/Steps/Output) | Treat the todo list as the **execution rail**: each step is a todo with `status` ∈ todo/doing/blocked/done. A small declarative step grammar (a "task DSL") compiles the prompt's Steps section into todos with `tool_hint`s, so the engine tracks position on the rail instead of re-reading free text each fire. |
 | **Per-step context awareness** | OX flow steps choose their OY lobe slice | `task_execute_advance` already scopes tools; extend so each rail step pulls only its relevant context node (its todo + the scratchpad keys it references), not the whole task. Metacognition's `adjust_lobe_slice` trims under pressure. |
 | **Unexpected defects / error handling** | run status state machine (`RUN_TRANSITIONS`) + todo `status="blocked"/"failed"` + metacognition | On a step error: mark the todo `blocked`/`failed` with `error`, write a scratchpad note, and let metacognition decide `retry_step` (bounded) vs escalate. The continuation loop re-fires; the next fire reads the failure note and changes direction. |
@@ -109,12 +109,14 @@ memo-shaped notes cross the boundary, honoring the compression invariant).
   `todoloop`'s cap check.
 - **Identity/ACL.** Fires inherit the creator's identity; the scratchpad's
   `scope_ref` is server-resolved from `conversation_id`. The model never supplies
-  identity (context-memory.md).
+  identity (universal-memory.md).
 
 ## Related
 
-- [architecture.md](./architecture.md) — OX/OY/metacognition the mode reuses.
-- [context-memory.md](./context-memory.md) — the scratchpad store + scopes.
+- [architecture.md](./01-architecture.md) — OX/OY/metacognition the mode reuses.
+- [universal-memory.md](./06-universal-memory.md) — the scratchpad store + scopes.
+- [subagent-fanout.md](./12-subagent-fanout.md) — the `loop="map"` fan-out the TodoRail drives, and the
+  subagent/compression model behind it.
 - `benchmarks/taskbench/` — execution gate (where each step above is measured).
 - `apps/worker-task/`, `apps/worker-local/` — the in-house and external executor
   tiers that run this flow off the assistant queue.
