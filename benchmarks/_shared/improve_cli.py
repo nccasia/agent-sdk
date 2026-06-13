@@ -50,6 +50,9 @@ def main() -> int:
     p = sub.add_parser("promote"); p.add_argument("bench_dir"); p.add_argument("--wave", required=True)
     p.add_argument("--after", required=True); p.add_argument("--label", required=True)
     p.add_argument("--model", default=""); p.add_argument("--note", default="")
+    p.add_argument("--kind", default="fix", choices=["fix", "harden", "dataset"])
+    p.add_argument("--scenarios-added", type=int, default=0)
+    p = sub.add_parser("count-scenarios"); p.add_argument("bench_dir")
     p = sub.add_parser("release"); p.add_argument("bench_dir"); p.add_argument("--label", required=True)
     a = ap.parse_args()
 
@@ -80,18 +83,37 @@ def main() -> int:
         print(json.dumps(decision, indent=2))
         return 0 if decision["kept"] else 1
 
+    if a.cmd == "count-scenarios":
+        ds = bench / "dataset"
+        n = sum(sum(1 for ln in f.read_text().splitlines() if ln.strip())
+                for f in ds.glob("*.jsonl")) if ds.is_dir() else 0
+        print(n)
+        return 0
+
     if a.cmd == "promote":
         after = _load(a.after)
         before = I.load_best(bench)
-        decision = I.delta_gate(before, after)
+        if a.kind == "dataset":
+            # Growing the bench RE-BASELINES the measurement surface — new scenarios that bite are
+            # the point, not a regression. Always keep the additions; reset best.json to the grown
+            # verdict so the next fix wave ratchets back up against the larger set.
+            decision = {"kept": True, "reason": f"dataset growth (+{a.scenarios_added} scenarios)",
+                        "before": I.verdict_summary(before) if before else None,
+                        "after": I.verdict_summary(after)}
+            I.write_best(bench, after, label=a.label, model=a.model)
+        else:
+            decision = I.delta_gate(before, after)
+            if decision["kept"]:
+                I.write_best(bench, after, label=a.label, model=a.model)
         wave_dir = I.improve_dir(bench) / a.wave
         wave_dir.mkdir(parents=True, exist_ok=True)
-        I.write_wave_decision(wave_dir, {"wave": a.wave, "note": a.note, **decision})
-        if decision["kept"]:
-            I.write_best(bench, after, label=a.label, model=a.model)
-        I.append_journal(bench, f"{a.wave}: {'kept' if decision['kept'] else 'reverted'} — {decision['reason']}"
-                                + (f" ({a.note})" if a.note else ""))
-        I.append_history(bench, {"wave": a.wave, "label": a.label, **decision})
+        rec = {"wave": a.wave, "kind": a.kind, "scenarios_added": a.scenarios_added,
+               "note": a.note, **decision}
+        I.write_wave_decision(wave_dir, rec)
+        I.append_journal(bench, f"{a.wave} [{a.kind}]: {'kept' if decision['kept'] else 'reverted'} — "
+                                f"{decision['reason']}" + (f" ({a.note})" if a.note else ""))
+        I.append_history(bench, {"wave": a.wave, "label": a.label, "kind": a.kind,
+                                 "scenarios_added": a.scenarios_added, **decision})
         print(json.dumps(decision, indent=2))
         return 0 if decision["kept"] else 1
 

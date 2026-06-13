@@ -33,12 +33,23 @@ run by default. No `@pytest.mark.asyncio` needed.
 
 Optional extras: `openai`, `redis`. Dev extra pulls `pytest`, `pytest-asyncio`, `fakeredis`.
 
-### Benchmarks are live-only
+### Benchmarks: live + free-deterministic
 
-`benchmarks/` (agentbench, taskbench, extensionbench, skillbench, coding-agent-bench) take **no LLM
-stubs** — a stubbed bench is an integration test and belongs in `tests/`. They require provider
-credentials and a `--live` flag, e.g. `python benchmarks/extensionbench/run.py --live` (emits
-`READY`/`NOT_READY`). The free deterministic gate is `bash benchmarks/ci-free-gates.sh`.
+**Live** (real provider, `--live`, no stubs): agentbench, taskbench, extensionbench, skillbench,
+coding-agent-bench, **toolbench** (its spec/select/composite tier is free; its `loop` mode is live).
+**Free / deterministic** (no provider — they read the engine's pure functions of `(spec, context)`):
+**corgictionbech** (metacognition), **flowbench** (flow axis), **attentionbench** (context axis).
+The free unit gate is `bash benchmarks/ci-free-gates.sh`; the full readiness sweep is
+`bash benchmarks/loop/ladder.sh` (the deterministic benches show READY even with no creds).
+
+This gives the optimize loop coverage of every core concept: tools, skills, tasks, plugins/MCP,
+flows (OX), lobes/attention (OY), metacognition, and the full agent (coding-agent-bench).
+
+**Porting monorepo benches:** `benchmarks/MIGRATION.md` tracks bringing the monorepo's SDK-conceptual
+benches onto the SDK surface, leaf-pure (toolbench/attentionbench/flowbench/corgictionbech → ported).
+The project-only ones (KB/funrag/crag, mello, admin, tasks, schedule, assistant) stay in the monorepo
+(they test the project engine). `toolbench` is the worked port reference; `_shared/TEMPLATE.md` +
+`_template/` + the `bench-scaffold` skill author new ones.
 
 ## The model (read before touching the pipeline)
 
@@ -132,40 +143,33 @@ Enforced by the test suite (`CONTRIBUTING.md`):
 
 ## Project skills (`.claude/skills/`)
 
-A benchmark-driven workflow suite operates this repo's live-only benches and the SDK's tuning
-surfaces. Invoke by name (`/preact-bench`, etc.); they compose, and share one knowledge base under
-`.claude/skills/preact-bench/reference/` (benches, the verdict model, the optimization surfaces +
-the five invariants):
+A benchmark-driven improvement system operates this repo's benches and the SDK's tuning surfaces.
+Invoke by name; they compose, share one knowledge base under `.claude/skills/preact-bench/reference/`,
+and are mapped in `.claude/skills/README.md` (the control-flow index). The control flow:
 
-- **`preact-bench`** — run a bench / the ladder and report a normalized verdict (the run+parse primitive).
-- **`bench-first-dev`** — red→green: write the failing bench scenario first, then the minimal fix.
-- **`optimize-verdict`** — the autonomous per-verdict loop: diagnose a failing gating check from the
-  probe trace → smallest legitimate fix (weight / registry row / plugin / prompt / skill content) →
-  re-run → invariants green → commit. Hard-stops rather than weakening a gate.
-- **`production-ready`** — orchestrator: full readiness matrix, then drive every NOT_READY/UNMEASURED
-  to READY via `optimize-verdict`, keeping all five invariants green (single drive-to-green pass).
-- **`bench-harden`** — the "improve the benchmark" half of the ratchet: add discriminating cases
-  (near-neighbor / refusal / adversarial / per-turn) so a green bench surfaces the next real gap.
-- **`improve-loop`** — the continuous feedback loop: sweep → analyze the trend → `optimize-verdict`
-  where failing, `bench-harden` where green, repeat. Drive hands-off with `/loop improve-loop`.
-- **`bench-scaffold`** — author a new benchmark from `benchmarks/_template/` to the standard
-  (`benchmarks/_shared/TEMPLATE.md`): a method/optimization approach (`METHOD.md`) + metrics/gates +
-  a live `run.py` emitting the verdict contract + the `improve/` ratchet. For "create many benchmarks".
-- **`workflow-improve`** — run the loop autonomously via Claude's **Workflow (workflow.js)** feature:
-  `Workflow({ name: "improve-loop", args: { bench, waves, model } })` drives diagnose → implement →
-  re-bench → keep-or-revert per wave, committing kept waves.
+- **`optimize-bench`** (flagship) — `/optimize-bench <name>` runs the **comprehensive per-bench loop**
+  via `.claude/workflows/optimize-bench.js`: each round does baseline (free + live) → **grow scenarios
+  (realistic + adversarial)** → diagnose → smallest legitimate SDK fix → re-bench → ratchet
+  (keep/revert, commit), until the bench converges.
+- **`optimize-suite`** — `/optimize-suite` runs that loop across the whole suite
+  (`.claude/workflows/optimize-suite.js`): matrix → per-bench `optimize-bench` → regression recheck.
+- **`production-ready`** — terminal goal: drive every bench to READY (delegates to `optimize-suite`).
+- **`preact-bench`** — run a bench / the free gate and report a normalized verdict (the run+parse primitive).
+- **`optimize-verdict`** — the hands-on single-pass fixer (diagnose → smallest fix → re-run → commit).
+- **`bench-harden`** — the Grow-phase doer: add realistic + adversarial scenarios (per
+  `optimize-bench/reference/scenario-templates.md`).
+- **`bench-first-dev`** — red→green a specific behavior; **`bench-scaffold`** — author a new bench.
 
 ### Feedback-loop infrastructure (`benchmarks/`)
-- `benchmarks/loop/` — `ladder.sh` sweeps the ladder; `snapshot.py` writes the readiness matrix + the
-  append-only trend (`history.jsonl`).
 - `benchmarks/_shared/improve.py` + `improve_cli.py` — the **moving-baseline ratchet** (best.json +
-  append-only `wave-NNN/` + journal + history + `releases/`/`SOTA.json`), generalized over the
-  `compose_verdict` shape. The keep/revert decision is deterministic (status rank + passing-gate
-  count), never model-judged.
-- `benchmarks/_shared/TEMPLATE.md` + `benchmarks/_template/` — the benchmark standard + scaffold.
-- `.claude/workflows/improve-loop.js` — the Workflow-tool driver of the wave loop.
+  append-only `wave-NNN/` + journal + history + `releases/`/`SOTA.json`). Keep/revert is deterministic
+  (status rank + passing-gate count), never model-judged; `--kind dataset` re-baselines on scenario growth.
+- `benchmarks/loop/` — `ladder.sh` sweeps the suite; `snapshot.py` writes the readiness matrix + trend.
+- `benchmarks/_shared/TEMPLATE.md` + `benchmarks/_template/` — the benchmark standard + scaffold;
+  `benchmarks/README.md` — the suite map; `benchmarks/MIGRATION.md` — the monorepo port tracker.
+- `.claude/workflows/{optimize-bench,optimize-suite}.js` — the Workflow-tool drivers.
 
-`.claude/settings.json` allowlists the read-only bench/test/loop/ratchet commands these skills run.
+`.claude/settings.json` allowlists the bench/test/ratchet/git commands these skills + workflows run.
 
 ## Conventions
 

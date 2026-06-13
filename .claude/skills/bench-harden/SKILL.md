@@ -1,14 +1,17 @@
 ---
 name: bench-harden
-description: Harden a PreAct agent-sdk benchmark so it discriminates — add near-neighbor, refusal, adversarial, and per-turn scenarios (and tighten thresholds only where justified) to expose the next real SDK gap. The "improve the benchmark" half of the improve-loop ratchet. Use when a bench is READY/all-green and you want it to keep finding gaps, when the user says "make the benchmark harder", "the bench is too easy", "improve the bench coverage", or "raise the bar".
+description: Grow a PreAct agent-sdk benchmark with more data scenarios — realistic (representative in-domain) AND adversarial (near-neighbor, refusal, edge, per-turn) cases that expose the next real SDK gap. The "add more data scenarios" doer behind the optimize-bench Grow phase. Use when adding scenarios to a bench, when the user says "grow the bench", "add more scenarios", "make the benchmark harder", "the bench is too easy", "improve the bench coverage", or "raise the bar".
 ---
 
-# bench-harden — make the bench discriminate again
+# bench-harden — grow the bench with realistic + adversarial scenarios
 
-A bench that never fails proves nothing. When a bench is READY, the next move in the loop is to make
-it *harder* until it surfaces a real gap — then `optimize-verdict` closes that gap, and the ratchet
-turns once more. This is the **opposite** of weakening a bench to pass: you add fair, real cases the
-SDK *should* handle and may not.
+A bench that never fails proves nothing, and a bench that only tests easy cases isn't realistic. So the
+"add more data scenarios" move grows a bench two ways every round: **realistic** cases (representative
+in-domain queries it doesn't cover) and **adversarial** cases (near-neighbor, refusal/out-of-scope,
+edge, per-turn) that surface the next gap — which the SDK-fix phase then closes, and the ratchet turns
+again. This is the Grow phase the `optimize-bench` loop runs; the concrete per-bench scenario surfaces
++ schemas + category templates live in `../optimize-bench/reference/scenario-templates.md`. This is the
+**opposite** of weakening a bench to pass: you add fair, real cases the SDK *should* handle and may not.
 
 `benchmarks/skillbench/ANALYSIS.md` is the worked playbook for this (it flipped skillbench
 READY→NOT_READY by hardening the dataset, exposing the real refusal-path defect). Read it first when

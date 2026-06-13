@@ -16,10 +16,22 @@
       "Bash(python benchmarks/agentbench/run.py:*)",
       "Bash(python benchmarks/extensionbench/run.py:*)",
       "Bash(python benchmarks/coding-agent-bench/run.py:*)",
+      "Bash(python benchmarks/toolbench/run.py:*)",
+      "Bash(python3 benchmarks/toolbench/run.py:*)",
+      "Bash(python benchmarks/corgictionbech/run.py:*)",
+      "Bash(python3 benchmarks/corgictionbech/run.py:*)",
+      "Bash(python benchmarks/flowbench/run.py:*)",
+      "Bash(python3 benchmarks/flowbench/run.py:*)",
+      "Bash(python benchmarks/attentionbench/run.py:*)",
+      "Bash(python3 benchmarks/attentionbench/run.py:*)",
       "Bash(python benchmarks/skillbench/compare.py:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git restore:*)",
+      "Bash(git checkout --:*)"
     ]
   }
 }

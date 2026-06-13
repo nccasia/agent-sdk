@@ -1,17 +1,19 @@
 ---
 name: production-ready
-description: Autonomously drive the whole PreAct agent-sdk to production readiness — run the full benchmark ladder, build a readiness matrix across all five live benches, then drive every NOT_READY/UNMEASURED verdict to READY via the optimize-verdict loop while keeping the five invariants green, committing per fix. Use when the user says "make the SDK production ready", "get everything to READY", "ship it", "run the full readiness pass", or wants an end-to-end autonomous hardening of the SDK.
+description: Autonomously drive the whole PreAct agent-sdk to production readiness — build a readiness matrix across the benchmark suite, then drive every NOT_READY/UNMEASURED verdict to READY (via the optimize-suite / optimize-bench loop) while keeping the five invariants green, committing per fix. Use when the user says "make the SDK production ready", "get everything to READY", "ship it", "run the full readiness pass", or wants an end-to-end autonomous hardening of the SDK.
 ---
 
 # production-ready — drive the SDK to all-green, autonomously
 
-The terminal orchestrator. It establishes the readiness picture, then closes every gap by delegating
-to **optimize-verdict**, enforcing the invariants between every change, and finishing with a clean
-summary and history. Fully autonomous, hard-gated: it never weakens a gate, branches the interpreter,
-stubs a bench, or breaks an invariant — it stops and reports instead.
+The terminal **goal** orchestrator: get every bench to READY and keep it there. Establish the readiness
+picture, then close every gap by running the comprehensive **`optimize-suite`** driver (which runs the
+per-bench **`optimize-bench`** loop on each bench), enforcing the invariants between every change, and
+finishing with a clean summary + history. Fully autonomous, hard-gated: it never weakens a gate,
+branches the interpreter, stubs a bench, or breaks an invariant — it stops and reports instead.
 
-Builds on **preact-bench** (run/parse), **optimize-verdict** (per-verdict loop), and the shared
-references under `../preact-bench/reference/`.
+Where `optimize-suite` is "make every bench better" (grow + fix, open-ended), `production-ready` is the
+**terminal target** "everything READY, shipped." It builds on **preact-bench** (run/parse), the
+**optimize-suite**/**optimize-bench** loop, and the shared references under `../preact-bench/reference/`.
 
 ## Phase 0 — preconditions
 - Confirm a clean-ish working tree (`git status`); note the starting commit so the whole pass is
