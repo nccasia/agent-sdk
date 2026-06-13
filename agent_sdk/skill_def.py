@@ -17,6 +17,7 @@ this turn. It compiles to the ported :class:`SkillPack` the runtime consumes.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
+from typing import Any
 
 from agent_sdk.signals import compile_signal
 from agent_sdk.skills import SkillPack
@@ -37,6 +38,8 @@ class Skill:
         name: str = "",
         description: str = "",
         stages: Sequence[str] = (),
+        checklist: Sequence[Mapping[str, Any]] = (),
+        context_vars: Sequence[Mapping[str, Any]] = (),
         signal: Callable[[dict], float] | dict | float | None = None,
     ):
         if disclosure not in ("eager", "on_demand"):
@@ -50,6 +53,10 @@ class Skill:
         self.name = name or id
         self.description = description or when
         self.stages = tuple(stages)
+        # Declarative wizard steps + skill-scoped workspace state (checklist/todos/
+        # notes/var). Carried through to the SkillPack the skill_active lobe drives.
+        self.checklist = tuple(dict(c) for c in checklist)
+        self.context_vars = tuple(dict(v) for v in context_vars)
         if signal is None:
             self._signal_fn: Callable[[dict], float] | None = None
         elif callable(signal):
@@ -72,6 +79,8 @@ class Skill:
             required_tools=self.tools,
             injection=self.disclosure,
             files=self.files,
+            checklist=self.checklist,
+            context_vars=self.context_vars,
         )
 
     def __repr__(self) -> str:  # pragma: no cover - cosmetic

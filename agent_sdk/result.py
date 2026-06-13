@@ -100,6 +100,13 @@ class Trace:
     # input tokens + per-hop funnel-tail series. Empty when no node-emitting lobe
     # fires (default network) — strictly additive to the trace schema.
     attention: dict = field(default_factory=dict)
+    # First-class adaptive-exposure telemetry, projected from the per-stage traces
+    # (a clean host projection, no metadata digging). ``tool_selection``: one
+    # ``{stage, kept, hinted, dropped}`` per stage that ran adaptive tool routing;
+    # ``skill_selection``: one ``{stage, ranking:[…]}`` per stage that surfaced
+    # on_demand skills. Empty for the static default (byte-identical).
+    tool_selection: list[dict] = field(default_factory=list)
+    skill_selection: list[dict] = field(default_factory=list)
 
     def timeline(self) -> list[dict]:
         """ReAct sub-steps across the run (thinking / tool_use / tool_result / answer)."""
@@ -122,6 +129,8 @@ class Trace:
             "meta_actions": self.meta_actions,
             "llm_calls": self.llm_calls,
             "attention": self.attention,
+            "tool_selection": self.tool_selection,
+            "skill_selection": self.skill_selection,
         }
 
 

@@ -14,6 +14,7 @@ from agent_sdk.memory.durable import (
     MemoryToolRuntime,
 )
 from agent_sdk.memory.scratchpad import Scratchpad
+from agent_sdk.memory.semantic_cache import SemanticCache
 
 __all__ = [
     "Scratchpad",
@@ -21,4 +22,5 @@ __all__ = [
     "MemoryItem",
     "MemoryToolRuntime",
     "DEFAULT_SCOPES",
+    "SemanticCache",
 ]

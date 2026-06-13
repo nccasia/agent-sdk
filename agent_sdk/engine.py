@@ -229,6 +229,8 @@ class Engine:
         tz: str = "UTC",
         lang: str = "en",
         prompt_format: str = "xml",
+        context: Any = None,
+        pre_turn_gate: Any = None,
         max_hops: int = 6,
         default_max_tokens: int = 4096,  # thinking models burn >1k on reasoning before a tool call
     ):
@@ -276,6 +278,18 @@ class Engine:
         self.tz = tz
         self.lang = lang
         self.prompt_format = prompt_format  # "xml" (default, Claude-Code-style) | "markdown"
+        # Opaque host context bag (identity/principal/tenant/channel) folded into
+        # the per-turn snapshot so it lands on every ``TurnContext.identity`` /
+        # ``.channel``. The engine never inspects it — a host ToolRuntime / lobe /
+        # tool_filter reads ``current_turn().identity`` for ACL etc. A prefetch
+        # hook may still override a key. None ⇒ unchanged (empty identity/channel).
+        self.context = dict(context) if context else {}
+        # Pre-turn gate (host seam): a callable ``(query, state) -> AgentResult |
+        # None`` (sync or async) run BEFORE any reasoning. A non-None result ends
+        # the turn immediately (a golden-answer cache hit or a refusal-rule match);
+        # None proceeds. The host closure carries whatever it needs (identity/ACL
+        # cohort via ``self.context``, golden head, refusal rules). None ⇒ no gate.
+        self._pre_turn_gate = pre_turn_gate
         self.max_hops = max_hops
         self.default_max_tokens = default_max_tokens
         # Explicit ported PathSpec recognizers (production network) take
@@ -400,7 +414,8 @@ class Engine:
     def _compose_system_segmented(
         self, stage: Stage, ctx: dict, state: SessionState, notes: list[str],
         turn_ctx: Any = None, attn_out: dict | None = None,
-        tool_specs: list[dict] | None = None, *, is_last: bool = False,
+        tool_specs: list[dict] | None = None, skill_sel_out: list | None = None,
+        *, is_last: bool = False,
     ) -> tuple[str, list[dict]]:
         """Compose the stage system prompt AND its provenance segments.
 
@@ -462,7 +477,8 @@ class Engine:
             if tools_block:
                 parts.append(("tools", tools_block, "slow"))
         skill_block = build_skill_prompt_block(
-            self.skill_registry, self._policy(), stage.id, query=ctx.get("query")
+            self.skill_registry, self._policy(), stage.id, query=ctx.get("query"),
+            ranking_out=skill_sel_out,
         )
         if skill_block:
             parts.append(("skills", skill_block, "slow"))
@@ -536,6 +552,18 @@ class Engine:
             self.memory_store.reset_flash()
         yield stamp(RunStart(), trace_id)
 
+        # Pre-turn gate: a host short-circuit before any reasoning (golden-cache
+        # hit / refusal-rule match). A returned AgentResult ends the turn; None
+        # proceeds. Keeps the gate's host coupling (golden head, ACL-keyed cache)
+        # OUT of the engine — it's an opaque callable.
+        if self._pre_turn_gate is not None:
+            gated = self._pre_turn_gate(query, state)
+            if hasattr(gated, "__await__"):
+                gated = await gated
+            if gated is not None:
+                yield stamp(Final(result=gated), trace_id)
+                return
+
         ctx = self.build_context(query, state)
         weights = merge_lobe_weights({}, self.weights)
         resolution = propagate(
@@ -557,6 +585,10 @@ class Engine:
 
         scratchpad = Scratchpad()
         snapshot = await self._prefetch(query, state)
+        # Fold the static host context bag in as the base (identity/channel/…); a
+        # prefetch hook that set the same key wins (host can override per turn).
+        if self.context:
+            snapshot = {**self.context, **snapshot}
         for hook in self._turn_hooks:
             with contextlib.suppress(Exception):
                 hook(scratchpad)
@@ -567,6 +599,15 @@ class Engine:
         )
         # Expose the turn to tools/runtimes that opt into turn state (generic seam).
         _TURN.set(turn_ctx)
+
+        # The turn's shared evidence channel — one pool threaded into every
+        # ``call_tool`` so a KB-style runtime accumulates the chunks it retrieves
+        # (and dedupes via ``already_read``) across stages/hops, and a grounding
+        # lobe reads them via ``current_turn()``. Empty/ignored without KB tools.
+        retrieved_chunks: list[dict] = []
+        already_read: set[str] = set()
+        turn_ctx.retrieved_chunks = retrieved_chunks
+        turn_ctx.already_read = already_read
 
         base_msgs = state.messages() + [{"role": "user", "content": query}]
         # ``share_history`` threads the running message + tool history across
@@ -607,9 +648,10 @@ class Engine:
             # (cache-stable across hops); default is the full static set.
             sel_specs, tool_sel = self._select_tools(stage, ctx.get("query", ""))
             attn_trace: dict = {}
+            skill_sel: list[dict] = []
             system, system_segments = self._compose_system_segmented(
                 stage, ctx, state, notes, turn_ctx, attn_out=attn_trace,
-                tool_specs=sel_specs, is_last=is_last_stage,
+                tool_specs=sel_specs, skill_sel_out=skill_sel, is_last=is_last_stage,
             )
             steps: list[dict] = []
             stage_text = ""
@@ -648,9 +690,13 @@ class Engine:
                     gen = self._map_stage(
                         stage, system, stage_msgs, trace_id, steps, holder,
                         ctx=ctx, state=state, notes=notes, turn_ctx=turn_ctx, sel_specs=sel_specs,
+                        retrieved_chunks=retrieved_chunks, already_read=already_read,
                     )
                 else:
-                    gen = self._agentic(stage, system, stage_msgs, trace_id, steps, holder, specs=sel_specs)
+                    gen = self._agentic(
+                        stage, system, stage_msgs, trace_id, steps, holder, specs=sel_specs,
+                        retrieved_chunks=retrieved_chunks, already_read=already_read,
+                    )
                 async for ev in gen:
                     yield ev
                 llm_calls.extend(holder["llm_calls"])
@@ -695,6 +741,7 @@ class Engine:
                             (stage_holder or {}).get("funnel_obs_chars", [])
                         ),
                         "tool_selection": tool_sel,
+                        "skill_selection": skill_sel,
                     },
                     "attention": attn_trace,
                 }
@@ -796,8 +843,18 @@ class Engine:
         steps: list[dict],
         holder: dict,
         specs: list[dict] | None = None,
+        *,
+        retrieved_chunks: list[dict] | None = None,
+        already_read: set[str] | None = None,
     ) -> AsyncIterator[Any]:
         specs = self._tool_specs(stage) if specs is None else specs
+        # The turn's evidence channel (shared by the caller across stages/hops).
+        # Default to fresh per-call containers so a direct ``_agentic`` call (tests)
+        # still works; the engine passes the turn's pool so evidence accumulates.
+        if retrieved_chunks is None:
+            retrieved_chunks = []
+        if already_read is None:
+            already_read = set()
         max_hops = stage.hops or self.max_hops
         # No-progress / repetition break (opt-in). When set, a run of `patience`
         # consecutive hops whose every tool call repeats an already-seen
@@ -878,7 +935,9 @@ class Engine:
                         out = self._run_tool_filters(stage.id, name, inp)
                         if out is None:
                             out = (
-                                await self.tools.call_tool(name, inp, [], set())
+                                await self.tools.call_tool(
+                                    name, inp, retrieved_chunks, already_read
+                                )
                                 if self.tools
                                 else "(no tools)"
                             )
@@ -995,6 +1054,8 @@ class Engine:
         self, stage: Stage, system: str, msgs: list[dict], trace_id: str,
         steps: list[dict], holder: dict, *, ctx: dict, state: SessionState,
         notes: list[str], turn_ctx: Any, sel_specs: list[dict] | None,
+        retrieved_chunks: list[dict] | None = None,
+        already_read: set[str] | None = None,
     ) -> AsyncIterator[Any]:
         """Generic fan-out (``loop="map"``): run one bounded, SCOPED ``_agentic``
         sub-execution per work-item in ``scratchpad[fanout_key]`` (a list the producing
@@ -1006,7 +1067,10 @@ class Engine:
         sp = getattr(turn_ctx, "scratchpad", None)
         items = sp.as_list(stage.fanout_key) if (sp is not None and stage.fanout_key) else []
         if not items:
-            async for ev in self._agentic(stage, system, msgs, trace_id, steps, holder, specs=sel_specs):
+            async for ev in self._agentic(
+                stage, system, msgs, trace_id, steps, holder, specs=sel_specs,
+                retrieved_chunks=retrieved_chunks, already_read=already_read,
+            ):
                 yield ev
             return
 
@@ -1035,7 +1099,10 @@ class Engine:
                                    "content": f"Sub-task ({label}): {item.get('input') or label}"}]
             th: dict[str, Any] = {"text": "", "tool_calls": [], "citations": [],
                                   "llm_calls": [], "funnel_obs_chars": []}
-            async for ev in self._agentic(scoped, isys, imsgs, trace_id, steps, th, specs=item_specs):
+            async for ev in self._agentic(
+                scoped, isys, imsgs, trace_id, steps, th, specs=item_specs,
+                retrieved_chunks=retrieved_chunks, already_read=already_read,
+            ):
                 yield ev
             res = th.get("text", "")
             results.append({"label": label, "result": res})
@@ -1098,6 +1165,18 @@ class Engine:
             cache_write_tokens=after.cache_write_tokens - usage_before.cache_write_tokens,
         )
         usage = Usage.from_provider(diff)
+        # Project the per-stage adaptive-exposure records to first-class trace
+        # fields (host reads trace.tool_selection / .skill_selection directly).
+        tool_selection = [
+            {"stage": s.get("stage"), **sel}
+            for s in flow_stages_trace
+            if (sel := (s.get("metadata") or {}).get("tool_selection"))
+        ]
+        skill_selection = [
+            {"stage": s.get("stage"), "ranking": sel}
+            for s in flow_stages_trace
+            if (sel := (s.get("metadata") or {}).get("skill_selection"))
+        ]
         trace = Trace(
             trace_id=trace_id,
             path=path,
@@ -1108,6 +1187,8 @@ class Engine:
             meta_actions=meta_actions,
             llm_calls=llm_calls,
             attention=_attention_rollup(flow_stages_trace),
+            tool_selection=tool_selection,
+            skill_selection=skill_selection,
         )
         # Ground-or-refuse: a grounding flow with citations required but none found.
         if self.require_citations and flow.grounds and not citations:

@@ -35,6 +35,13 @@ class PreactSpec:
     skills: list[dict] = field(default_factory=list)
     weights: dict = field(default_factory=dict)
     budgets: dict = field(default_factory=dict)
+    # Named authoring aliases (1:1 with a Mezon BotPolicy). ``weights``/``budgets``
+    # stay the canonical surface the engine consumes and what ``build_spec``
+    # captures; a host hand-authoring a spec from a BotPolicy may instead set these
+    # named fields and ``agent_from_spec`` folds them into weights/budgets. Empty by
+    # default ⇒ no effect (the generic surface already round-trips).
+    flow_lobe_weights: dict = field(default_factory=dict)
+    flow_layer_budgets: dict = field(default_factory=dict)
     pinned_lobes: list[str] = field(default_factory=lambda: sorted(PINNED_LOBES))
     require_citations: bool = False
     tz: str = "UTC"
@@ -127,6 +134,8 @@ def _skill_row(pack: Any) -> dict:
         "tools": list(pack.required_tools),
         "disclosure": pack.injection,
         "files": dict(pack.files),
+        "checklist": [dict(c) for c in getattr(pack, "checklist", ())],
+        "context_vars": [dict(v) for v in getattr(pack, "context_vars", ())],
     }
 
 
@@ -221,9 +230,15 @@ def agent_from_spec(
             name=r.get("name", ""),
             description=r.get("description", ""),
             stages=r.get("stages", []),
+            checklist=r.get("checklist", []),
+            context_vars=r.get("context_vars", []),
         )
         for r in spec.skills
     ]
+    # Fold the named authoring aliases into the canonical surfaces (the named
+    # fields win a key collision — they are the explicit BotPolicy intent).
+    weights = {**spec.weights, **(spec.flow_lobe_weights or {})}
+    budgets = {**spec.budgets, **(spec.flow_layer_budgets or {})}
     kwargs = dict(
         client=client,
         instructions=spec.instructions,
@@ -232,8 +247,8 @@ def agent_from_spec(
         flows=flows,
         skills=skills or None,
         tools=tools,
-        weights=spec.weights,
-        budgets=spec.budgets,
+        weights=weights,
+        budgets=budgets,
         require_citations=spec.require_citations,
         tz=spec.tz,
         lang=spec.lang,

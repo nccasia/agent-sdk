@@ -58,6 +58,14 @@ class TurnContext:
     memory_items: Sequence[Mapping[str, Any]] = ()
     task_items: Sequence[Mapping[str, Any]] = ()
     catalog_items: Sequence[Mapping[str, Any]] = ()
+    # The turn's shared evidence channel: a KB-style ToolRuntime appends the
+    # source chunks it retrieved to ``retrieved_chunks`` and records the chunk
+    # ids it has surfaced in ``already_read`` (dedupe). The engine threads the
+    # SAME two objects into every ``call_tool`` of the turn, so evidence
+    # accumulates across stages/hops and a grounding lobe (cite/filter) can read
+    # the pool via ``current_turn()``. Empty + ignored by tools that don't ground.
+    retrieved_chunks: list[dict] = field(default_factory=list)
+    already_read: set[str] = field(default_factory=set)
 
 
 @dataclass

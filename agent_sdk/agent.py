@@ -108,6 +108,9 @@ class PreactAgent:
         tz: str = "UTC",
         lang: str = "en",
         prompt_format: str = "xml",
+        context: Any = None,
+        host: Any = None,
+        pre_turn_gate: Any = None,
     ):
         # Keep the raw config so with_() can produce immutable copies.
         self._config: dict[str, Any] = dict(
@@ -136,6 +139,9 @@ class PreactAgent:
             tz=tz,
             lang=lang,
             prompt_format=prompt_format,
+            context=context,
+            host=host,
+            pre_turn_gate=pre_turn_gate,
         )
 
         self.client = make_client(client)
@@ -171,6 +177,9 @@ class PreactAgent:
         # paths/skills/tools) and may subtract a builtin it owns. A plugin carrying
         # ``enabled = False`` is skipped — disabling = not registered/resolvable.
         setup = AgentSetup()
+        # The host a plugin may bind a stateful tool runtime to (agent-core passes
+        # its interpreter). None for a bare agent.
+        setup.host = host
         # ``plugins`` may be a list OR a PluginRegistry — a registry resolves to its enabled
         # (active) set, so enable/disable/override is managed there.
         active_plugins = plugins.active() if hasattr(plugins, "active") else list(plugins or [])
@@ -261,7 +270,8 @@ class PreactAgent:
         self._memory_runtime = memory_runtime
         extra_runtimes = list(mcp_runtimes) + [r for r in (recall_runtime,) if r is not None]
         tool_runtime = self._compose_tools(
-            list(tools or []) + list(setup.tools) + extra_runtimes, memory_runtime
+            list(tools or []) + list(setup.tools) + extra_runtimes, memory_runtime,
+            priority_runtimes=list(setup.tool_runtimes),
         )
         # Any tool runtime that needs an async connect/discover phase (MCP) — resolved
         # once before the first turn (see ``_resolve_mcp`` / ``connect``).
@@ -303,6 +313,8 @@ class PreactAgent:
             tz=tz,
             lang=lang,
             prompt_format=prompt_format,
+            context=context,
+            pre_turn_gate=pre_turn_gate,
         )
         self.engine._prefetch_hooks = prefetch_hooks
         self.engine._tool_filters = list(setup.tool_filters) + list(tool_filters or [])
@@ -312,7 +324,9 @@ class PreactAgent:
 
     # ── tool composition ─────────────────────────────────────────────────────
     @staticmethod
-    def _compose_tools(tools: list[Any], memory_runtime: Any) -> Any:
+    def _compose_tools(
+        tools: list[Any], memory_runtime: Any, *, priority_runtimes: list[Any] | None = None
+    ) -> Any:
         from agent_sdk.contracts.tools import CompositeToolRuntime
         from agent_sdk.tools import FunctionToolRuntime
 
@@ -323,7 +337,9 @@ class PreactAgent:
                 runtimes.append(t)
             else:
                 fn_tools.append(t)
-        composed: list[Any] = []
+        # Plugin-mounted whole runtimes go first so a namespaced surface (kb.*)
+        # wins the first-seen-name dedup over @tool fns and other runtimes.
+        composed: list[Any] = list(priority_runtimes or [])
         if fn_tools:
             composed.append(FunctionToolRuntime(fn_tools))
         composed.extend(runtimes)

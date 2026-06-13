@@ -52,6 +52,14 @@ class AgentSetup:
 
     def __init__(self) -> None:
         self.tools: list[Any] = []
+        # Full, stateful ``ToolRuntime``s a plugin mounts whole (get_tool_specs +
+        # call_tool) — distinct from ``tools`` (@tool fns). Composed AHEAD of the
+        # @tool fns so a runtime owning a namespaced surface (e.g. ``kb.*``) wins
+        # a name collision (first-wins dedup in CompositeToolRuntime).
+        self.tool_runtimes: list[Any] = []
+        # The host object a plugin may read to build a stateful runtime bound to
+        # the application (e.g. agent-core's interpreter). None for a bare agent.
+        self.host: Any = None
         self.lobes: list[Any] = []
         self.stages: list[Any] = []
         self.flows: list[Any] = []
@@ -75,6 +83,13 @@ class AgentSetup:
 
     def add_tool(self, t: Any) -> None:
         self.tools.append(t)
+
+    def add_tool_runtime(self, rt: Any) -> None:
+        """Contribute a whole, stateful ``ToolRuntime`` (``get_tool_specs`` +
+        ``call_tool``) — for tools that hold state or bind to ``setup.host``
+        (a KB/skill/memory/task runtime), not simple ``@tool`` functions. Mounted
+        ahead of the @tool fns so a namespaced surface wins name collisions."""
+        self.tool_runtimes.append(rt)
 
     def add_lobe(self, lobe: Any) -> None:
         """Contribute a runtime ``Lobe`` (carries a ``.spec``)."""

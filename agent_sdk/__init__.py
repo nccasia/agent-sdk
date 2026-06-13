@@ -70,7 +70,7 @@ from agent_sdk.events import (
 )
 from agent_sdk.flow_def import Flow, flow
 from agent_sdk.mcp import MCPError, MCPServerSpec, MCPToolRuntime
-from agent_sdk.memory import Memory, MemoryItem, Scratchpad
+from agent_sdk.memory import Memory, MemoryItem, Scratchpad, SemanticCache
 from agent_sdk.metacognition_facade import Metacognition
 from agent_sdk.preact.defaults import Flows, Lobes, Stages
 from agent_sdk.probe import ProbeRecord, probe
@@ -114,6 +114,7 @@ __all__ = [
     "Memory",
     "MemoryItem",
     "Scratchpad",
+    "SemanticCache",
     "Metacognition",
     "tool",
     "Tool",
