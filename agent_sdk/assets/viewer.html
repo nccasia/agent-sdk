@@ -26,6 +26,20 @@
   *{box-sizing:border-box}
   body{font:13px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
        margin:0;color:var(--ink);background:var(--paper)}
+  /* The single overview line — a full-width second row inside the emerald header. */
+  .voverview{flex-basis:100%;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;
+    margin-top:.15rem}
+  .voverview:empty{display:none}
+  .vbadge{display:inline-block;padding:.1rem .7rem;border-radius:99px;font-weight:700;
+    letter-spacing:.04em;font-size:12px}
+  .vbadge.READY{background:#dff0e6;color:#0d4d31}
+  .vbadge.NOT_READY{background:#fbe0dc;color:#7a1d16}
+  .vbadge.UNMEASURED{background:#eee;color:#444}
+  .vtot{font-size:12px;font-weight:600;opacity:.95}
+  .vchip{font-size:11px;padding:.08rem .5rem;border-radius:99px;
+    background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25)}
+  .vchip.bad{background:rgba(255,210,205,.95);color:#7a1d16;border-color:transparent}
+  .vreason{flex-basis:100%;color:#ffe3df;font-size:11.5px}
   code,.mono{font-family:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
   header{position:sticky;top:0;z-index:5;background:var(--emerald);color:#fff;
          padding:.55rem 1rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;
@@ -337,6 +351,7 @@
 <header>
   <div class="brand">engine probe<b id="label"></b><b style="opacity:.65">OX flow × OY context · metacognition</b></div>
   <div class="turns" id="turns"></div>
+  <div id="verdict" class="voverview"></div>
 </header>
 <nav class="panels" id="panelnav" hidden></nav>
 <div class="drop" id="drop" hidden>
@@ -411,11 +426,12 @@ function wireConvTurnStrip(){
 }
 
 function normalize(raw){
-  if(!raw || typeof raw !== "object") return {label:"", records:[]};
+  if(!raw || typeof raw !== "object") return {label:"", records:[], verdict:null, modes:null};
   let records = raw.records || raw.turns;
   if(!records && Array.isArray(raw)) records = raw;
   if(!records && raw.trace) records = [raw];           // a single turn
-  return {label: raw.label || raw.benchmark || "", records: records || []};
+  return {label: raw.label || raw.benchmark || "", records: records || [],
+          verdict: raw.verdict || null, modes: raw.modes || null};
 }
 
 function load(raw){
@@ -431,8 +447,30 @@ function load(raw){
   renderChrome(); renderPanel();
 }
 
+function renderVerdict(){
+  // The ONE benchmark overview, condensed into the header: a verdict badge, the
+  // overall check count, and a per-group pass/total chip (red when a group fails)
+  // + the failing reasons. The detailed per-turn panels are unchanged. Shown only
+  // when the payload carries a ``verdict`` (a plain trace JSON has none).
+  const el = document.getElementById("verdict");
+  const v = DATA.verdict;
+  if(!v){ el.innerHTML = ""; return; }
+  const modes = DATA.modes || {};
+  let pass = 0, n = 0;
+  const chips = Object.keys(modes).map(g=>{
+    const p = modes[g]; if(!p) return "";
+    pass += p.pass||0; n += p.n||0;
+    return `<span class="vchip ${p.all_pass?'':'bad'}" title="${esc(g)}">${esc(g)} ${p.pass}/${p.n}</span>`;
+  }).join("");
+  let h = `<span class="vbadge ${esc(v.status||'?')}">${esc(v.status||'?')}</span>`+
+          `<span class="vtot">${pass}/${n} checks</span>${chips}`;
+  (v.reasons||[]).forEach(r=>{ if(r) h += `<div class="vreason">${esc(r)}</div>`; });
+  el.innerHTML = h;
+}
+
 function renderChrome(){
   document.getElementById("label").textContent = DATA.label ? " · "+DATA.label : "";
+  renderVerdict();
   const tw = document.getElementById("turns"); tw.innerHTML = "";
   // We inspect BY CONVERSATION — one button per conversation (turns are a
   // smaller component, navigated inside the Timeline). The button label is the

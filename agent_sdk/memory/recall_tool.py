@@ -15,8 +15,6 @@ re-expandable). See ``docs/concepts/universal-memory.md``.
 
 from __future__ import annotations
 
-from typing import Any
-
 from agent_sdk.memory.universal import FLASH_SCOPE, MemoryStore
 
 __all__ = ["RecallToolRuntime"]

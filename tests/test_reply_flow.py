@@ -36,7 +36,7 @@ def test_respond_is_a_real_registered_production_lobe():
 
 def test_respond_lobe_emits_dialog_and_framing_sections():
     from agent_sdk.contracts.turn import TurnContext
-    from agent_sdk.lobes.expression.respond import LOBE
+    from agent_sdk.expression.lobes.respond import LOBE
 
     state = SessionState(history=[Turn("user", "what is X?"), Turn("assistant", "X is foo")])
     contribs = LOBE.prompt(TurnContext(query="and Y?", session_memory=state))

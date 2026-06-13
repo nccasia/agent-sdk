@@ -68,6 +68,29 @@ async def test_render_html_combines_report_and_probes():
     assert "http://" not in html and "src=" not in html
 
 
+async def test_probe_carries_skill_selection():
+    import agent_sdk as sdk
+
+    sk = sdk.Skill("kbk", when="look things up", disclosure="on_demand", stages=["work"])
+    agent = PreactAgent(
+        client=FakeClient(["done"]),
+        instructions="bot",
+        universal_memory=False,
+        skills=[sk],
+        flows=[sdk.flow("work", stages=["work"], signal={"const": 1.0})],
+        stages=[sdk.stage("work", lobes=["synthesize"], loop="single")],
+    )
+    rec = await probe(agent, "go", label="skill turn")
+    assert isinstance(rec.skill_selection, list)
+    assert any(
+        r.get("label") == "kbk"
+        for sel in rec.skill_selection
+        for r in sel.get("ranking", [])
+    )
+    assert isinstance(rec.tool_selection, list)
+    assert isinstance(rec.degraded, list)
+
+
 async def test_probe_carries_path_and_hints():
     rec = await probe(_agent(["x"]), "hi?", label="t")
     assert rec.path.get("name") in ("qna", "research", "clarify", "relational", "emergent")
@@ -80,6 +103,24 @@ async def test_write_html(tmp_path):
     out = write_html(tmp_path / "r.html", "bench", probes=[rec])
     assert out.exists()
     assert "<html>" in out.read_text()
+
+
+async def test_render_html_combines_overview_and_probes():
+    # one HTML carrying BOTH the verdict/group overview and the rich probe inspect
+    agent = _agent(["answer"])
+    rec = await probe(agent, "compare a and b", label="probe1")
+    verdict = {"status": "READY", "reasons": [], "metrics": {"activation.recall": 1.0}}
+    modes = {"activation": {"checks": [{"id": "activation.code_review", "ok": True,
+                                        "detail": "P=1.0 R=1.0"}], "n": 1, "pass": 1,
+                            "all_pass": True}}
+    html = render_html("skillbench", verdict=verdict, modes=modes, probes=[rec],
+                       generated_at="FIXED")
+    # overview half
+    assert "Overview" in html and 'class="verdict READY"' in html
+    assert "activation.code_review" in html and "activation.recall" in html
+    # probe-inspect half (rich timeline + drilldown)
+    assert "Probes" in html and "probe1" in html and "raw JSON" in html
+    assert "http://" not in html and "src=" not in html  # self-contained
 
 
 async def test_render_html_report_only():

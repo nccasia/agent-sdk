@@ -6,6 +6,8 @@ from __future__ import annotations
 from agent_sdk import PreactAgent, flow, probe, stage, tool
 from agent_sdk.clients import FakeClient
 from agent_sdk.clients.fake import scripted
+from agent_sdk.clients.messages import TextBlock
+from agent_sdk.engine import _assistant_content, _block_to_dict, _text_of
 
 
 def _agent(client, *, tools=None, stages=None, budgets=None):
@@ -115,3 +117,67 @@ async def test_novel_results_keep_progressing():
     rec = await probe(agent, "go", label="t")
     assert not any(m.get("action") == "stall_break" for m in rec.meta_actions)
     assert rec.answer == "done"
+
+
+# ── A4: thinking blocks never leak as a Python repr ───────────────────────────
+class _FakeThinking:
+    """A provider thinking block (anthropic shape): ``type='thinking'``, ``.thinking``,
+    and NO ``.text`` attribute — the exact object the old repr fallback stringified."""
+
+    type = "thinking"
+    thinking = "let me reason about this"
+
+
+class _FakeUnknown:
+    type = "weird"  # some future/unknown block with no usable text
+
+
+class _Msg:
+    def __init__(self, content):
+        self.content = content
+
+
+def test_thinking_block_normalized_not_reprd():
+    d = _block_to_dict(_FakeThinking())
+    assert d == {"type": "thinking", "text": "let me reason about this"}
+    # an unknown block must never become a Python repr text
+    du = _block_to_dict(_FakeUnknown())
+    assert du == {"type": "text", "text": ""}
+
+
+def test_thinking_dropped_from_replayed_history():
+    msg = _Msg([_FakeThinking(), TextBlock(text="the real answer")])
+    hist = _assistant_content(msg)
+    assert {"type": "text", "text": "the real answer"} in hist
+    assert all(b.get("type") != "thinking" for b in hist)
+    # the killer regression: no "ThinkingBlock(" repr anywhere in replayed content
+    assert not any("Thinking" in str(b.get("text", "")) for b in hist)
+
+
+def test_text_of_ignores_thinking():
+    # _text_of (the answer source) must read text blocks only
+    assert _text_of(_Msg([_FakeThinking(), TextBlock(text="hello")])) == "hello"
+    assert _text_of(_Msg([_FakeThinking()])) == ""
+
+
+# ── A5: the agentic loop always surfaces prose, even if it ends on a tool_use ──
+async def test_agentic_forces_final_answer_when_loop_ends_on_tool_call():
+    # The model emits a tool call on EVERY hop — including the last, tool-free hop
+    # (as MiniMax does via recovered <invoke> markup). Without the forced-final hop
+    # the turn would end silent (answer == ""); with it, prose is guaranteed.
+    @tool
+    async def look(x: int) -> str:
+        return f"looked {x}"
+
+    script = [
+        {"tools": [{"name": "look", "input": {"x": 1}}]},  # hop 0
+        {"tools": [{"name": "look", "input": {"x": 2}}]},  # hop 1 (last, tool-free) — still 'calls'
+        "I cannot confirm that from the references.",       # forced tool-free answer hop
+    ]
+    agent = _agent(
+        FakeClient(script),
+        tools=[look],
+        stages=[stage("work", lobes=["synthesize"], loop="agentic", tools=["look"], hops=2)],
+    )
+    rec = await probe(agent, "go", label="t")
+    assert rec.answer == "I cannot confirm that from the references."

@@ -1,9 +1,11 @@
-"""The default network — explicit, ordered aggregation of every lobe and path.
+"""The default network — domain-driven aggregation of every lobe and path.
 
-THIS is the single place execution order lives: declaration order below =
-intra-layer `order` = the forward-DAG rank edges validate against. A new
-default lobe/path is one import + one list entry (or, per-bot, a registry row
-via ``LobeRegistry.add_row`` — never an interpreter branch).
+Each domain MODULE owns its lobes (``<domain>.LOBES``) and the ``paths`` domain
+owns ``PATHS``; this module just concatenates them across domains, in B-layer
+order, and the engine re-sorts by ``(layer, order)`` — so a new default lobe is
+one entry in its domain's ``LOBES`` (or, per-bot, a registry row via
+``LobeRegistry.add_row``), never an edit to a central list and never an
+interpreter branch.
 
 The DEFAULT registry is the DEGENERATE NETWORK: at default weights it
 reproduces the legacy decision table exactly (the migration anchor — recall
@@ -15,40 +17,40 @@ legacy ``_should_*`` predicates). The parity fixture matrix in
 
 from __future__ import annotations
 
+from agent_sdk import paths
+from agent_sdk.cognition import lobes as cognition_lobes
+from agent_sdk.expression import lobes as expression_lobes
 from agent_sdk.flows.compat import Stage
-from agent_sdk.lobes import cognition, expression, memory, paths, skill, tools
 from agent_sdk.lobes.runtime import BaseLobe
+from agent_sdk.memory import lobes as memory_lobes
 from agent_sdk.network.activation import LobeSpec, PathSpec
+from agent_sdk.skills import lobes as skill_lobes
+from agent_sdk.tools import lobes as tools_lobes
+
+# The core domains, in B-layer order. Each domain package owns its ``LOBES`` in a
+# ``lobes`` subpackage (``agent_sdk.<domain>.lobes``); this network is their
+# concatenation (then ``(layer, order)``-sorted in ``default_lobe_objects``).
+_CORE_LOBE_DOMAINS = (
+    memory_lobes,      # B2 Memory — recall (agent_sdk.memory.lobes)
+    skill_lobes,       # B3 Skill — progressive-disclosure skills (agent_sdk.skills.lobes)
+    tools_lobes,       # B3 Tools — adaptive tool-exposure selection (agent_sdk.tools.lobes)
+    cognition_lobes,   # B4 Cognition — the reasoning spine (agent_sdk.cognition.lobes)
+    expression_lobes,  # B5 Expression — the reply flow (agent_sdk.expression.lobes)
+)
 
 
 def _core_lobe_objects() -> list[BaseLobe]:
-    """The core network — the lobes intrinsic to *every* PreAct agent, owned by ``lobes/``:
-    memory recall, skills, adaptive tool selection, the cognition reasoning spine, and the
-    reply flow (``respond``). These are not toggleable.
+    """The core network — the lobes intrinsic to *every* PreAct agent, gathered from
+    each domain's ``LOBES``: memory recall, skills, adaptive tool selection, the
+    cognition reasoning spine, and the reply flow (``respond``). Not toggleable.
 
     Output styling (``format``), grounding (``cite``/``filter``), and task execution are
     *toggleable* plugin capabilities — ``FormatPlugin`` / ``SafetyPlugin`` (default-on) and the
     opt-in ``TaskPlugin`` — not core. See ``default_lobe_objects``."""
-    return [
-        # B2 Memory — recall.
-        memory.memory_recall.LOBE,
-        memory.session_recall.LOBE,
-        memory.ctxvar_resolve.LOBE,
-        # B3 Skill — progressive-disclosure skills.
-        skill.skill_select.LOBE,
-        skill.skill_active.LOBE,
-        # B3 Tools — adaptive tool-exposure selection.
-        tools.tool_select.LOBE,
-        # B4 Cognition — the work.
-        cognition.condense.LOBE,
-        cognition.scope_check.LOBE,
-        cognition.classify.LOBE,
-        cognition.plan.LOBE,
-        cognition.research.LOBE,
-        cognition.synthesize.LOBE,
-        # B5 Expression — the reply flow.
-        expression.respond.LOBE,
-    ]
+    objs: list[BaseLobe] = []
+    for domain in _CORE_LOBE_DOMAINS:
+        objs.extend(domain.LOBES)
+    return objs
 
 
 def default_lobe_objects() -> list[BaseLobe]:
@@ -73,16 +75,9 @@ def default_lobes() -> list[LobeSpec]:
 def default_paths() -> list[PathSpec]:
     """Path biases are deliberately small (≤0.3): a bias may tip a borderline
     member, never cross a parity threshold gap on its own — the degenerate-
-    parity fixture matrix is the proof. Paths bias, never gate."""
-    return [
-        paths.qna.PATH,
-        paths.research.PATH,
-        paths.clarify.PATH,
-        paths.relational.PATH,
-        # Steward mode — recognizer keys solely on the harness-set
-        # config_mode flag, so normal turns can never resolve here.
-        paths.onboarding.PATH,
-    ]
+    parity fixture matrix is the proof. Paths bias, never gate. The ``paths``
+    domain owns the list (``paths.PATHS``); a new path is one entry there."""
+    return list(paths.PATHS)
 
 
 def default_stages() -> list[Stage]:

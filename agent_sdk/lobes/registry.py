@@ -33,9 +33,13 @@ Stage = Any
 # registers these at import time so the SDK registry carries no concrete
 # lobe / path / stage instances (framework, not instances). They default to
 # empty for standalone SDK use.
-_default_lobe_objects: Callable[[], list[BaseLobe]] = lambda: []
-_default_paths: Callable[[], list[PathSpec]] = lambda: []
-_default_stages: Callable[[], list[Any]] = lambda: []
+def _empty_list() -> list:
+    return []
+
+
+_default_lobe_objects: Callable[[], list[BaseLobe]] = _empty_list
+_default_paths: Callable[[], list[PathSpec]] = _empty_list
+_default_stages: Callable[[], list[Any]] = _empty_list
 
 
 def set_default_providers(

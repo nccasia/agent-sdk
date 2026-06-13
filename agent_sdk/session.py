@@ -49,6 +49,10 @@ class SessionState:
     summary: str = ""
     facts: list[str] = field(default_factory=list)
     context: list[str] = field(default_factory=list)
+    # Skills the model has activated in this conversation (RFC 0013). Persisted so
+    # the skill_active lobe keeps driving a loaded SOP across turns (set by the
+    # engine from the turn's ``skills_in_use`` at the ActivateSkill moment).
+    skills_in_use: list[str] = field(default_factory=list)
 
     def messages(
         self, *, first_n: int = 1, last_m: int = 6, max_turn_chars: int = 2000
@@ -111,6 +115,7 @@ class SessionState:
             "summary": self.summary,
             "facts": self.facts,
             "context": self.context,
+            "skills_in_use": self.skills_in_use,
         }
 
     @classmethod
@@ -121,6 +126,7 @@ class SessionState:
             summary=d.get("summary", ""),
             facts=list(d.get("facts", [])),
             context=list(d.get("context", [])),
+            skills_in_use=list(d.get("skills_in_use", [])),
         )
 
 

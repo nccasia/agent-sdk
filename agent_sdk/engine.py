@@ -15,6 +15,7 @@ import contextlib
 import contextvars
 import json
 import re
+import unicodedata
 import uuid
 from collections.abc import AsyncIterator
 from typing import Any
@@ -81,7 +82,12 @@ _WH = ("what", "why", "how", "when", "where", "who", "which", "can ", "is ", "do
 
 
 def _block_to_dict(block: Any) -> dict:
-    """Normalize a provider content block (dataclass or anthropic obj) to a dict."""
+    """Normalize a provider content block (dataclass or anthropic obj) to a dict.
+
+    A *thinking* block is surfaced as ``type:"thinking"`` carrying its reasoning text —
+    never stringified to a ``str(block)`` Python repr. The old repr fallback both leaked
+    a ``ThinkingBlock(...)`` repr into the answer (via ``_text_of`` on an echoed history)
+    and corrupted replayed history (MiniMax then parrots the repr back as text)."""
     t = getattr(block, "type", None)
     if t == "text":
         return {"type": "text", "text": getattr(block, "text", "")}
@@ -92,11 +98,24 @@ def _block_to_dict(block: Any) -> dict:
             "name": getattr(block, "name", ""),
             "input": getattr(block, "input", {}) or {},
         }
-    return {"type": "text", "text": str(getattr(block, "text", block))}
+    if t in ("thinking", "redacted_thinking"):
+        return {"type": "thinking", "text": getattr(block, "thinking", "") or ""}
+    # Unknown block: keep only a genuine string ``.text``; never a repr.
+    txt = getattr(block, "text", None)
+    return {"type": "text", "text": txt if isinstance(txt, str) else ""}
 
 
 def _assistant_content(msg: Any) -> list[dict]:
-    return [_block_to_dict(b) for b in getattr(msg, "content", []) or []]
+    """Assistant content for REPLAY into the running history. Thinking blocks are
+    dropped — the provider does not need its own prior reasoning replayed, and
+    serializing it (especially as a repr) corrupts the next hop."""
+    out: list[dict] = []
+    for b in getattr(msg, "content", []) or []:
+        d = _block_to_dict(b)
+        if d.get("type") == "thinking":
+            continue
+        out.append(d)
+    return out
 
 
 def _text_of(msg: Any) -> str:
@@ -105,6 +124,80 @@ def _text_of(msg: Any) -> str:
         for b in getattr(msg, "content", []) or []
         if getattr(b, "type", None) == "text"
     ).strip()
+
+
+def _citations_from_text(text: str, chunks: list[dict]) -> list[Citation]:
+    """Citations for a one-shot (single-loop) answer: each evidence chunk whose
+    ``[chunk_id]`` literally appears in the answer becomes a Citation. Lets a
+    one-shot RAG stage ground from a prefetch-seeded evidence channel, the way the
+    agentic path grounds from tool-output citations. No tool loop required."""
+    if not text or not chunks:
+        return []
+    out: list[Citation] = []
+    seen: set[str] = set()
+    for ch in chunks:
+        cid = str(ch.get("chunk_id") or "")
+        if cid and cid not in seen and f"[{cid}]" in text:
+            seen.add(cid)
+            out.append(Citation(
+                chunk_id=cid,
+                source_ref=str(ch.get("source_ref") or ""),
+                supporting_span=(0, len(text)),
+            ))
+    return out
+
+
+_BACKFILL_MIN_ANSWER_CHARS = 60   # a refusal/one-liner is shorter ⇒ never backfilled
+_BACKFILL_MAX_ADD = 3             # cap added citations
+_BACKFILL_MIN_OVERLAP = 4         # ≥ this many distinctive chunk tokens in the answer
+
+
+def _content_tokens(text: str) -> set[str]:
+    """Distinctive content tokens (NFC-lower, len≥4, deduped) for overlap scoring.
+    Generic — no language-specific stopword list; the length filter drops most
+    function words while keeping content syllables/words."""
+    norm = unicodedata.normalize("NFC", text or "").lower()
+    return {t for t in re.split(r"[^0-9a-zà-ỹ_]+", norm) if len(t) >= 4}
+
+
+def _backfill_citations(
+    answer: str, chunks: list[dict], existing: list[Citation]
+) -> list[Citation]:
+    """Cite the retrieved chunks an answer actually USED but didn't `[chunk_id]`-mark.
+
+    A grounded answer that paraphrases (the model omitted the marker) still needs
+    its source cited for grounding/scoring. For each not-yet-cited evidence chunk
+    (top score first), attach a Citation when enough of the chunk's distinctive
+    content tokens appear in the answer — so a refusal/one-liner (too short) or a
+    chitchat answer (no KB-content overlap) gets ZERO backfill. Capped. Domain-free.
+    """
+    if not answer or len(answer) < _BACKFILL_MIN_ANSWER_CHARS or not chunks:
+        return []
+    cited = {c.chunk_id for c in existing}
+    ans_tokens = _content_tokens(answer)
+    if not ans_tokens:
+        return []
+    ranked = sorted(chunks, key=lambda c: float(c.get("score") or 0), reverse=True)
+    out: list[Citation] = []
+    for ch in ranked:
+        cid = str(ch.get("chunk_id") or "")
+        if not cid or cid in cited:
+            continue
+        ctoks = _content_tokens(ch.get("text") or "")
+        if not ctoks:
+            continue
+        shared = len(ctoks & ans_tokens)
+        # absolute overlap, or (for short chunks) a strong relative overlap
+        if shared >= _BACKFILL_MIN_OVERLAP or (shared and shared >= 0.5 * len(ctoks)):
+            cited.add(cid)
+            out.append(Citation(
+                chunk_id=cid,
+                source_ref=str(ch.get("source_ref") or ""),
+                supporting_span=(0, len(answer)),
+            ))
+            if len(out) >= _BACKFILL_MAX_ADD:
+                break
+    return out
 
 
 def _tool_uses(msg: Any) -> list[Any]:
@@ -240,7 +333,7 @@ class Engine:
         # pins it onto the terminal stage so that stage becomes the response stage — it renders
         # the next conversation message from the gathered notes. No extra LLM call.
         if not any(lb.id == "respond" for lb in self.lobes):
-            from agent_sdk.lobes.expression.respond import LOBE as _respond_lobe
+            from agent_sdk.expression.lobes.respond import LOBE as _respond_lobe
 
             self.lobes.append(_respond_lobe)
         # Weave lobes into canonical (layer, order) position so extension-plugin lobes land
@@ -256,6 +349,39 @@ class Engine:
         self.skill_packs = [s.to_pack() for s in (skills or [])]
         self.skill_registry = SkillRegistry(self.skill_packs)
         self.tools = tools
+        # On-demand skills need a way for the model to LOAD them: the skill-activation
+        # tools (ActivateSkill / skill.read / skill.search). Compose them in whenever an
+        # on-demand skill is declared so the directive in the prompt is actually callable.
+        # Eager skills inline their body and need no tool.
+        on_demand_slugs = [
+            p.id for p in self.skill_packs if getattr(p, "injection", "") == "on_demand"
+        ]
+        self._skill_runtime = None
+        self._skill_tool_names: set[str] = set()
+        if on_demand_slugs:
+            from agent_sdk.contracts.tools import CompositeToolRuntime
+            from agent_sdk.skills import ACTIVATE, READ, SEARCH, SkillToolRuntime
+            from agent_sdk.skills.cache import SurfaceCache
+
+            # Lazy compile-on-activate: the runtime builds each skill's budget surface
+            # with the engine's client the first time it's activated, and caches it.
+            _b = budgets or {}
+            self._skill_runtime = SkillToolRuntime(
+                self.skill_registry, on_demand_slugs,
+                llm=self.client,
+                cache=SurfaceCache(persist=bool(_b.get("skill_surface_persist", True))),
+                budget_tokens=int(_b.get("skill_surface_budget", 600)),
+                # Default per the skillbench A/B (benchmarks/skillbench/compare.py): the
+                # deterministic chunk-index surface is the most compact activation at
+                # equal accuracy and zero compile cost — it dominates both "off" (raw
+                # body) and "llm" (compile cost, no accuracy gain). "llm" stays opt-in.
+                surface_mode=str(_b.get("skill_surface_mode", "deterministic")),
+            )
+            self._skill_tool_names = {ACTIVATE, READ, SEARCH}
+            runtimes = [self._skill_runtime]
+            if self.tools is not None:
+                runtimes.append(self.tools)
+            self.tools = CompositeToolRuntime(runtimes)
         self.instructions = instructions
         # An SDK-injected system directive (e.g. the memory directive) — part of the composed prompt
         # but NOT part of `instructions` (so the spec / with_() keep the user's original).
@@ -329,6 +455,19 @@ class Engine:
     # bypass the per-stage allowlist (and the adaptive drop) in every agentic stage.
     _MEMORY_ESSENTIALS = ("recall", "note")
 
+    def _skill_tools_live(self, stage: Stage) -> bool:
+        """Whether the skill-activation tools should be exposed on this stage: only
+        when an on-demand skill is declared FOR this stage, or one is already in use
+        (so grounding/format/other stages with no skill don't carry ~155 tok of
+        unused skill tool specs)."""
+        if not self._skill_tool_names:
+            return False
+        in_use = list((getattr(current_turn(), "lobe_outputs", {}) or {}).get("skills_in_use") or [])
+        if in_use:
+            return True
+        declared = self.skill_registry.active_for_stage(self._policy(), stage.id)
+        return any(getattr(p, "injection", "") == "on_demand" for p in declared)
+
     def _tool_specs(self, stage: Stage) -> list[dict]:
         if self.tools is None:
             return []
@@ -337,6 +476,10 @@ class Engine:
             allow = set(stage.tools)
             if self.memory_store is not None:
                 allow |= set(self._MEMORY_ESSENTIALS)
+            # Skill-activation tools bypass the per-stage allowlist, but only when a
+            # skill is actually loadable/active here (mirrors the memory essentials).
+            if self._skill_tools_live(stage):
+                allow |= self._skill_tool_names
             specs = [s for s in specs if s.get("name") in allow]
         return specs
 
@@ -437,6 +580,12 @@ class Engine:
         # todo's tailored instruction). Lobe contributions still append below.
         if getattr(stage, "system_prompt", None):
             parts.append(("stage_prompt", stage.system_prompt.strip(), "stable"))
+        # KB prefetch context (host-rendered): the strong-retrieval chunks seeded
+        # before reasoning, surfaced so a grounding stage answers from them. Opaque
+        # to the engine; rendered by the host plugin (kept domain-free here).
+        _pf = getattr(turn_ctx, "prefetch_context", "") if turn_ctx is not None else ""
+        if _pf:
+            parts.append(("retrieved_context", _pf.strip(), "turn"))
         # Always-on memory index: the agent SEES what it has stored each turn (the Tier-2 menu over
         # universal memory), so it answers from memory and knows what to recall — instead of saying
         # "I don't have that". Query-scored, capped, newest-first; empty store ⇒ nothing added.
@@ -476,12 +625,17 @@ class Engine:
             tools_block = self._tools_prompt_block(stage, tool_specs)
             if tools_block:
                 parts.append(("tools", tools_block, "slow"))
-        skill_block = build_skill_prompt_block(
-            self.skill_registry, self._policy(), stage.id, query=ctx.get("query"),
-            ranking_out=skill_sel_out,
-        )
-        if skill_block:
-            parts.append(("skills", skill_block, "slow"))
+        # The skill_select lobe owns the index (state-aware) when it's in the stage;
+        # only fall back to the direct block on stages that don't include it — so
+        # there's never a duplicate, and a custom stage without the lobe still lists.
+        if "skill_select" not in stage.lobes:
+            in_use = list((getattr(turn_ctx, "lobe_outputs", {}) or {}).get("skills_in_use") or [])
+            skill_block = build_skill_prompt_block(
+                self.skill_registry, self._policy(), stage.id, query=ctx.get("query"),
+                ranking_out=skill_sel_out, skills_in_use=in_use,
+            )
+            if skill_block:
+                parts.append(("skills", skill_block, "slow"))
         # Dynamic lobe context (Phase 0): the stage's lobes emit ContextNodes
         # (memory/skill/task recall, …); pool → attention → tier → render. No-op
         # for prompt-only lobes (build_context returns []).
@@ -585,6 +739,19 @@ class Engine:
 
         scratchpad = Scratchpad()
         snapshot = await self._prefetch(query, state)
+        # Retrieval-gated refusal: a prefetch hook may decide (with retrieval in
+        # hand) that the turn is out-of-scope and request a refusal via
+        # ``_refuse`` — so an in-domain question with strong retrieval is NEVER
+        # refused, while an off-topic one that retrieves nothing relevant is.
+        # Domain-free: the engine just honors the opaque reason string.
+        if isinstance(snapshot, dict) and snapshot.get("_refuse"):
+            _reason = str(snapshot["_refuse"])
+            _res = AgentResult(
+                text=_reason, status="refused",
+                refusal=Refusal(reason="policy_violation", message=_reason),
+            )
+            yield stamp(Final(result=_res), trace_id)
+            return
         # Fold the static host context bag in as the base (identity/channel/…); a
         # prefetch hook that set the same key wins (host can override per turn).
         if self.context:
@@ -596,6 +763,20 @@ class Engine:
             query, state, scratchpad=scratchpad, snapshot=snapshot,
             path=path.get("name"), active_lobes=tuple(resolution.activated),
             policy=self._policy(),
+            # Seed the skills the conversation already activated so the skill_active
+            # lobe keeps driving a loaded SOP this turn (RFC 0013 lifecycle). The
+            # ActivateSkill tool appends to this list mid-turn; it is persisted back
+            # to the session at the end of the turn.
+            # Seed the registry too, so skill_select/skill_active actually FIRE
+            # (without it active_skill_packs() is empty and they stay dormant). They
+            # own the state-aware skill prompts: skill_select renders the index when
+            # selecting, skill_active the drive-guide + pinned context_vars when driving.
+            lobe_outputs={
+                "skills_in_use": list(getattr(state, "skills_in_use", []) or []),
+                "skill_registry": self.skill_registry,
+            }
+            if self.skill_packs
+            else None,
         )
         # Expose the turn to tools/runtimes that opt into turn state (generic seam).
         _TURN.set(turn_ctx)
@@ -611,6 +792,23 @@ class Engine:
         # Turn-level infra-degradation markers a host tool appends via current_turn().
         degraded: list[str] = []
         turn_ctx.degraded = degraded
+        # KB prefetch grounding seed: a prefetch hook (host plugin) may have run a
+        # strong deterministic retrieval on the standalone query and returned the
+        # chunks (``_prefetch_chunks``) + a host-rendered prompt block
+        # (``_prefetch_block``) in the snapshot. Seed the chunks into the evidence
+        # channel (so citation grounding resolves) and stash the rendered block on
+        # the turn so the answer stage SEES them — a single-hop qna is then grounded
+        # by construction even when the model's own searches are weak. Domain-free:
+        # the engine moves opaque chunk dicts + an opaque string, no KB logic.
+        if isinstance(snapshot, dict) and snapshot.get("_prefetch_chunks"):
+            for _ch in snapshot["_prefetch_chunks"]:
+                _cid = str(_ch.get("chunk_id") or "")
+                if _cid and _cid not in already_read:
+                    already_read.add(_cid)
+                    retrieved_chunks.append(_ch)
+            _blk = snapshot.get("_prefetch_block")
+            if _blk:
+                turn_ctx.prefetch_context = str(_blk)
 
         base_msgs = state.messages() + [{"role": "user", "content": query}]
         # ``share_history`` threads the running message + tool history across
@@ -656,6 +854,11 @@ class Engine:
                 stage, ctx, state, notes, turn_ctx, attn_out=attn_trace,
                 tool_specs=sel_specs, skill_sel_out=skill_sel, is_last=is_last_stage,
             )
+            # When the skill_select lobe owns the index, it records the ranking on
+            # the turn (skill_ranking); use that for the inspector. Else the direct
+            # fallback filled skill_sel.
+            if "skill_select" in stage.lobes:
+                skill_sel = list(turn_ctx.lobe_outputs.get("skill_ranking") or [])
             steps: list[dict] = []
             stage_text = ""
             calls_before = len(llm_calls)
@@ -668,7 +871,28 @@ class Engine:
             elif stage.loop in ("single",):
                 resp = await self._call(stage, system, stage_msgs)
                 stage_text = _text_of(resp)
+                # Hedge retry (opt-in, host-driven): if the one-shot answer hedges
+                # despite a seeded evidence channel, retry ONCE with a host-provided
+                # forced-answer directive. The host owns the hedge detection +
+                # directive text (domain); the engine just re-calls and keeps the
+                # new answer only if it stops hedging. Default off ⇒ no-op.
+                _retry = getattr(self, "_answer_retry", None)
+                if _retry is not None and retrieved_chunks and stage_text:
+                    _dir = _retry(stage_text)
+                    if _dir:
+                        resp2 = await self._call(
+                            stage, system + "\n\n" + str(_dir), stage_msgs)
+                        _t2 = _text_of(resp2)
+                        if _t2 and not _retry(_t2):
+                            stage_text, resp = _t2, resp2
                 steps.append({"kind": "answer", "text": stage_text})
+                # One-shot grounding: a single-loop answer carries no tool-driven
+                # citations, so resolve [chunk_id] mentions against the (prefetch-
+                # seeded) evidence channel — lets a one-shot RAG stage ground like
+                # the agentic path. No-op when the answer cites nothing.
+                for _c in _citations_from_text(stage_text, retrieved_chunks):
+                    citations.append(_c)
+                    yield stamp(CitationFound(citation=_c), trace_id)
                 llm_calls.append({
                     "stage": stage.id, "hop": 0,
                     "stop_reason": getattr(resp, "stop_reason", "end_turn"),
@@ -750,6 +974,18 @@ class Engine:
                 }
             )
             yield stamp(StageEnd(flow=flow.id, stage=stage.id), trace_id)
+
+        # Persist activated skills onto the session so a loaded SOP keeps driving
+        # across turns (the ActivateSkill tool appended to this list mid-turn).
+        if self._skill_runtime is not None and hasattr(state, "skills_in_use"):
+            state.skills_in_use = list(turn_ctx.lobe_outputs.get("skills_in_use", []) or [])
+
+        # Citation backfill: a grounded answer that drew on the retrieved chunks
+        # but didn't emit [chunk_id] markers (the model paraphrased) still needs
+        # its source cited. Overlap-gated + capped, so refusals/chitchat get none.
+        for _bc in _backfill_citations(answer, retrieved_chunks, citations):
+            citations.append(_bc)
+            yield stamp(CitationFound(citation=_bc), trace_id)
 
         result = self._finalize(
             trace_id,
@@ -1053,6 +1289,24 @@ class Engine:
                 return
         # Final hop without an end_turn — use whatever text we have.
         holder["text"] = holder["text"] or think
+        if not holder["text"]:
+            # The loop hit the hop cap without ever producing prose — e.g. the model
+            # kept emitting tool calls (incl. recovered markup) to the very last,
+            # tool-free hop. Force ONE tool-free answer hop so the turn always surfaces
+            # a reply (a grounded refusal, here) instead of ending silent.
+            final_mt = stage.max_tokens or self.default_max_tokens
+            resp = await self._call(stage, system, msgs, [], max_tokens=final_mt)
+            holder["text"] = _text_of(resp)
+            steps.append({"kind": "answer", "text": holder["text"]})
+            holder["llm_calls"].append({
+                "stage": stage.id, "hop": max_hops,
+                "stop_reason": getattr(resp, "stop_reason", "end_turn"),
+                "usage": _call_usage(resp), "response": _response_blocks(resp),
+                "tool_results": [], "system": system, "messages": list(msgs),
+                "model": self._model_label(stage),
+                "temperature": stage.temperature if stage.temperature is not None else 0.0,
+                "max_tokens": final_mt, "tool_count": 0, "tools": [],
+            })
 
     async def _map_stage(
         self, stage: Stage, system: str, msgs: list[dict], trace_id: str,

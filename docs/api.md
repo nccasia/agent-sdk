@@ -306,6 +306,11 @@ Skill(
 )
 ```
 
+Skills are Standard Operating Procedures the agent runs: the `SKILL.md` standard, the
+folder/section/ToC chunking, the activation strategies, the skill lobe state machine, and
+how a skill's content is injected back into context — full reference in
+[`concepts/skills.md`](concepts/skills.md).
+
 ### Tools — the `@tool` decorator
 
 Turn a typed function into a tool; the SDK introspects the signature/types/docstring into an
