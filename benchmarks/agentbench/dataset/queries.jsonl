@@ -1,0 +1,30 @@
+{"id": "exact-zephyr", "type": "exact", "query": "what is the zephyr project deadline", "expect_keys": ["zephyr-deadline"], "difficulty": "easy", "note": ""}
+{"id": "sem-zephyr", "type": "semantic", "query": "when is the zephyr launch planned", "expect_keys": ["zephyr-schedule"], "difficulty": "medium", "note": "launch/planned ~ rollout/scheduled (in-vocab)"}
+{"id": "distract-zephyr", "type": "distractor", "query": "who is the owner of zephyr", "expect_keys": ["zephyr-owner"], "difficulty": "medium", "note": "every project has an owner"}
+{"id": "multi-zephyr", "type": "multi_needle", "query": "list the launch requirements for zephyr", "expect_keys": ["zephyr-req-1", "zephyr-req-2", "zephyr-req-3"], "difficulty": "hard", "note": ""}
+{"id": "para-zephyr", "type": "paraphrase_hard", "query": "who is accountable the zephyr project", "expect_keys": ["zephyr-owner"], "difficulty": "edge", "note": "out-of-vocab paraphrase — concept embedder can't match"}
+{"id": "exact-atlas", "type": "exact", "query": "what is the atlas project deadline", "expect_keys": ["atlas-deadline"], "difficulty": "easy", "note": ""}
+{"id": "sem-atlas", "type": "semantic", "query": "when is the atlas launch planned", "expect_keys": ["atlas-schedule"], "difficulty": "medium", "note": "launch/planned ~ rollout/scheduled (in-vocab)"}
+{"id": "distract-atlas", "type": "distractor", "query": "who is the owner of atlas", "expect_keys": ["atlas-owner"], "difficulty": "medium", "note": "every project has an owner"}
+{"id": "multi-atlas", "type": "multi_needle", "query": "list the launch requirements for atlas", "expect_keys": ["atlas-req-1", "atlas-req-2", "atlas-req-3"], "difficulty": "hard", "note": ""}
+{"id": "para-atlas", "type": "paraphrase_hard", "query": "who is accountable the atlas project", "expect_keys": ["atlas-owner"], "difficulty": "edge", "note": "out-of-vocab paraphrase — concept embedder can't match"}
+{"id": "exact-orion", "type": "exact", "query": "what is the orion project deadline", "expect_keys": ["orion-deadline"], "difficulty": "easy", "note": ""}
+{"id": "sem-orion", "type": "semantic", "query": "when is the orion launch planned", "expect_keys": ["orion-schedule"], "difficulty": "medium", "note": "launch/planned ~ rollout/scheduled (in-vocab)"}
+{"id": "distract-orion", "type": "distractor", "query": "who is the owner of orion", "expect_keys": ["orion-owner"], "difficulty": "medium", "note": "every project has an owner"}
+{"id": "multi-orion", "type": "multi_needle", "query": "list the launch requirements for orion", "expect_keys": ["orion-req-1", "orion-req-2", "orion-req-3"], "difficulty": "hard", "note": ""}
+{"id": "para-orion", "type": "paraphrase_hard", "query": "who is accountable the orion project", "expect_keys": ["orion-owner"], "difficulty": "edge", "note": "out-of-vocab paraphrase — concept embedder can't match"}
+{"id": "exact-helios", "type": "exact", "query": "what is the helios project deadline", "expect_keys": ["helios-deadline"], "difficulty": "easy", "note": ""}
+{"id": "sem-helios", "type": "semantic", "query": "when is the helios launch planned", "expect_keys": ["helios-schedule"], "difficulty": "medium", "note": "launch/planned ~ rollout/scheduled (in-vocab)"}
+{"id": "distract-helios", "type": "distractor", "query": "who is the owner of helios", "expect_keys": ["helios-owner"], "difficulty": "medium", "note": "every project has an owner"}
+{"id": "multi-helios", "type": "multi_needle", "query": "list the launch requirements for helios", "expect_keys": ["helios-req-1", "helios-req-2", "helios-req-3"], "difficulty": "hard", "note": ""}
+{"id": "para-helios", "type": "paraphrase_hard", "query": "who is accountable the helios project", "expect_keys": ["helios-owner"], "difficulty": "edge", "note": "out-of-vocab paraphrase — concept embedder can't match"}
+{"id": "exact-nova", "type": "exact", "query": "what is the nova project deadline", "expect_keys": ["nova-deadline"], "difficulty": "easy", "note": ""}
+{"id": "sem-nova", "type": "semantic", "query": "when is the nova launch planned", "expect_keys": ["nova-schedule"], "difficulty": "medium", "note": "launch/planned ~ rollout/scheduled (in-vocab)"}
+{"id": "distract-nova", "type": "distractor", "query": "who is the owner of nova", "expect_keys": ["nova-owner"], "difficulty": "medium", "note": "every project has an owner"}
+{"id": "multi-nova", "type": "multi_needle", "query": "list the launch requirements for nova", "expect_keys": ["nova-req-1", "nova-req-2", "nova-req-3"], "difficulty": "hard", "note": ""}
+{"id": "para-nova", "type": "paraphrase_hard", "query": "who is accountable the nova project", "expect_keys": ["nova-owner"], "difficulty": "edge", "note": "out-of-vocab paraphrase — concept embedder can't match"}
+{"id": "super-atlas", "type": "supersession", "query": "what is the current atlas deploy window", "expect_keys": ["atlas-deploy-v2"], "difficulty": "hard", "note": "stale v1 must lose to current v2"}
+{"id": "temporal-atlas", "type": "temporal", "query": "the latest atlas deploy window", "expect_keys": ["atlas-deploy-v2"], "difficulty": "hard", "note": ""}
+{"id": "multihop-1", "type": "multi_hop", "query": "who owns the project whose rollout is on the same day as atlas", "expect_keys": ["atlas-owner"], "difficulty": "edge", "note": "requires chaining two lookups"}
+{"id": "para-deadline", "type": "paraphrase_hard", "query": "what's the ship date for zephyr", "expect_keys": ["zephyr-deadline"], "difficulty": "edge", "note": "ship date ~ deadline (out-of-vocab)"}
+{"id": "para-perf", "type": "paraphrase_hard", "query": "how fast is the search service", "expect_keys": ["search-perf"], "difficulty": "edge", "note": "how fast ~ latency (out-of-vocab)"}

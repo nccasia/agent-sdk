@@ -1,0 +1,4 @@
+# generated run artifacts (can be large) — keep the dir, ignore the outputs
+results/*.json
+results/*.html
+__pycache__/

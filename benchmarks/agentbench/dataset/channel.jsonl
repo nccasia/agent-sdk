@@ -1,0 +1,1501 @@
+{"turn": 0, "speaker": "@user144", "text": "ship it"}
+{"turn": 1, "speaker": "@user049", "text": "ack"}
+{"turn": 2, "speaker": "@user158", "text": "@user078 ack"}
+{"turn": 3, "speaker": "@user190", "text": "atlas p99 latency is 503ms after the change", "fact_id": 0}
+{"turn": 4, "speaker": "@user041", "text": "@user136 following up here"}
+{"turn": 5, "speaker": "@user200", "text": "atlas rollout is rescheduled to Mon 18:00", "fact_id": 1}
+{"turn": 6, "speaker": "@user113", "text": "done"}
+{"turn": 7, "speaker": "@user164", "text": "who's on call tonight?"}
+{"turn": 8, "speaker": "@user118", "text": "is the build green?"}
+{"turn": 9, "speaker": "@user022", "text": "is the build green?"}
+{"turn": 10, "speaker": "@user074", "text": "@user197 lgtm 👍"}
+{"turn": 11, "speaker": "@user005", "text": "helios owner is now @user099", "fact_id": 2}
+{"turn": 12, "speaker": "@user001", "text": "@user014 I'll check after standup"}
+{"turn": 13, "speaker": "@user182", "text": "let's sync tomorrow"}
+{"turn": 14, "speaker": "@user051", "text": "is the build green?"}
+{"turn": 15, "speaker": "@user004", "text": "nice work team"}
+{"turn": 16, "speaker": "@user125", "text": "the lyra deadline is now 2026-01-02", "fact_id": 3}
+{"turn": 17, "speaker": "@user188", "text": "vega p99 latency is 561ms after the change", "fact_id": 4}
+{"turn": 18, "speaker": "@user108", "text": "@user108 let's sync tomorrow"}
+{"turn": 19, "speaker": "@user001", "text": "is the build green?"}
+{"turn": 20, "speaker": "@user152", "text": "who's on call tonight?"}
+{"turn": 21, "speaker": "@user148", "text": "titan p99 latency is 656ms after the change", "fact_id": 5}
+{"turn": 22, "speaker": "@user198", "text": "nova rollout is rescheduled to Wed 13:00", "fact_id": 6}
+{"turn": 23, "speaker": "@user076", "text": "@user024 let's sync tomorrow"}
+{"turn": 24, "speaker": "@user163", "text": "@user095 brb"}
+{"turn": 25, "speaker": "@user117", "text": "+1"}
+{"turn": 26, "speaker": "@user148", "text": "+1"}
+{"turn": 27, "speaker": "@user064", "text": "nova owner is now @user059", "fact_id": 7}
+{"turn": 28, "speaker": "@user041", "text": "@user100 PTAL"}
+{"turn": 29, "speaker": "@user155", "text": "any updates on this?"}
+{"turn": 30, "speaker": "@user112", "text": "postmortem: the Sev1 was caused by a connection pool leak in gateway", "fact_id": 287}
+{"turn": 30, "speaker": "@user181", "text": "atlas owner is now @user062", "fact_id": 8}
+{"turn": 31, "speaker": "@user108", "text": "following up here"}
+{"turn": 32, "speaker": "@user185", "text": "@user123 any updates on this?"}
+{"turn": 33, "speaker": "@user158", "text": "@user055 following up here"}
+{"turn": 34, "speaker": "@user053", "text": "@user106 lgtm 👍"}
+{"turn": 35, "speaker": "@user016", "text": "@user095 thanks!"}
+{"turn": 36, "speaker": "@user034", "text": "any updates on this?"}
+{"turn": 37, "speaker": "@user085", "text": "re-running CI"}
+{"turn": 38, "speaker": "@user080", "text": "the atlas deadline is now 2026-08-12", "fact_id": 9}
+{"turn": 39, "speaker": "@user006", "text": "following up here"}
+{"turn": 40, "speaker": "@user188", "text": "who's on call tonight?"}
+{"turn": 41, "speaker": "@user020", "text": "ship it"}
+{"turn": 42, "speaker": "@user189", "text": "+1"}
+{"turn": 43, "speaker": "@user091", "text": "any updates on this?"}
+{"turn": 44, "speaker": "@user107", "text": "lgtm 👍"}
+{"turn": 45, "speaker": "@user160", "text": "let's sync tomorrow"}
+{"turn": 46, "speaker": "@user066", "text": "the orion deadline is now 2026-02-21", "fact_id": 10}
+{"turn": 47, "speaker": "@user187", "text": "merged"}
+{"turn": 48, "speaker": "@user149", "text": "ship it"}
+{"turn": 49, "speaker": "@user022", "text": "re-running CI"}
+{"turn": 50, "speaker": "@user179", "text": "orion p99 latency is 62ms after the change", "fact_id": 11}
+{"turn": 51, "speaker": "@user078", "text": "ingest owner is now @user003", "fact_id": 12}
+{"turn": 52, "speaker": "@user062", "text": "vega rollout is rescheduled to Wed 16:00", "fact_id": 13}
+{"turn": 53, "speaker": "@user171", "text": "@user111 is the build green?"}
+{"turn": 54, "speaker": "@user194", "text": "I'll check after standup"}
+{"turn": 55, "speaker": "@user150", "text": "@user035 merged"}
+{"turn": 56, "speaker": "@user011", "text": "any updates on this?"}
+{"turn": 57, "speaker": "@user044", "text": "can someone take a look?"}
+{"turn": 58, "speaker": "@user055", "text": "nice work team"}
+{"turn": 59, "speaker": "@user173", "text": "merged"}
+{"turn": 60, "speaker": "@user160", "text": "ship it"}
+{"turn": 61, "speaker": "@user072", "text": "@user182 following up here"}
+{"turn": 62, "speaker": "@user091", "text": "who's on call tonight?"}
+{"turn": 63, "speaker": "@user165", "text": "+1"}
+{"turn": 64, "speaker": "@user030", "text": "draco rollout is rescheduled to Mon 9:00", "fact_id": 14}
+{"turn": 65, "speaker": "@user162", "text": "PTAL"}
+{"turn": 66, "speaker": "@user020", "text": "@user122 I'll check after standup"}
+{"turn": 67, "speaker": "@user183", "text": "lgtm 👍"}
+{"turn": 68, "speaker": "@user010", "text": "@user200 ack"}
+{"turn": 69, "speaker": "@user179", "text": "re-running CI"}
+{"turn": 70, "speaker": "@user041", "text": "let's sync tomorrow"}
+{"turn": 71, "speaker": "@user058", "text": "any updates on this?"}
+{"turn": 72, "speaker": "@user100", "text": "+1"}
+{"turn": 73, "speaker": "@user168", "text": "zephyr p99 latency is 603ms after the change", "fact_id": 15}
+{"turn": 74, "speaker": "@user088", "text": "ship it"}
+{"turn": 75, "speaker": "@user026", "text": "@user100 can someone take a look?"}
+{"turn": 76, "speaker": "@user080", "text": "PTAL"}
+{"turn": 77, "speaker": "@user068", "text": "lgtm 👍"}
+{"turn": 78, "speaker": "@user197", "text": "notifications owner is now @user141", "fact_id": 16}
+{"turn": 79, "speaker": "@user008", "text": "I'll check after standup"}
+{"turn": 80, "speaker": "@user036", "text": "atlas rollout is rescheduled to Fri 14:00", "fact_id": 17}
+{"turn": 81, "speaker": "@user133", "text": "re-running CI"}
+{"turn": 82, "speaker": "@user127", "text": "done"}
+{"turn": 83, "speaker": "@user075", "text": "lyra p99 latency is 579ms after the change", "fact_id": 18}
+{"turn": 84, "speaker": "@user144", "text": "ack"}
+{"turn": 85, "speaker": "@user144", "text": "is the build green?"}
+{"turn": 86, "speaker": "@user157", "text": "I'll check after standup"}
+{"turn": 87, "speaker": "@user138", "text": "draco p99 latency is 245ms after the change", "fact_id": 19}
+{"turn": 88, "speaker": "@user012", "text": "zephyr p99 latency is 68ms after the change", "fact_id": 20}
+{"turn": 89, "speaker": "@user103", "text": "PTAL"}
+{"turn": 90, "speaker": "@user126", "text": "any updates on this?"}
+{"turn": 91, "speaker": "@user069", "text": "notifications p99 latency is 859ms after the change", "fact_id": 21}
+{"turn": 92, "speaker": "@user127", "text": "+1"}
+{"turn": 93, "speaker": "@user122", "text": "re-running CI"}
+{"turn": 94, "speaker": "@user200", "text": "zephyr owner is now @user034", "fact_id": 22}
+{"turn": 95, "speaker": "@user010", "text": "@user004 I'll check after standup"}
+{"turn": 96, "speaker": "@user083", "text": "@user128 reverted, was flaky"}
+{"turn": 97, "speaker": "@user180", "text": "helios owner is now @user184", "fact_id": 23}
+{"turn": 98, "speaker": "@user112", "text": "lgtm 👍"}
+{"turn": 99, "speaker": "@user136", "text": "@user053 following up here"}
+{"turn": 100, "speaker": "@user137", "text": "I'll check after standup"}
+{"turn": 101, "speaker": "@user157", "text": "done"}
+{"turn": 102, "speaker": "@user190", "text": "reverted, was flaky"}
+{"turn": 103, "speaker": "@user081", "text": "@user050 I'll check after standup"}
+{"turn": 104, "speaker": "@user035", "text": "@user023 brb"}
+{"turn": 105, "speaker": "@user025", "text": "nice work team"}
+{"turn": 106, "speaker": "@user181", "text": "@user161 +1"}
+{"turn": 107, "speaker": "@user005", "text": "@user175 can someone take a look?"}
+{"turn": 108, "speaker": "@user093", "text": "can someone take a look?"}
+{"turn": 109, "speaker": "@user088", "text": "re-running CI"}
+{"turn": 110, "speaker": "@user019", "text": "@user010 the dashboard looks off"}
+{"turn": 111, "speaker": "@user158", "text": "re-running CI"}
+{"turn": 112, "speaker": "@user049", "text": "@user045 ack"}
+{"turn": 113, "speaker": "@user073", "text": "can someone take a look?"}
+{"turn": 114, "speaker": "@user120", "text": "the notifications deadline is now 2026-02-11", "fact_id": 24}
+{"turn": 115, "speaker": "@user091", "text": "@user096 nice work team"}
+{"turn": 116, "speaker": "@user093", "text": "atlas rollout is rescheduled to Mon 15:00", "fact_id": 25}
+{"turn": 117, "speaker": "@user104", "text": "I'll check after standup"}
+{"turn": 118, "speaker": "@user162", "text": "zephyr owner is now @user022", "fact_id": 26}
+{"turn": 119, "speaker": "@user146", "text": "@user150 following up here"}
+{"turn": 120, "speaker": "@user196", "text": "@user030 is the build green?"}
+{"turn": 121, "speaker": "@user200", "text": "ack"}
+{"turn": 122, "speaker": "@user085", "text": "PTAL"}
+{"turn": 123, "speaker": "@user196", "text": "ack"}
+{"turn": 124, "speaker": "@user019", "text": "merged"}
+{"turn": 125, "speaker": "@user077", "text": "the auth deadline is now 2026-04-09", "fact_id": 27}
+{"turn": 126, "speaker": "@user169", "text": "let's sync tomorrow"}
+{"turn": 127, "speaker": "@user100", "text": "re-running CI"}
+{"turn": 128, "speaker": "@user180", "text": "can someone take a look?"}
+{"turn": 129, "speaker": "@user006", "text": "can someone take a look?"}
+{"turn": 130, "speaker": "@user066", "text": "ship it"}
+{"turn": 131, "speaker": "@user067", "text": "vega p99 latency is 51ms after the change", "fact_id": 28}
+{"turn": 132, "speaker": "@user088", "text": "PTAL"}
+{"turn": 133, "speaker": "@user134", "text": "done"}
+{"turn": 134, "speaker": "@user195", "text": "the notifications deadline is now 2026-09-20", "fact_id": 29}
+{"turn": 135, "speaker": "@user099", "text": "ack"}
+{"turn": 136, "speaker": "@user127", "text": "PTAL"}
+{"turn": 137, "speaker": "@user103", "text": "ingest p99 latency is 331ms after the change", "fact_id": 30}
+{"turn": 138, "speaker": "@user094", "text": "@user168 re-running CI"}
+{"turn": 139, "speaker": "@user073", "text": "@user198 who's on call tonight?"}
+{"turn": 140, "speaker": "@user011", "text": "ack"}
+{"turn": 141, "speaker": "@user014", "text": "merged"}
+{"turn": 142, "speaker": "@user123", "text": "the search deadline is now 2026-04-14", "fact_id": 31}
+{"turn": 143, "speaker": "@user194", "text": "@user026 brb"}
+{"turn": 144, "speaker": "@user186", "text": "@user063 ship it"}
+{"turn": 145, "speaker": "@user030", "text": "thanks!"}
+{"turn": 146, "speaker": "@user053", "text": "thanks!"}
+{"turn": 147, "speaker": "@user107", "text": "auth p99 latency is 183ms after the change", "fact_id": 32}
+{"turn": 148, "speaker": "@user068", "text": "done"}
+{"turn": 149, "speaker": "@user191", "text": "re-running CI"}
+{"turn": 150, "speaker": "@user129", "text": "payments-api rollout is rescheduled to Mon 16:00", "fact_id": 33}
+{"turn": 151, "speaker": "@user130", "text": "following up here"}
+{"turn": 152, "speaker": "@user157", "text": "done"}
+{"turn": 153, "speaker": "@user168", "text": "draco rollout is rescheduled to Mon 12:00", "fact_id": 34}
+{"turn": 154, "speaker": "@user175", "text": "thanks!"}
+{"turn": 155, "speaker": "@user010", "text": "draco p99 latency is 67ms after the change", "fact_id": 35}
+{"turn": 156, "speaker": "@user141", "text": "the draco deadline is now 2026-02-22", "fact_id": 36}
+{"turn": 157, "speaker": "@user096", "text": "the dashboard looks off"}
+{"turn": 158, "speaker": "@user088", "text": "the dashboard looks off"}
+{"turn": 159, "speaker": "@user020", "text": "can someone take a look?"}
+{"turn": 160, "speaker": "@user197", "text": "I'll check after standup"}
+{"turn": 161, "speaker": "@user100", "text": "+1"}
+{"turn": 162, "speaker": "@user153", "text": "@user195 merged"}
+{"turn": 163, "speaker": "@user048", "text": "nice work team"}
+{"turn": 164, "speaker": "@user119", "text": "@user022 merged"}
+{"turn": 165, "speaker": "@user146", "text": "the dashboard looks off"}
+{"turn": 166, "speaker": "@user199", "text": "@user055 lgtm 👍"}
+{"turn": 167, "speaker": "@user155", "text": "any updates on this?"}
+{"turn": 168, "speaker": "@user196", "text": "@user037 merged"}
+{"turn": 169, "speaker": "@user169", "text": "merged"}
+{"turn": 170, "speaker": "@user079", "text": "notifications owner is now @user113", "fact_id": 37}
+{"turn": 171, "speaker": "@user057", "text": "let's sync tomorrow"}
+{"turn": 172, "speaker": "@user133", "text": "@user094 brb"}
+{"turn": 173, "speaker": "@user190", "text": "gateway p99 latency is 855ms after the change", "fact_id": 38}
+{"turn": 174, "speaker": "@user100", "text": "@user152 PTAL"}
+{"turn": 175, "speaker": "@user046", "text": "any updates on this?"}
+{"turn": 176, "speaker": "@user073", "text": "@user015 lgtm 👍"}
+{"turn": 177, "speaker": "@user146", "text": "who's on call tonight?"}
+{"turn": 178, "speaker": "@user109", "text": "any updates on this?"}
+{"turn": 179, "speaker": "@user140", "text": "any updates on this?"}
+{"turn": 180, "speaker": "@user027", "text": "@user163 merged"}
+{"turn": 181, "speaker": "@user025", "text": "@user057 nice work team"}
+{"turn": 182, "speaker": "@user134", "text": "merged"}
+{"turn": 183, "speaker": "@user087", "text": "merged"}
+{"turn": 184, "speaker": "@user138", "text": "any updates on this?"}
+{"turn": 185, "speaker": "@user106", "text": "reverted, was flaky"}
+{"turn": 186, "speaker": "@user023", "text": "ship it"}
+{"turn": 187, "speaker": "@user135", "text": "reverted, was flaky"}
+{"turn": 188, "speaker": "@user108", "text": "nice work team"}
+{"turn": 189, "speaker": "@user042", "text": "let's sync tomorrow"}
+{"turn": 190, "speaker": "@user100", "text": "nice work team"}
+{"turn": 191, "speaker": "@user016", "text": "the dashboard looks off"}
+{"turn": 192, "speaker": "@user150", "text": "nova rollout is rescheduled to Mon 16:00", "fact_id": 39}
+{"turn": 193, "speaker": "@user010", "text": "@user048 merged"}
+{"turn": 194, "speaker": "@user151", "text": "brb"}
+{"turn": 195, "speaker": "@user131", "text": "brb"}
+{"turn": 196, "speaker": "@user104", "text": "ack"}
+{"turn": 197, "speaker": "@user161", "text": "PTAL"}
+{"turn": 198, "speaker": "@user067", "text": "the dashboard looks off"}
+{"turn": 199, "speaker": "@user088", "text": "PTAL"}
+{"turn": 200, "speaker": "@user035", "text": "lyra p99 latency is 90ms after the change", "fact_id": 40}
+{"turn": 201, "speaker": "@user099", "text": "re-running CI"}
+{"turn": 202, "speaker": "@user015", "text": "brb"}
+{"turn": 203, "speaker": "@user096", "text": "ship it"}
+{"turn": 204, "speaker": "@user156", "text": "ack"}
+{"turn": 205, "speaker": "@user038", "text": "is the build green?"}
+{"turn": 206, "speaker": "@user034", "text": "@user137 following up here"}
+{"turn": 207, "speaker": "@user033", "text": "the titan deadline is now 2026-04-27", "fact_id": 41}
+{"turn": 208, "speaker": "@user022", "text": "the draco deadline is now 2026-08-23", "fact_id": 42}
+{"turn": 209, "speaker": "@user151", "text": "PTAL"}
+{"turn": 210, "speaker": "@user049", "text": "@user175 nice work team"}
+{"turn": 211, "speaker": "@user135", "text": "notifications rollout is rescheduled to Mon 17:00", "fact_id": 43}
+{"turn": 212, "speaker": "@user080", "text": "merged"}
+{"turn": 213, "speaker": "@user018", "text": "payments-api p99 latency is 723ms after the change", "fact_id": 44}
+{"turn": 214, "speaker": "@user176", "text": "@user101 +1"}
+{"turn": 215, "speaker": "@user192", "text": "can someone take a look?"}
+{"turn": 216, "speaker": "@user145", "text": "gateway p99 latency is 283ms after the change", "fact_id": 45}
+{"turn": 217, "speaker": "@user161", "text": "zephyr rollout is rescheduled to Fri 11:00", "fact_id": 46}
+{"turn": 218, "speaker": "@user139", "text": "who's on call tonight?"}
+{"turn": 219, "speaker": "@user143", "text": "@user052 any updates on this?"}
+{"turn": 220, "speaker": "@user029", "text": "merged"}
+{"turn": 221, "speaker": "@user121", "text": "merged"}
+{"turn": 222, "speaker": "@user027", "text": "+1"}
+{"turn": 223, "speaker": "@user119", "text": "titan rollout is rescheduled to Mon 15:00", "fact_id": 47}
+{"turn": 224, "speaker": "@user024", "text": "@user041 can someone take a look?"}
+{"turn": 225, "speaker": "@user112", "text": "nice work team"}
+{"turn": 226, "speaker": "@user110", "text": "@user053 re-running CI"}
+{"turn": 227, "speaker": "@user177", "text": "let's sync tomorrow"}
+{"turn": 228, "speaker": "@user160", "text": "lgtm 👍"}
+{"turn": 229, "speaker": "@user082", "text": "brb"}
+{"turn": 230, "speaker": "@user005", "text": "is the build green?"}
+{"turn": 231, "speaker": "@user167", "text": "@user097 ship it"}
+{"turn": 232, "speaker": "@user086", "text": "who's on call tonight?"}
+{"turn": 233, "speaker": "@user041", "text": "is the build green?"}
+{"turn": 234, "speaker": "@user141", "text": "brb"}
+{"turn": 235, "speaker": "@user037", "text": "done"}
+{"turn": 236, "speaker": "@user133", "text": "I'll check after standup"}
+{"turn": 237, "speaker": "@user148", "text": "the vega deadline is now 2026-03-08", "fact_id": 48}
+{"turn": 238, "speaker": "@user086", "text": "@user093 merged"}
+{"turn": 239, "speaker": "@user032", "text": "ship it"}
+{"turn": 240, "speaker": "@user086", "text": "orion owner is now @user044", "fact_id": 49}
+{"turn": 241, "speaker": "@user032", "text": "@user094 lgtm 👍"}
+{"turn": 242, "speaker": "@user147", "text": "reverted, was flaky"}
+{"turn": 243, "speaker": "@user047", "text": "orion p99 latency is 72ms after the change", "fact_id": 50}
+{"turn": 244, "speaker": "@user169", "text": "+1"}
+{"turn": 245, "speaker": "@user189", "text": "let's sync tomorrow"}
+{"turn": 246, "speaker": "@user196", "text": "@user106 lgtm 👍"}
+{"turn": 247, "speaker": "@user037", "text": "re-running CI"}
+{"turn": 248, "speaker": "@user045", "text": "merged"}
+{"turn": 249, "speaker": "@user146", "text": "@user010 merged"}
+{"turn": 250, "speaker": "@user038", "text": "let's sync tomorrow"}
+{"turn": 251, "speaker": "@user121", "text": "reverted, was flaky"}
+{"turn": 252, "speaker": "@user177", "text": "done"}
+{"turn": 253, "speaker": "@user125", "text": "ship it"}
+{"turn": 254, "speaker": "@user105", "text": "@user030 nice work team"}
+{"turn": 255, "speaker": "@user135", "text": "merged"}
+{"turn": 256, "speaker": "@user007", "text": "merged"}
+{"turn": 257, "speaker": "@user158", "text": "nice work team"}
+{"turn": 258, "speaker": "@user193", "text": "who's on call tonight?"}
+{"turn": 259, "speaker": "@user063", "text": "can someone take a look?"}
+{"turn": 260, "speaker": "@user102", "text": "thanks!"}
+{"turn": 261, "speaker": "@user061", "text": "lyra owner is now @user169", "fact_id": 51}
+{"turn": 262, "speaker": "@user188", "text": "reverted, was flaky"}
+{"turn": 263, "speaker": "@user043", "text": "brb"}
+{"turn": 264, "speaker": "@user032", "text": "@user034 any updates on this?"}
+{"turn": 265, "speaker": "@user077", "text": "the notifications deadline is now 2026-05-08", "fact_id": 52}
+{"turn": 266, "speaker": "@user102", "text": "the titan deadline is now 2026-08-15", "fact_id": 53}
+{"turn": 267, "speaker": "@user081", "text": "the lyra deadline is now 2026-05-01", "fact_id": 54}
+{"turn": 268, "speaker": "@user128", "text": "+1"}
+{"turn": 269, "speaker": "@user121", "text": "@user178 I'll check after standup"}
+{"turn": 270, "speaker": "@user051", "text": "merged"}
+{"turn": 271, "speaker": "@user121", "text": "@user179 lgtm 👍"}
+{"turn": 272, "speaker": "@user052", "text": "PTAL"}
+{"turn": 273, "speaker": "@user071", "text": "the atlas deadline is now 2026-05-24", "fact_id": 55}
+{"turn": 274, "speaker": "@user183", "text": "+1"}
+{"turn": 275, "speaker": "@user200", "text": "ship it"}
+{"turn": 276, "speaker": "@user069", "text": "the payments-api deadline is now 2026-12-23", "fact_id": 56}
+{"turn": 277, "speaker": "@user170", "text": "lyra owner is now @user070", "fact_id": 57}
+{"turn": 278, "speaker": "@user030", "text": "done"}
+{"turn": 279, "speaker": "@user047", "text": "@user164 brb"}
+{"turn": 280, "speaker": "@user119", "text": "any updates on this?"}
+{"turn": 281, "speaker": "@user136", "text": "@user151 thanks!"}
+{"turn": 282, "speaker": "@user065", "text": "nice work team"}
+{"turn": 283, "speaker": "@user188", "text": "payments-api rollout is rescheduled to Mon 11:00", "fact_id": 58}
+{"turn": 284, "speaker": "@user048", "text": "+1"}
+{"turn": 285, "speaker": "@user016", "text": "notifications p99 latency is 42ms after the change", "fact_id": 59}
+{"turn": 286, "speaker": "@user009", "text": "auth owner is now @user169", "fact_id": 60}
+{"turn": 287, "speaker": "@user130", "text": "re-running CI"}
+{"turn": 288, "speaker": "@user153", "text": "@user112 ack"}
+{"turn": 289, "speaker": "@user113", "text": "PTAL"}
+{"turn": 290, "speaker": "@user185", "text": "@user140 brb"}
+{"turn": 291, "speaker": "@user149", "text": "following up here"}
+{"turn": 292, "speaker": "@user039", "text": "atlas p99 latency is 224ms after the change", "fact_id": 61}
+{"turn": 293, "speaker": "@user156", "text": "the dashboard looks off"}
+{"turn": 294, "speaker": "@user186", "text": "is the build green?"}
+{"turn": 295, "speaker": "@user185", "text": "helios rollout is rescheduled to Fri 17:00", "fact_id": 62}
+{"turn": 296, "speaker": "@user038", "text": "thanks!"}
+{"turn": 297, "speaker": "@user128", "text": "search owner is now @user196", "fact_id": 63}
+{"turn": 298, "speaker": "@user041", "text": "titan p99 latency is 300ms after the change", "fact_id": 64}
+{"turn": 299, "speaker": "@user169", "text": "following up here"}
+{"turn": 300, "speaker": "@user056", "text": "billing p99 latency is 413ms after the change", "fact_id": 65}
+{"turn": 301, "speaker": "@user011", "text": "+1"}
+{"turn": 302, "speaker": "@user035", "text": "+1"}
+{"turn": 303, "speaker": "@user011", "text": "@user135 lgtm 👍"}
+{"turn": 304, "speaker": "@user020", "text": "gateway owner is now @user121", "fact_id": 66}
+{"turn": 305, "speaker": "@user175", "text": "@user065 following up here"}
+{"turn": 306, "speaker": "@user059", "text": "lyra p99 latency is 512ms after the change", "fact_id": 67}
+{"turn": 307, "speaker": "@user087", "text": "@user042 following up here"}
+{"turn": 308, "speaker": "@user167", "text": "thanks!"}
+{"turn": 309, "speaker": "@user152", "text": "ack"}
+{"turn": 310, "speaker": "@user055", "text": "let's sync tomorrow"}
+{"turn": 311, "speaker": "@user141", "text": "billing owner is now @user064", "fact_id": 68}
+{"turn": 312, "speaker": "@user123", "text": "I'll check after standup"}
+{"turn": 313, "speaker": "@user195", "text": "who's on call tonight?"}
+{"turn": 314, "speaker": "@user161", "text": "ack"}
+{"turn": 315, "speaker": "@user099", "text": "@user177 nice work team"}
+{"turn": 316, "speaker": "@user071", "text": "@user047 following up here"}
+{"turn": 317, "speaker": "@user132", "text": "let's sync tomorrow"}
+{"turn": 318, "speaker": "@user056", "text": "@user015 is the build green?"}
+{"turn": 319, "speaker": "@user083", "text": "auth rollout is rescheduled to Mon 10:00", "fact_id": 69}
+{"turn": 320, "speaker": "@user116", "text": "any updates on this?"}
+{"turn": 321, "speaker": "@user066", "text": "re-running CI"}
+{"turn": 322, "speaker": "@user156", "text": "brb"}
+{"turn": 323, "speaker": "@user109", "text": "the nova deadline is now 2026-04-10", "fact_id": 70}
+{"turn": 324, "speaker": "@user178", "text": "+1"}
+{"turn": 325, "speaker": "@user081", "text": "ship it"}
+{"turn": 326, "speaker": "@user116", "text": "vega owner is now @user137", "fact_id": 71}
+{"turn": 327, "speaker": "@user099", "text": "re-running CI"}
+{"turn": 328, "speaker": "@user075", "text": "reverted, was flaky"}
+{"turn": 329, "speaker": "@user011", "text": "lgtm 👍"}
+{"turn": 330, "speaker": "@user003", "text": "who's on call tonight?"}
+{"turn": 331, "speaker": "@user199", "text": "vega owner is now @user171", "fact_id": 72}
+{"turn": 332, "speaker": "@user061", "text": "@user110 is the build green?"}
+{"turn": 333, "speaker": "@user073", "text": "the ingest deadline is now 2026-08-13", "fact_id": 73}
+{"turn": 334, "speaker": "@user072", "text": "@user104 brb"}
+{"turn": 335, "speaker": "@user197", "text": "ack"}
+{"turn": 336, "speaker": "@user134", "text": "any updates on this?"}
+{"turn": 337, "speaker": "@user039", "text": "the dashboard looks off"}
+{"turn": 338, "speaker": "@user142", "text": "who's on call tonight?"}
+{"turn": 339, "speaker": "@user070", "text": "the gateway deadline is now 2026-06-03", "fact_id": 74}
+{"turn": 340, "speaker": "@user084", "text": "ingest owner is now @user121", "fact_id": 75}
+{"turn": 341, "speaker": "@user019", "text": "@user083 lgtm 👍"}
+{"turn": 342, "speaker": "@user145", "text": "@user172 who's on call tonight?"}
+{"turn": 343, "speaker": "@user165", "text": "the dashboard looks off"}
+{"turn": 344, "speaker": "@user093", "text": "lgtm 👍"}
+{"turn": 345, "speaker": "@user198", "text": "any updates on this?"}
+{"turn": 346, "speaker": "@user106", "text": "following up here"}
+{"turn": 347, "speaker": "@user119", "text": "ship it"}
+{"turn": 348, "speaker": "@user010", "text": "+1"}
+{"turn": 349, "speaker": "@user127", "text": "reverted, was flaky"}
+{"turn": 350, "speaker": "@user175", "text": "vega owner is now @user059", "fact_id": 76}
+{"turn": 351, "speaker": "@user134", "text": "lgtm 👍"}
+{"turn": 352, "speaker": "@user001", "text": "brb"}
+{"turn": 353, "speaker": "@user196", "text": "@user144 PTAL"}
+{"turn": 354, "speaker": "@user177", "text": "@user027 merged"}
+{"turn": 355, "speaker": "@user081", "text": "I'll check after standup"}
+{"turn": 356, "speaker": "@user050", "text": "@user160 ack"}
+{"turn": 357, "speaker": "@user145", "text": "who's on call tonight?"}
+{"turn": 358, "speaker": "@user192", "text": "PTAL"}
+{"turn": 359, "speaker": "@user093", "text": "merged"}
+{"turn": 360, "speaker": "@user189", "text": "+1"}
+{"turn": 361, "speaker": "@user027", "text": "@user116 who's on call tonight?"}
+{"turn": 362, "speaker": "@user174", "text": "@user160 the dashboard looks off"}
+{"turn": 363, "speaker": "@user124", "text": "thanks!"}
+{"turn": 364, "speaker": "@user190", "text": "@user163 let's sync tomorrow"}
+{"turn": 365, "speaker": "@user184", "text": "@user195 merged"}
+{"turn": 366, "speaker": "@user145", "text": "+1"}
+{"turn": 367, "speaker": "@user181", "text": "+1"}
+{"turn": 368, "speaker": "@user042", "text": "@user160 +1"}
+{"turn": 369, "speaker": "@user060", "text": "ack"}
+{"turn": 370, "speaker": "@user178", "text": "@user070 +1"}
+{"turn": 371, "speaker": "@user162", "text": "let's sync tomorrow"}
+{"turn": 372, "speaker": "@user036", "text": "@user031 thanks!"}
+{"turn": 373, "speaker": "@user050", "text": "who's on call tonight?"}
+{"turn": 374, "speaker": "@user031", "text": "let's sync tomorrow"}
+{"turn": 375, "speaker": "@user113", "text": "ingest rollout is rescheduled to Wed 10:00", "fact_id": 77}
+{"turn": 376, "speaker": "@user167", "text": "@user185 who's on call tonight?"}
+{"turn": 377, "speaker": "@user196", "text": "+1"}
+{"turn": 378, "speaker": "@user178", "text": "I'll check after standup"}
+{"turn": 379, "speaker": "@user038", "text": "@user028 ship it"}
+{"turn": 380, "speaker": "@user065", "text": "the dashboard looks off"}
+{"turn": 381, "speaker": "@user037", "text": "zephyr owner is now @user145", "fact_id": 78}
+{"turn": 382, "speaker": "@user103", "text": "is the build green?"}
+{"turn": 383, "speaker": "@user144", "text": "vega owner is now @user142", "fact_id": 79}
+{"turn": 384, "speaker": "@user002", "text": "the orion deadline is now 2026-05-22", "fact_id": 80}
+{"turn": 385, "speaker": "@user009", "text": "ingest rollout is rescheduled to Mon 15:00", "fact_id": 81}
+{"turn": 386, "speaker": "@user144", "text": "let's sync tomorrow"}
+{"turn": 387, "speaker": "@user158", "text": "@user049 following up here"}
+{"turn": 388, "speaker": "@user064", "text": "ship it"}
+{"turn": 389, "speaker": "@user013", "text": "ack"}
+{"turn": 390, "speaker": "@user138", "text": "can someone take a look?"}
+{"turn": 391, "speaker": "@user007", "text": "PTAL"}
+{"turn": 392, "speaker": "@user003", "text": "@user094 I'll check after standup"}
+{"turn": 393, "speaker": "@user079", "text": "draco rollout is rescheduled to Fri 16:00", "fact_id": 82}
+{"turn": 394, "speaker": "@user171", "text": "can someone take a look?"}
+{"turn": 395, "speaker": "@user181", "text": "@user160 nice work team"}
+{"turn": 396, "speaker": "@user095", "text": "nova rollout is rescheduled to Wed 15:00", "fact_id": 83}
+{"turn": 397, "speaker": "@user071", "text": "reverted, was flaky"}
+{"turn": 398, "speaker": "@user080", "text": "@user168 is the build green?"}
+{"turn": 399, "speaker": "@user025", "text": "is the build green?"}
+{"turn": 400, "speaker": "@user055", "text": "thanks!"}
+{"turn": 401, "speaker": "@user175", "text": "@user028 I'll check after standup"}
+{"turn": 402, "speaker": "@user006", "text": "auth owner is now @user047", "fact_id": 84}
+{"turn": 403, "speaker": "@user138", "text": "atlas p99 latency is 137ms after the change", "fact_id": 85}
+{"turn": 404, "speaker": "@user195", "text": "@user045 I'll check after standup"}
+{"turn": 405, "speaker": "@user194", "text": "@user083 done"}
+{"turn": 406, "speaker": "@user057", "text": "the dashboard looks off"}
+{"turn": 407, "speaker": "@user046", "text": "@user100 is the build green?"}
+{"turn": 408, "speaker": "@user083", "text": "ack"}
+{"turn": 409, "speaker": "@user003", "text": "+1"}
+{"turn": 410, "speaker": "@user165", "text": "@user158 thanks!"}
+{"turn": 411, "speaker": "@user113", "text": "nice work team"}
+{"turn": 412, "speaker": "@user030", "text": "can someone take a look?"}
+{"turn": 413, "speaker": "@user117", "text": "nice work team"}
+{"turn": 414, "speaker": "@user099", "text": "@user154 re-running CI"}
+{"turn": 415, "speaker": "@user011", "text": "re-running CI"}
+{"turn": 416, "speaker": "@user116", "text": "@user012 ship it"}
+{"turn": 417, "speaker": "@user084", "text": "+1"}
+{"turn": 418, "speaker": "@user066", "text": "following up here"}
+{"turn": 419, "speaker": "@user142", "text": "@user033 let's sync tomorrow"}
+{"turn": 420, "speaker": "@user126", "text": "@user167 can someone take a look?"}
+{"turn": 421, "speaker": "@user037", "text": "can someone take a look?"}
+{"turn": 422, "speaker": "@user067", "text": "@user010 any updates on this?"}
+{"turn": 423, "speaker": "@user065", "text": "re-running CI"}
+{"turn": 424, "speaker": "@user138", "text": "lgtm 👍"}
+{"turn": 425, "speaker": "@user113", "text": "draco rollout is rescheduled to Mon 10:00", "fact_id": 86}
+{"turn": 426, "speaker": "@user126", "text": "@user128 brb"}
+{"turn": 427, "speaker": "@user198", "text": "PTAL"}
+{"turn": 428, "speaker": "@user086", "text": "nova owner is now @user046", "fact_id": 87}
+{"turn": 429, "speaker": "@user047", "text": "auth rollout is rescheduled to Wed 10:00", "fact_id": 88}
+{"turn": 430, "speaker": "@user008", "text": "following up here"}
+{"turn": 431, "speaker": "@user023", "text": "I'll check after standup"}
+{"turn": 432, "speaker": "@user187", "text": "I'll check after standup"}
+{"turn": 433, "speaker": "@user097", "text": "lgtm 👍"}
+{"turn": 434, "speaker": "@user162", "text": "is the build green?"}
+{"turn": 435, "speaker": "@user054", "text": "ack"}
+{"turn": 436, "speaker": "@user067", "text": "the notifications deadline is now 2026-03-09", "fact_id": 89}
+{"turn": 437, "speaker": "@user157", "text": "following up here"}
+{"turn": 438, "speaker": "@user198", "text": "orion rollout is rescheduled to Fri 14:00", "fact_id": 90}
+{"turn": 439, "speaker": "@user038", "text": "any updates on this?"}
+{"turn": 440, "speaker": "@user157", "text": "@user035 nice work team"}
+{"turn": 441, "speaker": "@user025", "text": "reverted, was flaky"}
+{"turn": 442, "speaker": "@user127", "text": "@user032 done"}
+{"turn": 443, "speaker": "@user074", "text": "any updates on this?"}
+{"turn": 444, "speaker": "@user123", "text": "@user106 let's sync tomorrow"}
+{"turn": 445, "speaker": "@user115", "text": "any updates on this?"}
+{"turn": 446, "speaker": "@user150", "text": "ship it"}
+{"turn": 447, "speaker": "@user170", "text": "lgtm 👍"}
+{"turn": 448, "speaker": "@user106", "text": "@user065 reverted, was flaky"}
+{"turn": 449, "speaker": "@user072", "text": "@user197 merged"}
+{"turn": 450, "speaker": "@user140", "text": "can someone take a look?"}
+{"turn": 451, "speaker": "@user094", "text": "lgtm 👍"}
+{"turn": 452, "speaker": "@user172", "text": "reverted, was flaky"}
+{"turn": 453, "speaker": "@user006", "text": "+1"}
+{"turn": 454, "speaker": "@user119", "text": "re-running CI"}
+{"turn": 455, "speaker": "@user156", "text": "thanks!"}
+{"turn": 456, "speaker": "@user102", "text": "nice work team"}
+{"turn": 457, "speaker": "@user180", "text": "can someone take a look?"}
+{"turn": 458, "speaker": "@user056", "text": "notifications p99 latency is 849ms after the change", "fact_id": 91}
+{"turn": 459, "speaker": "@user150", "text": "I'll check after standup"}
+{"turn": 460, "speaker": "@user132", "text": "@user022 let's sync tomorrow"}
+{"turn": 461, "speaker": "@user111", "text": "draco p99 latency is 834ms after the change", "fact_id": 92}
+{"turn": 462, "speaker": "@user005", "text": "reverted, was flaky"}
+{"turn": 463, "speaker": "@user007", "text": "can someone take a look?"}
+{"turn": 464, "speaker": "@user137", "text": "can someone take a look?"}
+{"turn": 465, "speaker": "@user170", "text": "the helios deadline is now 2026-10-08", "fact_id": 93}
+{"turn": 466, "speaker": "@user063", "text": "payments-api owner is now @user091", "fact_id": 94}
+{"turn": 467, "speaker": "@user106", "text": "@user056 ship it"}
+{"turn": 468, "speaker": "@user044", "text": "@user036 PTAL"}
+{"turn": 469, "speaker": "@user027", "text": "@user145 re-running CI"}
+{"turn": 470, "speaker": "@user105", "text": "following up here"}
+{"turn": 471, "speaker": "@user031", "text": "nice work team"}
+{"turn": 472, "speaker": "@user029", "text": "@user136 let's sync tomorrow"}
+{"turn": 473, "speaker": "@user104", "text": "can someone take a look?"}
+{"turn": 474, "speaker": "@user140", "text": "thanks!"}
+{"turn": 475, "speaker": "@user055", "text": "is the build green?"}
+{"turn": 476, "speaker": "@user108", "text": "merged"}
+{"turn": 477, "speaker": "@user144", "text": "+1"}
+{"turn": 478, "speaker": "@user025", "text": "let's sync tomorrow"}
+{"turn": 479, "speaker": "@user154", "text": "@user022 is the build green?"}
+{"turn": 480, "speaker": "@user123", "text": "let's sync tomorrow"}
+{"turn": 481, "speaker": "@user116", "text": "@user136 can someone take a look?"}
+{"turn": 482, "speaker": "@user173", "text": "gateway owner is now @user103", "fact_id": 95}
+{"turn": 483, "speaker": "@user059", "text": "the auth deadline is now 2026-06-12", "fact_id": 96}
+{"turn": 484, "speaker": "@user135", "text": "the dashboard looks off"}
+{"turn": 485, "speaker": "@user152", "text": "@user152 can someone take a look?"}
+{"turn": 486, "speaker": "@user064", "text": "reverted, was flaky"}
+{"turn": 487, "speaker": "@user078", "text": "I'll check after standup"}
+{"turn": 488, "speaker": "@user081", "text": "ack"}
+{"turn": 489, "speaker": "@user193", "text": "@user024 reverted, was flaky"}
+{"turn": 490, "speaker": "@user151", "text": "is the build green?"}
+{"turn": 491, "speaker": "@user166", "text": "reverted, was flaky"}
+{"turn": 492, "speaker": "@user175", "text": "@user058 can someone take a look?"}
+{"turn": 493, "speaker": "@user085", "text": "thanks!"}
+{"turn": 494, "speaker": "@user074", "text": "@user196 who's on call tonight?"}
+{"turn": 495, "speaker": "@user102", "text": "@user036 following up here"}
+{"turn": 496, "speaker": "@user164", "text": "lgtm 👍"}
+{"turn": 497, "speaker": "@user055", "text": "done"}
+{"turn": 498, "speaker": "@user123", "text": "nice work team"}
+{"turn": 499, "speaker": "@user020", "text": "ack"}
+{"turn": 500, "speaker": "@user193", "text": "+1"}
+{"turn": 501, "speaker": "@user112", "text": "can someone take a look?"}
+{"turn": 502, "speaker": "@user187", "text": "any updates on this?"}
+{"turn": 503, "speaker": "@user092", "text": "PTAL"}
+{"turn": 504, "speaker": "@user102", "text": "who's on call tonight?"}
+{"turn": 505, "speaker": "@user030", "text": "@user083 I'll check after standup"}
+{"turn": 506, "speaker": "@user032", "text": "+1"}
+{"turn": 507, "speaker": "@user009", "text": "nice work team"}
+{"turn": 508, "speaker": "@user180", "text": "the dashboard looks off"}
+{"turn": 509, "speaker": "@user100", "text": "re-running CI"}
+{"turn": 510, "speaker": "@user089", "text": "titan owner is now @user052", "fact_id": 97}
+{"turn": 511, "speaker": "@user167", "text": "reverted, was flaky"}
+{"turn": 512, "speaker": "@user176", "text": "let's sync tomorrow"}
+{"turn": 513, "speaker": "@user119", "text": "reverted, was flaky"}
+{"turn": 514, "speaker": "@user126", "text": "gateway owner is now @user024", "fact_id": 98}
+{"turn": 515, "speaker": "@user067", "text": "reverted, was flaky"}
+{"turn": 516, "speaker": "@user066", "text": "any updates on this?"}
+{"turn": 517, "speaker": "@user063", "text": "I'll check after standup"}
+{"turn": 518, "speaker": "@user144", "text": "ack"}
+{"turn": 519, "speaker": "@user117", "text": "let's sync tomorrow"}
+{"turn": 520, "speaker": "@user193", "text": "@user079 following up here"}
+{"turn": 521, "speaker": "@user039", "text": "thanks!"}
+{"turn": 522, "speaker": "@user041", "text": "PTAL"}
+{"turn": 523, "speaker": "@user115", "text": "reverted, was flaky"}
+{"turn": 524, "speaker": "@user157", "text": "nova rollout is rescheduled to Mon 17:00", "fact_id": 99}
+{"turn": 525, "speaker": "@user042", "text": "I'll check after standup"}
+{"turn": 526, "speaker": "@user095", "text": "merged"}
+{"turn": 527, "speaker": "@user184", "text": "who's on call tonight?"}
+{"turn": 528, "speaker": "@user068", "text": "@user006 can someone take a look?"}
+{"turn": 529, "speaker": "@user144", "text": "draco owner is now @user074", "fact_id": 100}
+{"turn": 530, "speaker": "@user072", "text": "the ingest deadline is now 2026-05-01", "fact_id": 101}
+{"turn": 531, "speaker": "@user039", "text": "@user140 let's sync tomorrow"}
+{"turn": 532, "speaker": "@user157", "text": "any updates on this?"}
+{"turn": 533, "speaker": "@user137", "text": "done"}
+{"turn": 534, "speaker": "@user014", "text": "nice work team"}
+{"turn": 535, "speaker": "@user139", "text": "brb"}
+{"turn": 536, "speaker": "@user089", "text": "I'll check after standup"}
+{"turn": 537, "speaker": "@user145", "text": "reverted, was flaky"}
+{"turn": 538, "speaker": "@user145", "text": "the helios deadline is now 2026-05-01", "fact_id": 102}
+{"turn": 539, "speaker": "@user050", "text": "reverted, was flaky"}
+{"turn": 540, "speaker": "@user016", "text": "@user106 any updates on this?"}
+{"turn": 541, "speaker": "@user176", "text": "re-running CI"}
+{"turn": 542, "speaker": "@user174", "text": "@user178 ack"}
+{"turn": 543, "speaker": "@user128", "text": "I'll check after standup"}
+{"turn": 544, "speaker": "@user178", "text": "nova p99 latency is 237ms after the change", "fact_id": 103}
+{"turn": 545, "speaker": "@user143", "text": "@user077 PTAL"}
+{"turn": 546, "speaker": "@user057", "text": "is the build green?"}
+{"turn": 547, "speaker": "@user040", "text": "nice work team"}
+{"turn": 548, "speaker": "@user197", "text": "ingest owner is now @user044", "fact_id": 104}
+{"turn": 549, "speaker": "@user009", "text": "@user078 can someone take a look?"}
+{"turn": 550, "speaker": "@user007", "text": "@user048 nice work team"}
+{"turn": 551, "speaker": "@user134", "text": "done"}
+{"turn": 552, "speaker": "@user022", "text": "lgtm 👍"}
+{"turn": 553, "speaker": "@user056", "text": "let's sync tomorrow"}
+{"turn": 554, "speaker": "@user086", "text": "brb"}
+{"turn": 555, "speaker": "@user095", "text": "lyra owner is now @user013", "fact_id": 105}
+{"turn": 556, "speaker": "@user086", "text": "re-running CI"}
+{"turn": 557, "speaker": "@user061", "text": "@user039 nice work team"}
+{"turn": 558, "speaker": "@user116", "text": "@user086 the dashboard looks off"}
+{"turn": 559, "speaker": "@user048", "text": "draco owner is now @user147", "fact_id": 106}
+{"turn": 560, "speaker": "@user017", "text": "who's on call tonight?"}
+{"turn": 561, "speaker": "@user053", "text": "thanks!"}
+{"turn": 562, "speaker": "@user021", "text": "@user056 re-running CI"}
+{"turn": 563, "speaker": "@user018", "text": "nova owner is now @user172", "fact_id": 107}
+{"turn": 564, "speaker": "@user100", "text": "+1"}
+{"turn": 565, "speaker": "@user060", "text": "merged"}
+{"turn": 566, "speaker": "@user074", "text": "PTAL"}
+{"turn": 567, "speaker": "@user122", "text": "@user009 lgtm 👍"}
+{"turn": 568, "speaker": "@user017", "text": "nice work team"}
+{"turn": 569, "speaker": "@user088", "text": "vega rollout is rescheduled to Wed 12:00", "fact_id": 108}
+{"turn": 570, "speaker": "@user050", "text": "nova rollout is rescheduled to Fri 14:00", "fact_id": 109}
+{"turn": 571, "speaker": "@user180", "text": "brb"}
+{"turn": 572, "speaker": "@user172", "text": "ship it"}
+{"turn": 573, "speaker": "@user070", "text": "+1"}
+{"turn": 574, "speaker": "@user032", "text": "titan owner is now @user174", "fact_id": 110}
+{"turn": 575, "speaker": "@user047", "text": "@user135 done"}
+{"turn": 576, "speaker": "@user146", "text": "ship it"}
+{"turn": 577, "speaker": "@user024", "text": "any updates on this?"}
+{"turn": 578, "speaker": "@user146", "text": "payments-api rollout is rescheduled to Mon 14:00", "fact_id": 111}
+{"turn": 579, "speaker": "@user126", "text": "ingest p99 latency is 398ms after the change", "fact_id": 112}
+{"turn": 580, "speaker": "@user049", "text": "+1"}
+{"turn": 581, "speaker": "@user007", "text": "ship it"}
+{"turn": 582, "speaker": "@user014", "text": "@user045 who's on call tonight?"}
+{"turn": 583, "speaker": "@user055", "text": "@user109 lgtm 👍"}
+{"turn": 584, "speaker": "@user128", "text": "following up here"}
+{"turn": 585, "speaker": "@user047", "text": "@user078 merged"}
+{"turn": 586, "speaker": "@user087", "text": "is the build green?"}
+{"turn": 587, "speaker": "@user177", "text": "@user191 the dashboard looks off"}
+{"turn": 588, "speaker": "@user092", "text": "+1"}
+{"turn": 589, "speaker": "@user107", "text": "nice work team"}
+{"turn": 590, "speaker": "@user086", "text": "@user160 the dashboard looks off"}
+{"turn": 591, "speaker": "@user169", "text": "ack"}
+{"turn": 592, "speaker": "@user074", "text": "ack"}
+{"turn": 593, "speaker": "@user143", "text": "done"}
+{"turn": 594, "speaker": "@user087", "text": "who's on call tonight?"}
+{"turn": 595, "speaker": "@user001", "text": "reverted, was flaky"}
+{"turn": 596, "speaker": "@user069", "text": "the gateway deadline is now 2026-11-16", "fact_id": 113}
+{"turn": 597, "speaker": "@user162", "text": "done"}
+{"turn": 598, "speaker": "@user037", "text": "ingest p99 latency is 103ms after the change", "fact_id": 114}
+{"turn": 599, "speaker": "@user072", "text": "PTAL"}
+{"turn": 600, "speaker": "@user066", "text": "atlas rollout is rescheduled to Fri 15:00", "fact_id": 115}
+{"turn": 601, "speaker": "@user015", "text": "helios p99 latency is 401ms after the change", "fact_id": 116}
+{"turn": 602, "speaker": "@user126", "text": "@user081 the dashboard looks off"}
+{"turn": 603, "speaker": "@user129", "text": "re-running CI"}
+{"turn": 604, "speaker": "@user171", "text": "vega p99 latency is 862ms after the change", "fact_id": 117}
+{"turn": 605, "speaker": "@user176", "text": "brb"}
+{"turn": 606, "speaker": "@user077", "text": "@user122 ack"}
+{"turn": 607, "speaker": "@user063", "text": "thanks!"}
+{"turn": 608, "speaker": "@user157", "text": "search p99 latency is 850ms after the change", "fact_id": 118}
+{"turn": 609, "speaker": "@user103", "text": "any updates on this?"}
+{"turn": 610, "speaker": "@user066", "text": "draco owner is now @user100", "fact_id": 119}
+{"turn": 611, "speaker": "@user105", "text": "draco rollout is rescheduled to Fri 9:00", "fact_id": 120}
+{"turn": 612, "speaker": "@user193", "text": "lgtm 👍"}
+{"turn": 613, "speaker": "@user164", "text": "@user183 the dashboard looks off"}
+{"turn": 614, "speaker": "@user006", "text": "ack"}
+{"turn": 615, "speaker": "@user060", "text": "following up here"}
+{"turn": 616, "speaker": "@user133", "text": "nice work team"}
+{"turn": 617, "speaker": "@user048", "text": "lgtm 👍"}
+{"turn": 618, "speaker": "@user027", "text": "merged"}
+{"turn": 619, "speaker": "@user159", "text": "zephyr owner is now @user137", "fact_id": 121}
+{"turn": 620, "speaker": "@user119", "text": "thanks!"}
+{"turn": 621, "speaker": "@user134", "text": "@user025 the dashboard looks off"}
+{"turn": 622, "speaker": "@user138", "text": "thanks!"}
+{"turn": 623, "speaker": "@user064", "text": "@user149 who's on call tonight?"}
+{"turn": 624, "speaker": "@user112", "text": "merged"}
+{"turn": 625, "speaker": "@user091", "text": "who's on call tonight?"}
+{"turn": 626, "speaker": "@user164", "text": "PTAL"}
+{"turn": 627, "speaker": "@user061", "text": "the dashboard looks off"}
+{"turn": 628, "speaker": "@user107", "text": "billing p99 latency is 527ms after the change", "fact_id": 122}
+{"turn": 629, "speaker": "@user143", "text": "re-running CI"}
+{"turn": 630, "speaker": "@user139", "text": "nice work team"}
+{"turn": 631, "speaker": "@user049", "text": "ack"}
+{"turn": 632, "speaker": "@user150", "text": "nova rollout is rescheduled to Fri 13:00", "fact_id": 123}
+{"turn": 633, "speaker": "@user082", "text": "is the build green?"}
+{"turn": 634, "speaker": "@user181", "text": "thanks!"}
+{"turn": 635, "speaker": "@user028", "text": "@user065 the dashboard looks off"}
+{"turn": 636, "speaker": "@user015", "text": "@user069 PTAL"}
+{"turn": 637, "speaker": "@user158", "text": "ship it"}
+{"turn": 638, "speaker": "@user128", "text": "done"}
+{"turn": 639, "speaker": "@user167", "text": "brb"}
+{"turn": 640, "speaker": "@user012", "text": "any updates on this?"}
+{"turn": 641, "speaker": "@user099", "text": "atlas p99 latency is 452ms after the change", "fact_id": 124}
+{"turn": 642, "speaker": "@user054", "text": "gateway p99 latency is 673ms after the change", "fact_id": 125}
+{"turn": 643, "speaker": "@user190", "text": "the dashboard looks off"}
+{"turn": 644, "speaker": "@user164", "text": "can someone take a look?"}
+{"turn": 645, "speaker": "@user009", "text": "billing p99 latency is 236ms after the change", "fact_id": 126}
+{"turn": 646, "speaker": "@user182", "text": "is the build green?"}
+{"turn": 647, "speaker": "@user112", "text": "I'll check after standup"}
+{"turn": 648, "speaker": "@user160", "text": "lgtm 👍"}
+{"turn": 649, "speaker": "@user198", "text": "any updates on this?"}
+{"turn": 650, "speaker": "@user141", "text": "ship it"}
+{"turn": 651, "speaker": "@user130", "text": "let's sync tomorrow"}
+{"turn": 652, "speaker": "@user155", "text": "lyra owner is now @user059", "fact_id": 127}
+{"turn": 653, "speaker": "@user168", "text": "ship it"}
+{"turn": 654, "speaker": "@user058", "text": "following up here"}
+{"turn": 655, "speaker": "@user187", "text": "merged"}
+{"turn": 656, "speaker": "@user107", "text": "reverted, was flaky"}
+{"turn": 657, "speaker": "@user158", "text": "@user102 let's sync tomorrow"}
+{"turn": 658, "speaker": "@user051", "text": "@user150 nice work team"}
+{"turn": 659, "speaker": "@user183", "text": "vega p99 latency is 108ms after the change", "fact_id": 128}
+{"turn": 660, "speaker": "@user087", "text": "reverted, was flaky"}
+{"turn": 661, "speaker": "@user181", "text": "PTAL"}
+{"turn": 662, "speaker": "@user131", "text": "zephyr rollout is rescheduled to Fri 14:00", "fact_id": 129}
+{"turn": 663, "speaker": "@user071", "text": "done"}
+{"turn": 664, "speaker": "@user084", "text": "ack"}
+{"turn": 665, "speaker": "@user127", "text": "@user108 the dashboard looks off"}
+{"turn": 666, "speaker": "@user026", "text": "@user119 following up here"}
+{"turn": 667, "speaker": "@user113", "text": "@user075 done"}
+{"turn": 668, "speaker": "@user195", "text": "@user077 thanks!"}
+{"turn": 669, "speaker": "@user044", "text": "reverted, was flaky"}
+{"turn": 670, "speaker": "@user071", "text": "+1"}
+{"turn": 671, "speaker": "@user007", "text": "PTAL"}
+{"turn": 672, "speaker": "@user039", "text": "who's on call tonight?"}
+{"turn": 673, "speaker": "@user157", "text": "@user007 brb"}
+{"turn": 674, "speaker": "@user006", "text": "the orion deadline is now 2026-12-07", "fact_id": 130}
+{"turn": 675, "speaker": "@user179", "text": "@user075 done"}
+{"turn": 676, "speaker": "@user055", "text": "following up here"}
+{"turn": 677, "speaker": "@user087", "text": "I'll check after standup"}
+{"turn": 678, "speaker": "@user008", "text": "ship it"}
+{"turn": 679, "speaker": "@user073", "text": "following up here"}
+{"turn": 680, "speaker": "@user141", "text": "brb"}
+{"turn": 681, "speaker": "@user166", "text": "merged"}
+{"turn": 682, "speaker": "@user045", "text": "ack"}
+{"turn": 683, "speaker": "@user044", "text": "the dashboard looks off"}
+{"turn": 684, "speaker": "@user056", "text": "merged"}
+{"turn": 685, "speaker": "@user094", "text": "@user184 thanks!"}
+{"turn": 686, "speaker": "@user179", "text": "any updates on this?"}
+{"turn": 687, "speaker": "@user150", "text": "@user012 lgtm 👍"}
+{"turn": 688, "speaker": "@user195", "text": "the dashboard looks off"}
+{"turn": 689, "speaker": "@user017", "text": "can someone take a look?"}
+{"turn": 690, "speaker": "@user158", "text": "ack"}
+{"turn": 691, "speaker": "@user200", "text": "nova owner is now @user014", "fact_id": 131}
+{"turn": 692, "speaker": "@user144", "text": "lgtm 👍"}
+{"turn": 693, "speaker": "@user064", "text": "@user004 who's on call tonight?"}
+{"turn": 694, "speaker": "@user069", "text": "payments-api p99 latency is 646ms after the change", "fact_id": 132}
+{"turn": 695, "speaker": "@user049", "text": "the titan deadline is now 2026-08-22", "fact_id": 133}
+{"turn": 696, "speaker": "@user194", "text": "following up here"}
+{"turn": 697, "speaker": "@user184", "text": "@user100 re-running CI"}
+{"turn": 698, "speaker": "@user068", "text": "ship it"}
+{"turn": 699, "speaker": "@user058", "text": "@user078 who's on call tonight?"}
+{"turn": 700, "speaker": "@user166", "text": "thanks!"}
+{"turn": 701, "speaker": "@user049", "text": "reverted, was flaky"}
+{"turn": 702, "speaker": "@user176", "text": "ship it"}
+{"turn": 703, "speaker": "@user117", "text": "any updates on this?"}
+{"turn": 704, "speaker": "@user149", "text": "@user064 I'll check after standup"}
+{"turn": 705, "speaker": "@user086", "text": "PTAL"}
+{"turn": 706, "speaker": "@user010", "text": "who's on call tonight?"}
+{"turn": 707, "speaker": "@user020", "text": "PTAL"}
+{"turn": 708, "speaker": "@user193", "text": "nova p99 latency is 772ms after the change", "fact_id": 134}
+{"turn": 709, "speaker": "@user018", "text": "the billing deadline is now 2026-10-23", "fact_id": 135}
+{"turn": 710, "speaker": "@user063", "text": "@user115 the dashboard looks off"}
+{"turn": 711, "speaker": "@user087", "text": "done"}
+{"turn": 712, "speaker": "@user004", "text": "brb"}
+{"turn": 713, "speaker": "@user155", "text": "@user080 any updates on this?"}
+{"turn": 714, "speaker": "@user144", "text": "@user164 re-running CI"}
+{"turn": 715, "speaker": "@user009", "text": "vega rollout is rescheduled to Mon 9:00", "fact_id": 136}
+{"turn": 716, "speaker": "@user184", "text": "+1"}
+{"turn": 717, "speaker": "@user190", "text": "ack"}
+{"turn": 718, "speaker": "@user083", "text": "is the build green?"}
+{"turn": 719, "speaker": "@user082", "text": "can someone take a look?"}
+{"turn": 720, "speaker": "@user012", "text": "done"}
+{"turn": 721, "speaker": "@user169", "text": "is the build green?"}
+{"turn": 722, "speaker": "@user107", "text": "the dashboard looks off"}
+{"turn": 723, "speaker": "@user022", "text": "draco owner is now @user052", "fact_id": 137}
+{"turn": 724, "speaker": "@user180", "text": "titan rollout is rescheduled to Wed 13:00", "fact_id": 138}
+{"turn": 725, "speaker": "@user016", "text": "gateway owner is now @user127", "fact_id": 139}
+{"turn": 726, "speaker": "@user151", "text": "@user065 let's sync tomorrow"}
+{"turn": 727, "speaker": "@user143", "text": "zephyr owner is now @user156", "fact_id": 140}
+{"turn": 728, "speaker": "@user038", "text": "done"}
+{"turn": 729, "speaker": "@user053", "text": "@user169 re-running CI"}
+{"turn": 730, "speaker": "@user145", "text": "brb"}
+{"turn": 731, "speaker": "@user011", "text": "any updates on this?"}
+{"turn": 732, "speaker": "@user034", "text": "I'll check after standup"}
+{"turn": 733, "speaker": "@user112", "text": "following up here"}
+{"turn": 734, "speaker": "@user038", "text": "the auth deadline is now 2026-06-27", "fact_id": 141}
+{"turn": 735, "speaker": "@user158", "text": "thanks!"}
+{"turn": 736, "speaker": "@user166", "text": "@user183 let's sync tomorrow"}
+{"turn": 737, "speaker": "@user074", "text": "the search deadline is now 2026-10-04", "fact_id": 142}
+{"turn": 738, "speaker": "@user164", "text": "the notifications deadline is now 2026-07-07", "fact_id": 143}
+{"turn": 739, "speaker": "@user019", "text": "ack"}
+{"turn": 740, "speaker": "@user105", "text": "+1"}
+{"turn": 741, "speaker": "@user025", "text": "@user079 let's sync tomorrow"}
+{"turn": 742, "speaker": "@user151", "text": "zephyr rollout is rescheduled to Wed 9:00", "fact_id": 144}
+{"turn": 743, "speaker": "@user075", "text": "@user171 PTAL"}
+{"turn": 744, "speaker": "@user168", "text": "gateway owner is now @user181", "fact_id": 145}
+{"turn": 745, "speaker": "@user193", "text": "payments-api owner is now @user075", "fact_id": 146}
+{"turn": 746, "speaker": "@user026", "text": "ack"}
+{"turn": 747, "speaker": "@user088", "text": "@user031 is the build green?"}
+{"turn": 748, "speaker": "@user176", "text": "reverted, was flaky"}
+{"turn": 749, "speaker": "@user148", "text": "done"}
+{"turn": 750, "speaker": "@user060", "text": "the dashboard looks off"}
+{"turn": 751, "speaker": "@user037", "text": "is the build green?"}
+{"turn": 752, "speaker": "@user034", "text": "thanks!"}
+{"turn": 753, "speaker": "@user054", "text": "merged"}
+{"turn": 754, "speaker": "@user069", "text": "ship it"}
+{"turn": 755, "speaker": "@user008", "text": "@user130 is the build green?"}
+{"turn": 756, "speaker": "@user049", "text": "PTAL"}
+{"turn": 757, "speaker": "@user001", "text": "the search deadline is now 2026-02-01", "fact_id": 147}
+{"turn": 758, "speaker": "@user165", "text": "is the build green?"}
+{"turn": 759, "speaker": "@user007", "text": "any updates on this?"}
+{"turn": 760, "speaker": "@user124", "text": "ack"}
+{"turn": 761, "speaker": "@user173", "text": "@user144 nice work team"}
+{"turn": 762, "speaker": "@user081", "text": "ship it"}
+{"turn": 763, "speaker": "@user168", "text": "@user154 I'll check after standup"}
+{"turn": 764, "speaker": "@user140", "text": "atlas p99 latency is 463ms after the change", "fact_id": 148}
+{"turn": 765, "speaker": "@user147", "text": "reverted, was flaky"}
+{"turn": 766, "speaker": "@user066", "text": "the helios deadline is now 2026-03-15", "fact_id": 149}
+{"turn": 767, "speaker": "@user141", "text": "ship it"}
+{"turn": 768, "speaker": "@user029", "text": "thanks!"}
+{"turn": 769, "speaker": "@user017", "text": "the lyra deadline is now 2026-01-19", "fact_id": 150}
+{"turn": 770, "speaker": "@user089", "text": "auth rollout is rescheduled to Mon 18:00", "fact_id": 151}
+{"turn": 771, "speaker": "@user096", "text": "reverted, was flaky"}
+{"turn": 772, "speaker": "@user150", "text": "brb"}
+{"turn": 773, "speaker": "@user084", "text": "who's on call tonight?"}
+{"turn": 774, "speaker": "@user109", "text": "@user113 ship it"}
+{"turn": 775, "speaker": "@user068", "text": "the dashboard looks off"}
+{"turn": 776, "speaker": "@user131", "text": "@user034 is the build green?"}
+{"turn": 777, "speaker": "@user094", "text": "can someone take a look?"}
+{"turn": 778, "speaker": "@user075", "text": "any updates on this?"}
+{"turn": 779, "speaker": "@user072", "text": "let's sync tomorrow"}
+{"turn": 780, "speaker": "@user102", "text": "the dashboard looks off"}
+{"turn": 781, "speaker": "@user021", "text": "the helios deadline is now 2026-12-13", "fact_id": 152}
+{"turn": 782, "speaker": "@user039", "text": "@user109 ship it"}
+{"turn": 783, "speaker": "@user095", "text": "lyra rollout is rescheduled to Wed 13:00", "fact_id": 153}
+{"turn": 784, "speaker": "@user055", "text": "@user044 lgtm 👍"}
+{"turn": 785, "speaker": "@user034", "text": "@user192 ack"}
+{"turn": 786, "speaker": "@user146", "text": "@user115 +1"}
+{"turn": 787, "speaker": "@user181", "text": "atlas owner is now @user013", "fact_id": 154}
+{"turn": 788, "speaker": "@user086", "text": "the orion deadline is now 2026-09-02", "fact_id": 155}
+{"turn": 789, "speaker": "@user196", "text": "I'll check after standup"}
+{"turn": 790, "speaker": "@user046", "text": "the dashboard looks off"}
+{"turn": 791, "speaker": "@user107", "text": "I'll check after standup"}
+{"turn": 792, "speaker": "@user108", "text": "ack"}
+{"turn": 793, "speaker": "@user083", "text": "thanks!"}
+{"turn": 794, "speaker": "@user011", "text": "@user140 re-running CI"}
+{"turn": 795, "speaker": "@user140", "text": "@user142 who's on call tonight?"}
+{"turn": 796, "speaker": "@user044", "text": "following up here"}
+{"turn": 797, "speaker": "@user087", "text": "nice work team"}
+{"turn": 798, "speaker": "@user058", "text": "@user131 ship it"}
+{"turn": 799, "speaker": "@user125", "text": "titan rollout is rescheduled to Wed 16:00", "fact_id": 156}
+{"turn": 800, "speaker": "@user095", "text": "@user156 any updates on this?"}
+{"turn": 801, "speaker": "@user033", "text": "any updates on this?"}
+{"turn": 802, "speaker": "@user157", "text": "following up here"}
+{"turn": 803, "speaker": "@user111", "text": "@user096 nice work team"}
+{"turn": 804, "speaker": "@user094", "text": "can someone take a look?"}
+{"turn": 805, "speaker": "@user091", "text": "PTAL"}
+{"turn": 806, "speaker": "@user174", "text": "+1"}
+{"turn": 807, "speaker": "@user165", "text": "@user081 thanks!"}
+{"turn": 808, "speaker": "@user045", "text": "who's on call tonight?"}
+{"turn": 809, "speaker": "@user180", "text": "+1"}
+{"turn": 810, "speaker": "@user162", "text": "any updates on this?"}
+{"turn": 811, "speaker": "@user126", "text": "@user018 brb"}
+{"turn": 812, "speaker": "@user122", "text": "I'll check after standup"}
+{"turn": 813, "speaker": "@user072", "text": "who's on call tonight?"}
+{"turn": 814, "speaker": "@user031", "text": "search p99 latency is 236ms after the change", "fact_id": 157}
+{"turn": 815, "speaker": "@user022", "text": "following up here"}
+{"turn": 816, "speaker": "@user120", "text": "following up here"}
+{"turn": 817, "speaker": "@user133", "text": "nice work team"}
+{"turn": 818, "speaker": "@user035", "text": "reverted, was flaky"}
+{"turn": 819, "speaker": "@user176", "text": "@user088 done"}
+{"turn": 820, "speaker": "@user024", "text": "ack"}
+{"turn": 821, "speaker": "@user077", "text": "orion rollout is rescheduled to Wed 18:00", "fact_id": 158}
+{"turn": 822, "speaker": "@user148", "text": "who's on call tonight?"}
+{"turn": 823, "speaker": "@user195", "text": "ship it"}
+{"turn": 824, "speaker": "@user200", "text": "merged"}
+{"turn": 825, "speaker": "@user191", "text": "billing p99 latency is 134ms after the change", "fact_id": 159}
+{"turn": 826, "speaker": "@user036", "text": "titan owner is now @user030", "fact_id": 160}
+{"turn": 827, "speaker": "@user145", "text": "@user200 done"}
+{"turn": 828, "speaker": "@user027", "text": "merged"}
+{"turn": 829, "speaker": "@user069", "text": "the gateway deadline is now 2026-04-03", "fact_id": 161}
+{"turn": 830, "speaker": "@user171", "text": "done"}
+{"turn": 831, "speaker": "@user066", "text": "search rollout is rescheduled to Wed 16:00", "fact_id": 162}
+{"turn": 832, "speaker": "@user051", "text": "the notifications deadline is now 2026-09-05", "fact_id": 163}
+{"turn": 833, "speaker": "@user139", "text": "done"}
+{"turn": 834, "speaker": "@user055", "text": "let's sync tomorrow"}
+{"turn": 835, "speaker": "@user170", "text": "@user194 ship it"}
+{"turn": 836, "speaker": "@user127", "text": "@user031 done"}
+{"turn": 837, "speaker": "@user110", "text": "brb"}
+{"turn": 838, "speaker": "@user024", "text": "zephyr p99 latency is 170ms after the change", "fact_id": 164}
+{"turn": 839, "speaker": "@user166", "text": "PTAL"}
+{"turn": 840, "speaker": "@user117", "text": "lgtm 👍"}
+{"turn": 841, "speaker": "@user117", "text": "re-running CI"}
+{"turn": 842, "speaker": "@user084", "text": "done"}
+{"turn": 843, "speaker": "@user021", "text": "gateway owner is now @user009", "fact_id": 165}
+{"turn": 844, "speaker": "@user172", "text": "brb"}
+{"turn": 845, "speaker": "@user036", "text": "search rollout is rescheduled to Wed 10:00", "fact_id": 166}
+{"turn": 846, "speaker": "@user027", "text": "gateway owner is now @user046", "fact_id": 167}
+{"turn": 847, "speaker": "@user114", "text": "@user022 brb"}
+{"turn": 848, "speaker": "@user024", "text": "gateway owner is now @user121", "fact_id": 168}
+{"turn": 849, "speaker": "@user078", "text": "thanks!"}
+{"turn": 850, "speaker": "@user121", "text": "can someone take a look?"}
+{"turn": 851, "speaker": "@user017", "text": "who's on call tonight?"}
+{"turn": 852, "speaker": "@user025", "text": "ack"}
+{"turn": 853, "speaker": "@user058", "text": "can someone take a look?"}
+{"turn": 854, "speaker": "@user020", "text": "done"}
+{"turn": 855, "speaker": "@user107", "text": "@user076 re-running CI"}
+{"turn": 856, "speaker": "@user075", "text": "nice work team"}
+{"turn": 857, "speaker": "@user188", "text": "the billing deadline is now 2026-07-08", "fact_id": 169}
+{"turn": 858, "speaker": "@user113", "text": "brb"}
+{"turn": 859, "speaker": "@user079", "text": "@user075 nice work team"}
+{"turn": 860, "speaker": "@user145", "text": "@user005 PTAL"}
+{"turn": 861, "speaker": "@user012", "text": "merged"}
+{"turn": 862, "speaker": "@user024", "text": "is the build green?"}
+{"turn": 863, "speaker": "@user124", "text": "payments-api rollout is rescheduled to Mon 12:00", "fact_id": 170}
+{"turn": 864, "speaker": "@user188", "text": "lgtm 👍"}
+{"turn": 865, "speaker": "@user135", "text": "@user026 ack"}
+{"turn": 866, "speaker": "@user143", "text": "@user099 the dashboard looks off"}
+{"turn": 867, "speaker": "@user129", "text": "let's sync tomorrow"}
+{"turn": 868, "speaker": "@user186", "text": "+1"}
+{"turn": 869, "speaker": "@user137", "text": "done"}
+{"turn": 870, "speaker": "@user014", "text": "following up here"}
+{"turn": 871, "speaker": "@user013", "text": "following up here"}
+{"turn": 872, "speaker": "@user149", "text": "ack"}
+{"turn": 873, "speaker": "@user193", "text": "@user163 the dashboard looks off"}
+{"turn": 874, "speaker": "@user111", "text": "lgtm 👍"}
+{"turn": 875, "speaker": "@user097", "text": "is the build green?"}
+{"turn": 876, "speaker": "@user119", "text": "thanks!"}
+{"turn": 877, "speaker": "@user020", "text": "thanks!"}
+{"turn": 878, "speaker": "@user044", "text": "can someone take a look?"}
+{"turn": 879, "speaker": "@user119", "text": "can someone take a look?"}
+{"turn": 880, "speaker": "@user132", "text": "helios rollout is rescheduled to Wed 15:00", "fact_id": 171}
+{"turn": 881, "speaker": "@user112", "text": "+1"}
+{"turn": 882, "speaker": "@user189", "text": "@user063 re-running CI"}
+{"turn": 883, "speaker": "@user080", "text": "ingest owner is now @user169", "fact_id": 172}
+{"turn": 884, "speaker": "@user034", "text": "any updates on this?"}
+{"turn": 885, "speaker": "@user011", "text": "@user031 brb"}
+{"turn": 886, "speaker": "@user068", "text": "@user072 PTAL"}
+{"turn": 887, "speaker": "@user184", "text": "done"}
+{"turn": 888, "speaker": "@user197", "text": "re-running CI"}
+{"turn": 889, "speaker": "@user155", "text": "merged"}
+{"turn": 890, "speaker": "@user030", "text": "draco rollout is rescheduled to Mon 12:00", "fact_id": 173}
+{"turn": 891, "speaker": "@user180", "text": "nice work team"}
+{"turn": 892, "speaker": "@user146", "text": "any updates on this?"}
+{"turn": 893, "speaker": "@user191", "text": "@user016 thanks!"}
+{"turn": 894, "speaker": "@user193", "text": "@user150 the dashboard looks off"}
+{"turn": 895, "speaker": "@user115", "text": "I'll check after standup"}
+{"turn": 896, "speaker": "@user095", "text": "thanks!"}
+{"turn": 897, "speaker": "@user039", "text": "gateway p99 latency is 513ms after the change", "fact_id": 174}
+{"turn": 898, "speaker": "@user175", "text": "PTAL"}
+{"turn": 899, "speaker": "@user107", "text": "gateway rollout is rescheduled to Mon 11:00", "fact_id": 175}
+{"turn": 900, "speaker": "@user152", "text": "+1"}
+{"turn": 901, "speaker": "@user091", "text": "titan owner is now @user158", "fact_id": 176}
+{"turn": 902, "speaker": "@user175", "text": "orion owner is now @user170", "fact_id": 177}
+{"turn": 903, "speaker": "@user014", "text": "ship it"}
+{"turn": 904, "speaker": "@user119", "text": "ship it"}
+{"turn": 905, "speaker": "@user155", "text": "ack"}
+{"turn": 906, "speaker": "@user094", "text": "@user083 thanks!"}
+{"turn": 907, "speaker": "@user125", "text": "@user009 done"}
+{"turn": 908, "speaker": "@user054", "text": "ship it"}
+{"turn": 909, "speaker": "@user182", "text": "lgtm 👍"}
+{"turn": 910, "speaker": "@user016", "text": "done"}
+{"turn": 911, "speaker": "@user177", "text": "can someone take a look?"}
+{"turn": 912, "speaker": "@user191", "text": "@user131 can someone take a look?"}
+{"turn": 913, "speaker": "@user012", "text": "merged"}
+{"turn": 914, "speaker": "@user148", "text": "re-running CI"}
+{"turn": 915, "speaker": "@user135", "text": "who's on call tonight?"}
+{"turn": 916, "speaker": "@user087", "text": "the dashboard looks off"}
+{"turn": 917, "speaker": "@user179", "text": "PTAL"}
+{"turn": 918, "speaker": "@user073", "text": "@user080 following up here"}
+{"turn": 919, "speaker": "@user015", "text": "@user192 reverted, was flaky"}
+{"turn": 920, "speaker": "@user119", "text": "the titan deadline is now 2026-10-15", "fact_id": 178}
+{"turn": 921, "speaker": "@user099", "text": "search owner is now @user016", "fact_id": 179}
+{"turn": 922, "speaker": "@user189", "text": "@user056 lgtm 👍"}
+{"turn": 923, "speaker": "@user144", "text": "notifications p99 latency is 367ms after the change", "fact_id": 180}
+{"turn": 924, "speaker": "@user191", "text": "is the build green?"}
+{"turn": 925, "speaker": "@user154", "text": "done"}
+{"turn": 926, "speaker": "@user132", "text": "@user185 +1"}
+{"turn": 927, "speaker": "@user001", "text": "@user198 +1"}
+{"turn": 928, "speaker": "@user128", "text": "ship it"}
+{"turn": 929, "speaker": "@user069", "text": "thanks!"}
+{"turn": 930, "speaker": "@user180", "text": "the notifications deadline is now 2026-06-24", "fact_id": 181}
+{"turn": 931, "speaker": "@user185", "text": "@user132 done"}
+{"turn": 932, "speaker": "@user071", "text": "who's on call tonight?"}
+{"turn": 933, "speaker": "@user022", "text": "let's sync tomorrow"}
+{"turn": 934, "speaker": "@user151", "text": "the zephyr deadline is now 2026-02-25", "fact_id": 182}
+{"turn": 935, "speaker": "@user121", "text": "ack"}
+{"turn": 936, "speaker": "@user086", "text": "following up here"}
+{"turn": 937, "speaker": "@user070", "text": "@user005 brb"}
+{"turn": 938, "speaker": "@user106", "text": "zephyr rollout is rescheduled to Wed 18:00", "fact_id": 183}
+{"turn": 939, "speaker": "@user081", "text": "who's on call tonight?"}
+{"turn": 940, "speaker": "@user027", "text": "@user156 ship it"}
+{"turn": 941, "speaker": "@user132", "text": "@user033 thanks!"}
+{"turn": 942, "speaker": "@user176", "text": "@user040 I'll check after standup"}
+{"turn": 943, "speaker": "@user128", "text": "can someone take a look?"}
+{"turn": 944, "speaker": "@user014", "text": "reverted, was flaky"}
+{"turn": 945, "speaker": "@user044", "text": "who's on call tonight?"}
+{"turn": 946, "speaker": "@user111", "text": "the auth deadline is now 2026-06-02", "fact_id": 184}
+{"turn": 947, "speaker": "@user169", "text": "@user137 brb"}
+{"turn": 948, "speaker": "@user033", "text": "@user190 ship it"}
+{"turn": 949, "speaker": "@user032", "text": "brb"}
+{"turn": 950, "speaker": "@user068", "text": "lgtm 👍"}
+{"turn": 951, "speaker": "@user062", "text": "ship it"}
+{"turn": 952, "speaker": "@user058", "text": "@user073 I'll check after standup"}
+{"turn": 953, "speaker": "@user023", "text": "re-running CI"}
+{"turn": 954, "speaker": "@user013", "text": "@user162 re-running CI"}
+{"turn": 955, "speaker": "@user185", "text": "let's sync tomorrow"}
+{"turn": 956, "speaker": "@user017", "text": "ship it"}
+{"turn": 957, "speaker": "@user002", "text": "@user022 brb"}
+{"turn": 958, "speaker": "@user156", "text": "the dashboard looks off"}
+{"turn": 959, "speaker": "@user004", "text": "@user007 +1"}
+{"turn": 960, "speaker": "@user165", "text": "@user078 following up here"}
+{"turn": 961, "speaker": "@user103", "text": "the dashboard looks off"}
+{"turn": 962, "speaker": "@user041", "text": "the dashboard looks off"}
+{"turn": 963, "speaker": "@user015", "text": "ingest rollout is rescheduled to Wed 14:00", "fact_id": 185}
+{"turn": 964, "speaker": "@user118", "text": "the dashboard looks off"}
+{"turn": 965, "speaker": "@user194", "text": "draco p99 latency is 827ms after the change", "fact_id": 186}
+{"turn": 966, "speaker": "@user017", "text": "draco owner is now @user158", "fact_id": 187}
+{"turn": 967, "speaker": "@user146", "text": "re-running CI"}
+{"turn": 968, "speaker": "@user137", "text": "any updates on this?"}
+{"turn": 969, "speaker": "@user194", "text": "nice work team"}
+{"turn": 970, "speaker": "@user022", "text": "let's sync tomorrow"}
+{"turn": 971, "speaker": "@user015", "text": "can someone take a look?"}
+{"turn": 972, "speaker": "@user038", "text": "ship it"}
+{"turn": 973, "speaker": "@user028", "text": "orion p99 latency is 151ms after the change", "fact_id": 188}
+{"turn": 974, "speaker": "@user157", "text": "any updates on this?"}
+{"turn": 975, "speaker": "@user041", "text": "is the build green?"}
+{"turn": 976, "speaker": "@user166", "text": "done"}
+{"turn": 977, "speaker": "@user192", "text": "vega owner is now @user111", "fact_id": 189}
+{"turn": 978, "speaker": "@user152", "text": "@user012 any updates on this?"}
+{"turn": 979, "speaker": "@user089", "text": "nice work team"}
+{"turn": 980, "speaker": "@user121", "text": "@user106 I'll check after standup"}
+{"turn": 981, "speaker": "@user148", "text": "gateway rollout is rescheduled to Fri 9:00", "fact_id": 190}
+{"turn": 982, "speaker": "@user048", "text": "@user192 following up here"}
+{"turn": 983, "speaker": "@user187", "text": "following up here"}
+{"turn": 984, "speaker": "@user051", "text": "is the build green?"}
+{"turn": 985, "speaker": "@user055", "text": "PTAL"}
+{"turn": 986, "speaker": "@user150", "text": "@user166 lgtm 👍"}
+{"turn": 987, "speaker": "@user062", "text": "the helios deadline is now 2026-10-20", "fact_id": 191}
+{"turn": 988, "speaker": "@user094", "text": "vega rollout is rescheduled to Wed 13:00", "fact_id": 192}
+{"turn": 989, "speaker": "@user001", "text": "ack"}
+{"turn": 990, "speaker": "@user160", "text": "brb"}
+{"turn": 991, "speaker": "@user098", "text": "following up here"}
+{"turn": 992, "speaker": "@user165", "text": "let's sync tomorrow"}
+{"turn": 993, "speaker": "@user058", "text": "@user031 lgtm 👍"}
+{"turn": 994, "speaker": "@user141", "text": "who's on call tonight?"}
+{"turn": 995, "speaker": "@user142", "text": "thanks!"}
+{"turn": 996, "speaker": "@user142", "text": "@user032 following up here"}
+{"turn": 997, "speaker": "@user080", "text": "can someone take a look?"}
+{"turn": 998, "speaker": "@user148", "text": "let's sync tomorrow"}
+{"turn": 999, "speaker": "@user046", "text": "@user059 following up here"}
+{"turn": 1000, "speaker": "@user052", "text": "@user021 lgtm 👍"}
+{"turn": 1001, "speaker": "@user037", "text": "titan p99 latency is 522ms after the change", "fact_id": 193}
+{"turn": 1002, "speaker": "@user119", "text": "re-running CI"}
+{"turn": 1003, "speaker": "@user188", "text": "can someone take a look?"}
+{"turn": 1004, "speaker": "@user158", "text": "is the build green?"}
+{"turn": 1005, "speaker": "@user074", "text": "who's on call tonight?"}
+{"turn": 1006, "speaker": "@user189", "text": "@user038 PTAL"}
+{"turn": 1007, "speaker": "@user127", "text": "re-running CI"}
+{"turn": 1008, "speaker": "@user099", "text": "@user005 ship it"}
+{"turn": 1009, "speaker": "@user193", "text": "@user197 following up here"}
+{"turn": 1010, "speaker": "@user190", "text": "the dashboard looks off"}
+{"turn": 1011, "speaker": "@user141", "text": "reverted, was flaky"}
+{"turn": 1012, "speaker": "@user024", "text": "PTAL"}
+{"turn": 1013, "speaker": "@user187", "text": "the dashboard looks off"}
+{"turn": 1014, "speaker": "@user159", "text": "@user007 reverted, was flaky"}
+{"turn": 1015, "speaker": "@user046", "text": "@user133 ack"}
+{"turn": 1016, "speaker": "@user075", "text": "any updates on this?"}
+{"turn": 1017, "speaker": "@user141", "text": "I'll check after standup"}
+{"turn": 1018, "speaker": "@user164", "text": "ship it"}
+{"turn": 1019, "speaker": "@user095", "text": "@user030 ship it"}
+{"turn": 1020, "speaker": "@user121", "text": "@user145 PTAL"}
+{"turn": 1021, "speaker": "@user083", "text": "I'll check after standup"}
+{"turn": 1022, "speaker": "@user070", "text": "merged"}
+{"turn": 1023, "speaker": "@user012", "text": "brb"}
+{"turn": 1024, "speaker": "@user041", "text": "@user113 ship it"}
+{"turn": 1025, "speaker": "@user090", "text": "following up here"}
+{"turn": 1026, "speaker": "@user164", "text": "the dashboard looks off"}
+{"turn": 1027, "speaker": "@user046", "text": "brb"}
+{"turn": 1028, "speaker": "@user182", "text": "merged"}
+{"turn": 1029, "speaker": "@user112", "text": "the dashboard looks off"}
+{"turn": 1030, "speaker": "@user160", "text": "is the build green?"}
+{"turn": 1031, "speaker": "@user101", "text": "let's sync tomorrow"}
+{"turn": 1032, "speaker": "@user092", "text": "billing rollout is rescheduled to Mon 12:00", "fact_id": 194}
+{"turn": 1033, "speaker": "@user004", "text": "@user071 re-running CI"}
+{"turn": 1034, "speaker": "@user046", "text": "@user119 the dashboard looks off"}
+{"turn": 1035, "speaker": "@user014", "text": "titan owner is now @user004", "fact_id": 195}
+{"turn": 1036, "speaker": "@user122", "text": "the dashboard looks off"}
+{"turn": 1037, "speaker": "@user187", "text": "brb"}
+{"turn": 1038, "speaker": "@user173", "text": "@user096 following up here"}
+{"turn": 1039, "speaker": "@user185", "text": "can someone take a look?"}
+{"turn": 1040, "speaker": "@user058", "text": "@user193 I'll check after standup"}
+{"turn": 1041, "speaker": "@user070", "text": "brb"}
+{"turn": 1042, "speaker": "@user102", "text": "the lyra deadline is now 2026-03-11", "fact_id": 196}
+{"turn": 1043, "speaker": "@user059", "text": "lgtm 👍"}
+{"turn": 1044, "speaker": "@user193", "text": "thanks!"}
+{"turn": 1045, "speaker": "@user117", "text": "I'll check after standup"}
+{"turn": 1046, "speaker": "@user012", "text": "the orion deadline is now 2026-01-04", "fact_id": 197}
+{"turn": 1047, "speaker": "@user051", "text": "is the build green?"}
+{"turn": 1048, "speaker": "@user084", "text": "+1"}
+{"turn": 1049, "speaker": "@user142", "text": "@user184 following up here"}
+{"turn": 1050, "speaker": "@user180", "text": "nice work team"}
+{"turn": 1051, "speaker": "@user200", "text": "can someone take a look?"}
+{"turn": 1052, "speaker": "@user073", "text": "lyra rollout is rescheduled to Fri 17:00", "fact_id": 198}
+{"turn": 1053, "speaker": "@user174", "text": "auth p99 latency is 875ms after the change", "fact_id": 199}
+{"turn": 1054, "speaker": "@user197", "text": "lgtm 👍"}
+{"turn": 1055, "speaker": "@user032", "text": "let's sync tomorrow"}
+{"turn": 1056, "speaker": "@user177", "text": "nice work team"}
+{"turn": 1057, "speaker": "@user092", "text": "@user091 let's sync tomorrow"}
+{"turn": 1058, "speaker": "@user118", "text": "ingest owner is now @user132", "fact_id": 200}
+{"turn": 1059, "speaker": "@user065", "text": "@user082 let's sync tomorrow"}
+{"turn": 1060, "speaker": "@user111", "text": "PTAL"}
+{"turn": 1061, "speaker": "@user142", "text": "can someone take a look?"}
+{"turn": 1062, "speaker": "@user194", "text": "who's on call tonight?"}
+{"turn": 1063, "speaker": "@user021", "text": "@user162 reverted, was flaky"}
+{"turn": 1064, "speaker": "@user102", "text": "brb"}
+{"turn": 1065, "speaker": "@user035", "text": "PTAL"}
+{"turn": 1066, "speaker": "@user004", "text": "the dashboard looks off"}
+{"turn": 1067, "speaker": "@user200", "text": "the notifications deadline is now 2026-08-08", "fact_id": 201}
+{"turn": 1068, "speaker": "@user060", "text": "ship it"}
+{"turn": 1069, "speaker": "@user155", "text": "ack"}
+{"turn": 1070, "speaker": "@user127", "text": "orion rollout is rescheduled to Wed 17:00", "fact_id": 202}
+{"turn": 1071, "speaker": "@user163", "text": "done"}
+{"turn": 1072, "speaker": "@user119", "text": "PTAL"}
+{"turn": 1073, "speaker": "@user170", "text": "orion rollout is rescheduled to Fri 10:00", "fact_id": 203}
+{"turn": 1074, "speaker": "@user163", "text": "@user112 following up here"}
+{"turn": 1075, "speaker": "@user110", "text": "@user179 brb"}
+{"turn": 1076, "speaker": "@user130", "text": "nova owner is now @user120", "fact_id": 204}
+{"turn": 1077, "speaker": "@user110", "text": "done"}
+{"turn": 1078, "speaker": "@user197", "text": "PTAL"}
+{"turn": 1079, "speaker": "@user105", "text": "ship it"}
+{"turn": 1080, "speaker": "@user073", "text": "@user069 merged"}
+{"turn": 1081, "speaker": "@user143", "text": "re-running CI"}
+{"turn": 1082, "speaker": "@user072", "text": "the dashboard looks off"}
+{"turn": 1083, "speaker": "@user020", "text": "any updates on this?"}
+{"turn": 1084, "speaker": "@user005", "text": "@user077 +1"}
+{"turn": 1085, "speaker": "@user165", "text": "re-running CI"}
+{"turn": 1086, "speaker": "@user046", "text": "re-running CI"}
+{"turn": 1087, "speaker": "@user058", "text": "the dashboard looks off"}
+{"turn": 1088, "speaker": "@user170", "text": "+1"}
+{"turn": 1089, "speaker": "@user149", "text": "following up here"}
+{"turn": 1090, "speaker": "@user108", "text": "the dashboard looks off"}
+{"turn": 1091, "speaker": "@user146", "text": "done"}
+{"turn": 1092, "speaker": "@user174", "text": "the payments-api deadline is now 2026-10-28", "fact_id": 205}
+{"turn": 1093, "speaker": "@user088", "text": "@user196 ship it"}
+{"turn": 1094, "speaker": "@user035", "text": "following up here"}
+{"turn": 1095, "speaker": "@user121", "text": "brb"}
+{"turn": 1096, "speaker": "@user149", "text": "@user065 nice work team"}
+{"turn": 1097, "speaker": "@user189", "text": "the gateway deadline is now 2026-11-17", "fact_id": 206}
+{"turn": 1098, "speaker": "@user036", "text": "following up here"}
+{"turn": 1099, "speaker": "@user175", "text": "reverted, was flaky"}
+{"turn": 1100, "speaker": "@user051", "text": "nice work team"}
+{"turn": 1101, "speaker": "@user097", "text": "helios rollout is rescheduled to Wed 15:00", "fact_id": 207}
+{"turn": 1102, "speaker": "@user078", "text": "@user041 reverted, was flaky"}
+{"turn": 1103, "speaker": "@user024", "text": "who's on call tonight?"}
+{"turn": 1104, "speaker": "@user183", "text": "ack"}
+{"turn": 1105, "speaker": "@user027", "text": "the dashboard looks off"}
+{"turn": 1106, "speaker": "@user116", "text": "@user118 nice work team"}
+{"turn": 1107, "speaker": "@user093", "text": "auth owner is now @user103", "fact_id": 208}
+{"turn": 1108, "speaker": "@user186", "text": "the ingest deadline is now 2026-07-01", "fact_id": 209}
+{"turn": 1109, "speaker": "@user162", "text": "@user171 any updates on this?"}
+{"turn": 1110, "speaker": "@user176", "text": "@user148 following up here"}
+{"turn": 1111, "speaker": "@user115", "text": "@user080 brb"}
+{"turn": 1112, "speaker": "@user086", "text": "reverted, was flaky"}
+{"turn": 1113, "speaker": "@user200", "text": "orion owner is now @user163", "fact_id": 210}
+{"turn": 1114, "speaker": "@user177", "text": "any updates on this?"}
+{"turn": 1115, "speaker": "@user097", "text": "@user108 who's on call tonight?"}
+{"turn": 1116, "speaker": "@user030", "text": "@user135 reverted, was flaky"}
+{"turn": 1117, "speaker": "@user041", "text": "can someone take a look?"}
+{"turn": 1118, "speaker": "@user137", "text": "+1"}
+{"turn": 1119, "speaker": "@user008", "text": "billing owner is now @user096", "fact_id": 211}
+{"turn": 1120, "speaker": "@user009", "text": "@user028 let's sync tomorrow"}
+{"turn": 1121, "speaker": "@user136", "text": "PTAL"}
+{"turn": 1122, "speaker": "@user117", "text": "is the build green?"}
+{"turn": 1123, "speaker": "@user188", "text": "is the build green?"}
+{"turn": 1124, "speaker": "@user044", "text": "ship it"}
+{"turn": 1125, "speaker": "@user011", "text": "@user029 lgtm 👍"}
+{"turn": 1126, "speaker": "@user100", "text": "the dashboard looks off"}
+{"turn": 1127, "speaker": "@user081", "text": "re-running CI"}
+{"turn": 1128, "speaker": "@user120", "text": "lgtm 👍"}
+{"turn": 1129, "speaker": "@user099", "text": "who's on call tonight?"}
+{"turn": 1130, "speaker": "@user139", "text": "can someone take a look?"}
+{"turn": 1131, "speaker": "@user161", "text": "@user088 nice work team"}
+{"turn": 1132, "speaker": "@user173", "text": "I'll check after standup"}
+{"turn": 1133, "speaker": "@user060", "text": "re-running CI"}
+{"turn": 1134, "speaker": "@user190", "text": "@user122 following up here"}
+{"turn": 1135, "speaker": "@user197", "text": "following up here"}
+{"turn": 1136, "speaker": "@user131", "text": "let's sync tomorrow"}
+{"turn": 1137, "speaker": "@user116", "text": "lgtm 👍"}
+{"turn": 1138, "speaker": "@user117", "text": "the nova deadline is now 2026-09-20", "fact_id": 212}
+{"turn": 1139, "speaker": "@user013", "text": "atlas p99 latency is 334ms after the change", "fact_id": 213}
+{"turn": 1140, "speaker": "@user046", "text": "@user128 merged"}
+{"turn": 1141, "speaker": "@user010", "text": "following up here"}
+{"turn": 1142, "speaker": "@user047", "text": "the dashboard looks off"}
+{"turn": 1143, "speaker": "@user118", "text": "titan p99 latency is 255ms after the change", "fact_id": 214}
+{"turn": 1144, "speaker": "@user048", "text": "ack"}
+{"turn": 1145, "speaker": "@user016", "text": "@user171 I'll check after standup"}
+{"turn": 1146, "speaker": "@user117", "text": "+1"}
+{"turn": 1147, "speaker": "@user120", "text": "who's on call tonight?"}
+{"turn": 1148, "speaker": "@user022", "text": "@user047 following up here"}
+{"turn": 1149, "speaker": "@user045", "text": "thanks!"}
+{"turn": 1150, "speaker": "@user163", "text": "any updates on this?"}
+{"turn": 1151, "speaker": "@user145", "text": "can someone take a look?"}
+{"turn": 1152, "speaker": "@user032", "text": "@user197 brb"}
+{"turn": 1153, "speaker": "@user099", "text": "I'll check after standup"}
+{"turn": 1154, "speaker": "@user045", "text": "merged"}
+{"turn": 1155, "speaker": "@user190", "text": "ack"}
+{"turn": 1156, "speaker": "@user113", "text": "@user118 is the build green?"}
+{"turn": 1157, "speaker": "@user066", "text": "can someone take a look?"}
+{"turn": 1158, "speaker": "@user106", "text": "notifications p99 latency is 46ms after the change", "fact_id": 215}
+{"turn": 1159, "speaker": "@user164", "text": "merged"}
+{"turn": 1160, "speaker": "@user070", "text": "ship it"}
+{"turn": 1161, "speaker": "@user089", "text": "@user119 lgtm 👍"}
+{"turn": 1162, "speaker": "@user170", "text": "PTAL"}
+{"turn": 1163, "speaker": "@user057", "text": "ack"}
+{"turn": 1164, "speaker": "@user056", "text": "is the build green?"}
+{"turn": 1165, "speaker": "@user074", "text": "@user015 PTAL"}
+{"turn": 1166, "speaker": "@user171", "text": "+1"}
+{"turn": 1167, "speaker": "@user123", "text": "draco p99 latency is 64ms after the change", "fact_id": 216}
+{"turn": 1168, "speaker": "@user053", "text": "lgtm 👍"}
+{"turn": 1169, "speaker": "@user055", "text": "lgtm 👍"}
+{"turn": 1170, "speaker": "@user139", "text": "PTAL"}
+{"turn": 1171, "speaker": "@user113", "text": "@user033 re-running CI"}
+{"turn": 1172, "speaker": "@user040", "text": "done"}
+{"turn": 1173, "speaker": "@user150", "text": "@user112 is the build green?"}
+{"turn": 1174, "speaker": "@user191", "text": "I'll check after standup"}
+{"turn": 1175, "speaker": "@user097", "text": "re-running CI"}
+{"turn": 1176, "speaker": "@user077", "text": "merged"}
+{"turn": 1177, "speaker": "@user161", "text": "@user046 +1"}
+{"turn": 1178, "speaker": "@user173", "text": "let's sync tomorrow"}
+{"turn": 1179, "speaker": "@user137", "text": "the dashboard looks off"}
+{"turn": 1180, "speaker": "@user014", "text": "@user083 brb"}
+{"turn": 1181, "speaker": "@user003", "text": "nice work team"}
+{"turn": 1182, "speaker": "@user199", "text": "I'll check after standup"}
+{"turn": 1183, "speaker": "@user021", "text": "who's on call tonight?"}
+{"turn": 1184, "speaker": "@user007", "text": "@user159 merged"}
+{"turn": 1185, "speaker": "@user162", "text": "the orion deadline is now 2026-08-26", "fact_id": 217}
+{"turn": 1186, "speaker": "@user136", "text": "@user199 reverted, was flaky"}
+{"turn": 1187, "speaker": "@user044", "text": "orion rollout is rescheduled to Fri 16:00", "fact_id": 218}
+{"turn": 1188, "speaker": "@user150", "text": "any updates on this?"}
+{"turn": 1189, "speaker": "@user185", "text": "@user195 following up here"}
+{"turn": 1190, "speaker": "@user061", "text": "the orion deadline is now 2026-08-14", "fact_id": 219}
+{"turn": 1191, "speaker": "@user150", "text": "I'll check after standup"}
+{"turn": 1192, "speaker": "@user036", "text": "PTAL"}
+{"turn": 1193, "speaker": "@user154", "text": "the dashboard looks off"}
+{"turn": 1194, "speaker": "@user159", "text": "billing owner is now @user015", "fact_id": 220}
+{"turn": 1195, "speaker": "@user099", "text": "@user188 ship it"}
+{"turn": 1196, "speaker": "@user018", "text": "@user131 merged"}
+{"turn": 1197, "speaker": "@user150", "text": "I'll check after standup"}
+{"turn": 1198, "speaker": "@user101", "text": "thanks!"}
+{"turn": 1199, "speaker": "@user037", "text": "ack"}
+{"turn": 1200, "speaker": "@user010", "text": "can someone take a look?"}
+{"turn": 1201, "speaker": "@user179", "text": "nice work team"}
+{"turn": 1202, "speaker": "@user047", "text": "@user046 following up here"}
+{"turn": 1203, "speaker": "@user066", "text": "+1"}
+{"turn": 1204, "speaker": "@user178", "text": "vega rollout is rescheduled to Fri 9:00", "fact_id": 221}
+{"turn": 1205, "speaker": "@user158", "text": "payments-api rollout is rescheduled to Wed 18:00", "fact_id": 222}
+{"turn": 1206, "speaker": "@user069", "text": "PTAL"}
+{"turn": 1207, "speaker": "@user125", "text": "@user073 any updates on this?"}
+{"turn": 1208, "speaker": "@user023", "text": "+1"}
+{"turn": 1209, "speaker": "@user093", "text": "zephyr p99 latency is 432ms after the change", "fact_id": 223}
+{"turn": 1210, "speaker": "@user115", "text": "orion rollout is rescheduled to Wed 9:00", "fact_id": 224}
+{"turn": 1211, "speaker": "@user082", "text": "brb"}
+{"turn": 1212, "speaker": "@user052", "text": "the dashboard looks off"}
+{"turn": 1213, "speaker": "@user193", "text": "merged"}
+{"turn": 1214, "speaker": "@user190", "text": "+1"}
+{"turn": 1215, "speaker": "@user184", "text": "billing p99 latency is 156ms after the change", "fact_id": 225}
+{"turn": 1216, "speaker": "@user154", "text": "ingest p99 latency is 855ms after the change", "fact_id": 226}
+{"turn": 1217, "speaker": "@user031", "text": "reverted, was flaky"}
+{"turn": 1218, "speaker": "@user177", "text": "the dashboard looks off"}
+{"turn": 1219, "speaker": "@user170", "text": "PTAL"}
+{"turn": 1220, "speaker": "@user136", "text": "@user016 who's on call tonight?"}
+{"turn": 1221, "speaker": "@user080", "text": "brb"}
+{"turn": 1222, "speaker": "@user001", "text": "@user159 merged"}
+{"turn": 1223, "speaker": "@user128", "text": "the dashboard looks off"}
+{"turn": 1224, "speaker": "@user100", "text": "@user158 merged"}
+{"turn": 1225, "speaker": "@user157", "text": "ack"}
+{"turn": 1226, "speaker": "@user178", "text": "@user171 nice work team"}
+{"turn": 1227, "speaker": "@user019", "text": "@user097 I'll check after standup"}
+{"turn": 1228, "speaker": "@user200", "text": "brb"}
+{"turn": 1229, "speaker": "@user042", "text": "brb"}
+{"turn": 1230, "speaker": "@user161", "text": "@user015 any updates on this?"}
+{"turn": 1231, "speaker": "@user158", "text": "lgtm 👍"}
+{"turn": 1232, "speaker": "@user079", "text": "who's on call tonight?"}
+{"turn": 1233, "speaker": "@user134", "text": "can someone take a look?"}
+{"turn": 1234, "speaker": "@user071", "text": "re-running CI"}
+{"turn": 1235, "speaker": "@user026", "text": "@user174 ack"}
+{"turn": 1236, "speaker": "@user083", "text": "@user023 reverted, was flaky"}
+{"turn": 1237, "speaker": "@user119", "text": "@user132 I'll check after standup"}
+{"turn": 1238, "speaker": "@user170", "text": "draco owner is now @user022", "fact_id": 227}
+{"turn": 1239, "speaker": "@user007", "text": "PTAL"}
+{"turn": 1240, "speaker": "@user088", "text": "+1"}
+{"turn": 1241, "speaker": "@user016", "text": "@user164 re-running CI"}
+{"turn": 1242, "speaker": "@user039", "text": "@user118 PTAL"}
+{"turn": 1243, "speaker": "@user014", "text": "lyra owner is now @user169", "fact_id": 228}
+{"turn": 1244, "speaker": "@user021", "text": "done"}
+{"turn": 1245, "speaker": "@user024", "text": "thanks!"}
+{"turn": 1246, "speaker": "@user086", "text": "@user019 done"}
+{"turn": 1247, "speaker": "@user094", "text": "orion rollout is rescheduled to Fri 18:00", "fact_id": 229}
+{"turn": 1248, "speaker": "@user022", "text": "nova rollout is rescheduled to Mon 16:00", "fact_id": 230}
+{"turn": 1249, "speaker": "@user058", "text": "lgtm 👍"}
+{"turn": 1250, "speaker": "@user002", "text": "nice work team"}
+{"turn": 1251, "speaker": "@user029", "text": "draco rollout is rescheduled to Fri 16:00", "fact_id": 231}
+{"turn": 1252, "speaker": "@user184", "text": "can someone take a look?"}
+{"turn": 1253, "speaker": "@user020", "text": "re-running CI"}
+{"turn": 1254, "speaker": "@user086", "text": "notifications p99 latency is 709ms after the change", "fact_id": 232}
+{"turn": 1255, "speaker": "@user129", "text": "@user095 I'll check after standup"}
+{"turn": 1256, "speaker": "@user165", "text": "zephyr rollout is rescheduled to Wed 15:00", "fact_id": 233}
+{"turn": 1257, "speaker": "@user057", "text": "@user066 the dashboard looks off"}
+{"turn": 1258, "speaker": "@user115", "text": "@user117 is the build green?"}
+{"turn": 1259, "speaker": "@user028", "text": "@user008 who's on call tonight?"}
+{"turn": 1260, "speaker": "@user174", "text": "the gateway deadline is now 2026-04-08", "fact_id": 234}
+{"turn": 1261, "speaker": "@user002", "text": "the nova deadline is now 2026-03-02", "fact_id": 235}
+{"turn": 1262, "speaker": "@user131", "text": "let's sync tomorrow"}
+{"turn": 1263, "speaker": "@user020", "text": "@user087 lgtm 👍"}
+{"turn": 1264, "speaker": "@user033", "text": "the search deadline is now 2026-06-12", "fact_id": 236}
+{"turn": 1265, "speaker": "@user045", "text": "vega p99 latency is 366ms after the change", "fact_id": 237}
+{"turn": 1266, "speaker": "@user086", "text": "can someone take a look?"}
+{"turn": 1267, "speaker": "@user193", "text": "@user033 brb"}
+{"turn": 1268, "speaker": "@user189", "text": "@user149 reverted, was flaky"}
+{"turn": 1269, "speaker": "@user059", "text": "@user140 re-running CI"}
+{"turn": 1270, "speaker": "@user011", "text": "draco rollout is rescheduled to Fri 17:00", "fact_id": 238}
+{"turn": 1271, "speaker": "@user157", "text": "@user054 any updates on this?"}
+{"turn": 1272, "speaker": "@user176", "text": "who's on call tonight?"}
+{"turn": 1273, "speaker": "@user139", "text": "payments-api owner is now @user198", "fact_id": 239}
+{"turn": 1274, "speaker": "@user023", "text": "re-running CI"}
+{"turn": 1275, "speaker": "@user001", "text": "let's sync tomorrow"}
+{"turn": 1276, "speaker": "@user090", "text": "merged"}
+{"turn": 1277, "speaker": "@user163", "text": "lgtm 👍"}
+{"turn": 1278, "speaker": "@user123", "text": "@user068 +1"}
+{"turn": 1279, "speaker": "@user076", "text": "can someone take a look?"}
+{"turn": 1280, "speaker": "@user160", "text": "+1"}
+{"turn": 1281, "speaker": "@user087", "text": "nice work team"}
+{"turn": 1282, "speaker": "@user177", "text": "@user068 re-running CI"}
+{"turn": 1283, "speaker": "@user045", "text": "reverted, was flaky"}
+{"turn": 1284, "speaker": "@user034", "text": "the dashboard looks off"}
+{"turn": 1285, "speaker": "@user092", "text": "the dashboard looks off"}
+{"turn": 1286, "speaker": "@user146", "text": "done"}
+{"turn": 1287, "speaker": "@user094", "text": "brb"}
+{"turn": 1288, "speaker": "@user006", "text": "nova owner is now @user056", "fact_id": 240}
+{"turn": 1289, "speaker": "@user086", "text": "payments-api owner is now @user183", "fact_id": 241}
+{"turn": 1290, "speaker": "@user024", "text": "can someone take a look?"}
+{"turn": 1291, "speaker": "@user119", "text": "merged"}
+{"turn": 1292, "speaker": "@user050", "text": "+1"}
+{"turn": 1293, "speaker": "@user128", "text": "done"}
+{"turn": 1294, "speaker": "@user083", "text": "let's sync tomorrow"}
+{"turn": 1295, "speaker": "@user037", "text": "the billing deadline is now 2026-08-25", "fact_id": 242}
+{"turn": 1296, "speaker": "@user063", "text": "@user053 any updates on this?"}
+{"turn": 1297, "speaker": "@user020", "text": "+1"}
+{"turn": 1298, "speaker": "@user127", "text": "the atlas deadline is now 2026-12-11", "fact_id": 243}
+{"turn": 1299, "speaker": "@user015", "text": "lyra p99 latency is 308ms after the change", "fact_id": 244}
+{"turn": 1300, "speaker": "@user117", "text": "merged"}
+{"turn": 1301, "speaker": "@user183", "text": "the payments-api deadline is now 2026-05-18", "fact_id": 245}
+{"turn": 1302, "speaker": "@user174", "text": "brb"}
+{"turn": 1303, "speaker": "@user027", "text": "brb"}
+{"turn": 1304, "speaker": "@user157", "text": "ship it"}
+{"turn": 1305, "speaker": "@user070", "text": "I'll check after standup"}
+{"turn": 1306, "speaker": "@user027", "text": "@user160 can someone take a look?"}
+{"turn": 1307, "speaker": "@user120", "text": "who's on call tonight?"}
+{"turn": 1308, "speaker": "@user179", "text": "is the build green?"}
+{"turn": 1309, "speaker": "@user024", "text": "gateway owner is now @user162", "fact_id": 246}
+{"turn": 1310, "speaker": "@user017", "text": "brb"}
+{"turn": 1311, "speaker": "@user093", "text": "is the build green?"}
+{"turn": 1312, "speaker": "@user200", "text": "the vega deadline is now 2026-03-12", "fact_id": 247}
+{"turn": 1313, "speaker": "@user175", "text": "ack"}
+{"turn": 1314, "speaker": "@user168", "text": "payments-api rollout is rescheduled to Fri 14:00", "fact_id": 248}
+{"turn": 1315, "speaker": "@user143", "text": "the auth deadline is now 2026-09-13", "fact_id": 249}
+{"turn": 1316, "speaker": "@user152", "text": "can someone take a look?"}
+{"turn": 1317, "speaker": "@user100", "text": "@user075 is the build green?"}
+{"turn": 1318, "speaker": "@user178", "text": "@user030 merged"}
+{"turn": 1319, "speaker": "@user128", "text": "following up here"}
+{"turn": 1320, "speaker": "@user053", "text": "@user134 re-running CI"}
+{"turn": 1321, "speaker": "@user030", "text": "@user089 ship it"}
+{"turn": 1322, "speaker": "@user020", "text": "I'll check after standup"}
+{"turn": 1323, "speaker": "@user052", "text": "zephyr rollout is rescheduled to Fri 11:00", "fact_id": 250}
+{"turn": 1324, "speaker": "@user167", "text": "the lyra deadline is now 2026-12-05", "fact_id": 251}
+{"turn": 1325, "speaker": "@user200", "text": "re-running CI"}
+{"turn": 1326, "speaker": "@user188", "text": "PTAL"}
+{"turn": 1327, "speaker": "@user185", "text": "following up here"}
+{"turn": 1328, "speaker": "@user109", "text": "done"}
+{"turn": 1329, "speaker": "@user010", "text": "@user167 lgtm 👍"}
+{"turn": 1330, "speaker": "@user182", "text": "who's on call tonight?"}
+{"turn": 1331, "speaker": "@user194", "text": "brb"}
+{"turn": 1332, "speaker": "@user002", "text": "ship it"}
+{"turn": 1333, "speaker": "@user026", "text": "@user164 lgtm 👍"}
+{"turn": 1334, "speaker": "@user056", "text": "+1"}
+{"turn": 1335, "speaker": "@user177", "text": "can someone take a look?"}
+{"turn": 1336, "speaker": "@user141", "text": "nice work team"}
+{"turn": 1337, "speaker": "@user136", "text": "the dashboard looks off"}
+{"turn": 1338, "speaker": "@user134", "text": "any updates on this?"}
+{"turn": 1339, "speaker": "@user041", "text": "lgtm 👍"}
+{"turn": 1340, "speaker": "@user063", "text": "@user194 I'll check after standup"}
+{"turn": 1341, "speaker": "@user186", "text": "+1"}
+{"turn": 1342, "speaker": "@user041", "text": "the dashboard looks off"}
+{"turn": 1343, "speaker": "@user166", "text": "@user180 lgtm 👍"}
+{"turn": 1344, "speaker": "@user110", "text": "any updates on this?"}
+{"turn": 1345, "speaker": "@user060", "text": "can someone take a look?"}
+{"turn": 1346, "speaker": "@user009", "text": "@user186 thanks!"}
+{"turn": 1347, "speaker": "@user016", "text": "merged"}
+{"turn": 1348, "speaker": "@user017", "text": "PTAL"}
+{"turn": 1349, "speaker": "@user088", "text": "thanks!"}
+{"turn": 1350, "speaker": "@user121", "text": "zephyr rollout is rescheduled to Mon 14:00", "fact_id": 252}
+{"turn": 1351, "speaker": "@user099", "text": "following up here"}
+{"turn": 1352, "speaker": "@user062", "text": "done"}
+{"turn": 1353, "speaker": "@user169", "text": "@user160 any updates on this?"}
+{"turn": 1354, "speaker": "@user118", "text": "is the build green?"}
+{"turn": 1355, "speaker": "@user103", "text": "re-running CI"}
+{"turn": 1356, "speaker": "@user070", "text": "gateway rollout is rescheduled to Wed 11:00", "fact_id": 253}
+{"turn": 1357, "speaker": "@user095", "text": "gateway p99 latency is 505ms after the change", "fact_id": 254}
+{"turn": 1358, "speaker": "@user139", "text": "gateway rollout is rescheduled to Fri 12:00", "fact_id": 255}
+{"turn": 1359, "speaker": "@user199", "text": "I'll check after standup"}
+{"turn": 1360, "speaker": "@user061", "text": "ingest owner is now @user116", "fact_id": 256}
+{"turn": 1361, "speaker": "@user129", "text": "@user096 who's on call tonight?"}
+{"turn": 1362, "speaker": "@user126", "text": "@user198 let's sync tomorrow"}
+{"turn": 1363, "speaker": "@user087", "text": "@user087 PTAL"}
+{"turn": 1364, "speaker": "@user174", "text": "billing p99 latency is 459ms after the change", "fact_id": 257}
+{"turn": 1365, "speaker": "@user001", "text": "@user138 thanks!"}
+{"turn": 1366, "speaker": "@user150", "text": "+1"}
+{"turn": 1367, "speaker": "@user165", "text": "following up here"}
+{"turn": 1368, "speaker": "@user150", "text": "notifications rollout is rescheduled to Fri 15:00", "fact_id": 258}
+{"turn": 1369, "speaker": "@user083", "text": "the zephyr deadline is now 2026-05-15", "fact_id": 259}
+{"turn": 1370, "speaker": "@user034", "text": "done"}
+{"turn": 1371, "speaker": "@user005", "text": "reverted, was flaky"}
+{"turn": 1372, "speaker": "@user164", "text": "is the build green?"}
+{"turn": 1373, "speaker": "@user088", "text": "any updates on this?"}
+{"turn": 1374, "speaker": "@user007", "text": "following up here"}
+{"turn": 1375, "speaker": "@user131", "text": "who's on call tonight?"}
+{"turn": 1376, "speaker": "@user140", "text": "search owner is now @user142", "fact_id": 260}
+{"turn": 1377, "speaker": "@user147", "text": "nice work team"}
+{"turn": 1378, "speaker": "@user193", "text": "ack"}
+{"turn": 1379, "speaker": "@user128", "text": "reverted, was flaky"}
+{"turn": 1380, "speaker": "@user106", "text": "re-running CI"}
+{"turn": 1381, "speaker": "@user079", "text": "is the build green?"}
+{"turn": 1382, "speaker": "@user184", "text": "@user131 can someone take a look?"}
+{"turn": 1383, "speaker": "@user107", "text": "@user077 can someone take a look?"}
+{"turn": 1384, "speaker": "@user038", "text": "is the build green?"}
+{"turn": 1385, "speaker": "@user096", "text": "thanks!"}
+{"turn": 1386, "speaker": "@user101", "text": "let's sync tomorrow"}
+{"turn": 1387, "speaker": "@user053", "text": "lgtm 👍"}
+{"turn": 1388, "speaker": "@user189", "text": "any updates on this?"}
+{"turn": 1389, "speaker": "@user179", "text": "+1"}
+{"turn": 1390, "speaker": "@user075", "text": "@user138 ack"}
+{"turn": 1391, "speaker": "@user131", "text": "ack"}
+{"turn": 1392, "speaker": "@user185", "text": "let's sync tomorrow"}
+{"turn": 1393, "speaker": "@user121", "text": "who's on call tonight?"}
+{"turn": 1394, "speaker": "@user022", "text": "the orion deadline is now 2026-08-02", "fact_id": 261}
+{"turn": 1395, "speaker": "@user159", "text": "who's on call tonight?"}
+{"turn": 1396, "speaker": "@user129", "text": "@user065 I'll check after standup"}
+{"turn": 1397, "speaker": "@user142", "text": "@user120 reverted, was flaky"}
+{"turn": 1398, "speaker": "@user063", "text": "notifications owner is now @user149", "fact_id": 262}
+{"turn": 1399, "speaker": "@user078", "text": "can someone take a look?"}
+{"turn": 1400, "speaker": "@user015", "text": "@user060 PTAL"}
+{"turn": 1401, "speaker": "@user113", "text": "lgtm 👍"}
+{"turn": 1402, "speaker": "@user100", "text": "@user091 reverted, was flaky"}
+{"turn": 1403, "speaker": "@user093", "text": "re-running CI"}
+{"turn": 1404, "speaker": "@user004", "text": "the dashboard looks off"}
+{"turn": 1405, "speaker": "@user190", "text": "the auth deadline is now 2026-10-19", "fact_id": 263}
+{"turn": 1406, "speaker": "@user078", "text": "helios rollout is rescheduled to Fri 10:00", "fact_id": 264}
+{"turn": 1407, "speaker": "@user106", "text": "@user150 ack"}
+{"turn": 1408, "speaker": "@user141", "text": "thanks!"}
+{"turn": 1409, "speaker": "@user187", "text": "billing rollout is rescheduled to Mon 17:00", "fact_id": 265}
+{"turn": 1410, "speaker": "@user030", "text": "@user069 ship it"}
+{"turn": 1411, "speaker": "@user116", "text": "the dashboard looks off"}
+{"turn": 1412, "speaker": "@user132", "text": "let's sync tomorrow"}
+{"turn": 1413, "speaker": "@user009", "text": "the dashboard looks off"}
+{"turn": 1414, "speaker": "@user039", "text": "@user178 nice work team"}
+{"turn": 1415, "speaker": "@user029", "text": "reverted, was flaky"}
+{"turn": 1416, "speaker": "@user061", "text": "brb"}
+{"turn": 1417, "speaker": "@user109", "text": "ingest owner is now @user130", "fact_id": 266}
+{"turn": 1418, "speaker": "@user112", "text": "I'll check after standup"}
+{"turn": 1419, "speaker": "@user051", "text": "@user084 ship it"}
+{"turn": 1420, "speaker": "@user069", "text": "@user137 re-running CI"}
+{"turn": 1421, "speaker": "@user067", "text": "@user133 merged"}
+{"turn": 1422, "speaker": "@user163", "text": "@user153 done"}
+{"turn": 1423, "speaker": "@user035", "text": "let's sync tomorrow"}
+{"turn": 1424, "speaker": "@user062", "text": "the auth deadline is now 2026-10-04", "fact_id": 267}
+{"turn": 1425, "speaker": "@user190", "text": "any updates on this?"}
+{"turn": 1426, "speaker": "@user042", "text": "@user147 any updates on this?"}
+{"turn": 1427, "speaker": "@user077", "text": "who's on call tonight?"}
+{"turn": 1428, "speaker": "@user126", "text": "done"}
+{"turn": 1429, "speaker": "@user072", "text": "lgtm 👍"}
+{"turn": 1430, "speaker": "@user193", "text": "is the build green?"}
+{"turn": 1431, "speaker": "@user048", "text": "+1"}
+{"turn": 1432, "speaker": "@user141", "text": "orion rollout is rescheduled to Mon 18:00", "fact_id": 268}
+{"turn": 1433, "speaker": "@user186", "text": "@user197 nice work team"}
+{"turn": 1434, "speaker": "@user153", "text": "ship it"}
+{"turn": 1435, "speaker": "@user131", "text": "re-running CI"}
+{"turn": 1436, "speaker": "@user167", "text": "@user110 any updates on this?"}
+{"turn": 1437, "speaker": "@user124", "text": "billing owner is now @user031", "fact_id": 269}
+{"turn": 1438, "speaker": "@user055", "text": "is the build green?"}
+{"turn": 1439, "speaker": "@user140", "text": "merged"}
+{"turn": 1440, "speaker": "@user145", "text": "PTAL"}
+{"turn": 1441, "speaker": "@user005", "text": "is the build green?"}
+{"turn": 1442, "speaker": "@user196", "text": "@user173 any updates on this?"}
+{"turn": 1443, "speaker": "@user070", "text": "the gateway deadline is now 2026-10-10", "fact_id": 270}
+{"turn": 1444, "speaker": "@user196", "text": "@user009 who's on call tonight?"}
+{"turn": 1445, "speaker": "@user137", "text": "@user048 thanks!"}
+{"turn": 1446, "speaker": "@user068", "text": "reverted, was flaky"}
+{"turn": 1447, "speaker": "@user146", "text": "search rollout is rescheduled to Mon 13:00", "fact_id": 271}
+{"turn": 1448, "speaker": "@user105", "text": "the lyra deadline is now 2026-08-20", "fact_id": 272}
+{"turn": 1449, "speaker": "@user188", "text": "the billing deadline is now 2026-05-01", "fact_id": 273}
+{"turn": 1450, "speaker": "@user104", "text": "the titan deadline is now 2026-06-05", "fact_id": 274}
+{"turn": 1451, "speaker": "@user038", "text": "@user188 done"}
+{"turn": 1452, "speaker": "@user111", "text": "lgtm 👍"}
+{"turn": 1453, "speaker": "@user084", "text": "PTAL"}
+{"turn": 1454, "speaker": "@user003", "text": "done"}
+{"turn": 1455, "speaker": "@user001", "text": "following up here"}
+{"turn": 1456, "speaker": "@user167", "text": "can someone take a look?"}
+{"turn": 1457, "speaker": "@user030", "text": "brb"}
+{"turn": 1458, "speaker": "@user097", "text": "merged"}
+{"turn": 1459, "speaker": "@user046", "text": "auth rollout is rescheduled to Wed 14:00", "fact_id": 275}
+{"turn": 1460, "speaker": "@user010", "text": "ship it"}
+{"turn": 1461, "speaker": "@user152", "text": "helios owner is now @user143", "fact_id": 276}
+{"turn": 1462, "speaker": "@user130", "text": "nova rollout is rescheduled to Wed 11:00", "fact_id": 277}
+{"turn": 1463, "speaker": "@user056", "text": "@user155 I'll check after standup"}
+{"turn": 1464, "speaker": "@user148", "text": "let's sync tomorrow"}
+{"turn": 1465, "speaker": "@user168", "text": "re-running CI"}
+{"turn": 1466, "speaker": "@user075", "text": "nice work team"}
+{"turn": 1467, "speaker": "@user098", "text": "atlas rollout is rescheduled to Wed 9:00", "fact_id": 278}
+{"turn": 1468, "speaker": "@user015", "text": "atlas p99 latency is 137ms after the change", "fact_id": 279}
+{"turn": 1469, "speaker": "@user063", "text": "+1"}
+{"turn": 1470, "speaker": "@user005", "text": "+1"}
+{"turn": 1471, "speaker": "@user173", "text": "@user197 can someone take a look?"}
+{"turn": 1472, "speaker": "@user133", "text": "is the build green?"}
+{"turn": 1473, "speaker": "@user065", "text": "I'll check after standup"}
+{"turn": 1474, "speaker": "@user116", "text": "who's on call tonight?"}
+{"turn": 1475, "speaker": "@user090", "text": "nice work team"}
+{"turn": 1476, "speaker": "@user098", "text": "ack"}
+{"turn": 1477, "speaker": "@user012", "text": "payments-api p99 latency is 457ms after the change", "fact_id": 280}
+{"turn": 1478, "speaker": "@user034", "text": "nice work team"}
+{"turn": 1479, "speaker": "@user179", "text": "I'll check after standup"}
+{"turn": 1480, "speaker": "@user124", "text": "@user134 merged"}
+{"turn": 1481, "speaker": "@user151", "text": "ack"}
+{"turn": 1482, "speaker": "@user093", "text": "zephyr owner is now @user149", "fact_id": 281}
+{"turn": 1483, "speaker": "@user149", "text": "done"}
+{"turn": 1484, "speaker": "@user108", "text": "lgtm 👍"}
+{"turn": 1485, "speaker": "@user176", "text": "+1"}
+{"turn": 1486, "speaker": "@user164", "text": "nova rollout is rescheduled to Mon 17:00", "fact_id": 282}
+{"turn": 1487, "speaker": "@user058", "text": "@user121 re-running CI"}
+{"turn": 1488, "speaker": "@user178", "text": "@user069 ship it"}
+{"turn": 1489, "speaker": "@user097", "text": "auth p99 latency is 889ms after the change", "fact_id": 283}
+{"turn": 1490, "speaker": "@user104", "text": "titan owner is now @user098", "fact_id": 284}
+{"turn": 1491, "speaker": "@user095", "text": "lgtm 👍"}
+{"turn": 1492, "speaker": "@user186", "text": "@user100 brb"}
+{"turn": 1493, "speaker": "@user031", "text": "the auth deadline is now 2026-11-21", "fact_id": 285}
+{"turn": 1494, "speaker": "@user047", "text": "the dashboard looks off"}
+{"turn": 1495, "speaker": "@user013", "text": "who's on call tonight?"}
+{"turn": 1496, "speaker": "@user096", "text": "the draco deadline is now 2026-03-08", "fact_id": 286}
+{"turn": 1497, "speaker": "@user190", "text": "I'll check after standup"}
+{"turn": 1498, "speaker": "@user055", "text": "PTAL"}
+{"turn": 1499, "speaker": "@user179", "text": "who's on call tonight?"}

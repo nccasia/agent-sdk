@@ -1,0 +1,94 @@
+[project]
+name = "agent-sdk"
+version = "0.1.0"
+description = "PreAct — a portable, pre-structured-acting agent SDK (lobes → stages → flows, deterministic activation, metacognition)."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "NCC", email = "minh.lucvan@ncc.asia" }]
+maintainers = [{ name = "NCC", email = "minh.lucvan@ncc.asia" }]
+keywords = [
+    "agent",
+    "llm",
+    "react",
+    "preact",
+    "anthropic",
+    "claude",
+    "tool-use",
+    "mcp",
+    "rag",
+    "agentic",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Typing :: Typed",
+]
+dependencies = [
+    "anthropic>=0.40.0",
+    "cachetools>=5.0.0",
+    "numpy>=1.26.0",
+    "pydantic>=2.0.0",
+]
+
+# TODO(maintainers): point these at the real public repository before publishing.
+[project.urls]
+Homepage = "https://github.com/ncc-asia/agent-sdk"
+Repository = "https://github.com/ncc-asia/agent-sdk"
+Documentation = "https://github.com/ncc-asia/agent-sdk/tree/main/docs"
+Issues = "https://github.com/ncc-asia/agent-sdk/issues"
+Changelog = "https://github.com/ncc-asia/agent-sdk/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+openai = ["openai>=1.40.0"]
+redis = ["redis>=5.0.0"]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "fakeredis>=2.20.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agent_sdk"]
+artifacts = ["agent_sdk/assets/*.html"]
+
+[tool.pytest.ini_options]
+# "tests" = root integration suite; "agent_sdk" picks up each plugin's co-located,
+# isolated unit tests (e.g. agent_sdk/plugins/tasks/tests/) so they run by default too.
+testpaths = ["tests", "agent_sdk"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC", "SIM"]
+ignore = ["E501"]  # handled by formatter
+
+[tool.ruff.lint.per-file-ignores]
+# These modules carry a few deliberate stylistic patterns (lambda
+# default-providers, unused unpack vars) that read more clearly left as-is.
+"agent_sdk/lobes/registry.py" = ["E731"]
+"agent_sdk/flows/registry.py" = ["E731"]
+"agent_sdk/skills.py" = ["B007"]
+"agent_sdk/react/conversation.py" = ["B007"]
+# Example + benchmark scripts: readability over async-IO purity; the sys.path
+# shim forces imports below the top of the file.
+"examples/**" = ["E402", "I001", "ASYNC230", "ASYNC240", "ASYNC221", "SIM115"]
+"benchmarks/**" = ["E402", "I001", "ASYNC230", "ASYNC240", "ASYNC221", "SIM115"]
+
+[tool.ruff.format]
+quote-style = "double"

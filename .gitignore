@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.env
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Benchmark result artifacts (regenerable, large) — keep .png doc images
+benchmarks/*/results/*.json
+benchmarks/*/results/*.html
+
+# OS
+.DS_Store
