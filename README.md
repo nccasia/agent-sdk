@@ -16,36 +16,29 @@ attention/budget, flow resolution) is a pure function of `(spec, context)`; ever
 the outside world (LLM, tools, embeddings, stores, queues) is a narrow protocol with an in-memory
 default.
 
-Built directly on the [Anthropic Python SDK](https://github.com/anthropics/anthropic-sdk-python) —
-**no agent framework underneath**. Provider-agnostic clients (Anthropic, OpenAI-compatible,
-MiniMax, a deterministic fake) ship in the box.
-
 ## Why agent-sdk
 
-For the developer who wants **durable reasoning and fully customized agent behavior, controlled from
-the reasoning process itself** — not a prompt-and-pray wrapper.
+Built for developers who want **durable reasoning and fully customized agent behavior, controlled
+from the reasoning process itself** — not a prompt-and-pray wrapper.
 
-- **Pre-structured reasoning** — not a turn-by-turn tool loop. Each turn runs a deliberate pipeline
-  you can read, reorder, and tune — reasoning shaped *before and around* the model's action.
-- **Multi-stage reasoning** — a flow is an ordered sequence of stages (e.g. `plan → execute →
-  deliver`), each owning its own prompt, lobe slice, loop mode, tool allowlist, and even model.
-  **Optimize one step without touching the rest.**
-- **Prompt / context optimization** — the prompt *funnels* toward the answer instead of
-  accumulating: every candidate is exposed by value (inject in full · hint + fetch · offload) and
-  re-tiered each hop. The target is *useful reasoning per token*, not maximum context.
-- **Fully inspectable** — every turn emits a structured trace (recognized path, flow, per-stage
-  composed prompts, lobe activations, tool calls, metacognition decisions, token cost) you can
-  render to a standalone interactive HTML viewer. Nothing is a black box.
-- **Custom, opt-in plugins** — package a whole capability (lobes + stages + flows + tools, even MCP
-  servers) as one plugin; mount it, disable it, or replace it wholesale. Core ships domain-free; you
-  add exactly the behavior you want.
-- **Durable reasoning & long-rail tasks** — one scoped `memory` tool (`turn → conversation → channel
-  → user → bot`) plus a task mode where the agent persists its own working state and resumes across
-  fires (recall → advance → checkpoint → continue).
-- **Provider-agnostic & portable** — Anthropic / OpenAI-compatible / MiniMax / deterministic-fake
-  clients behind one interface; the side-effect-free core ports cleanly to other languages.
-- **Benchmarkable** — live, ground-truth benchmarks (`taskbench`, `coding-agent-bench`, …) grade
-  real agent behavior against verifiable outcomes — not stubs.
+- **Pre-structured reasoning** — every turn runs a deliberate pipeline you can read, reorder, and
+  tune, instead of a turn-by-turn tool loop.
+- **Multi-stage reasoning** — a flow is an ordered sequence of stages (`plan → execute → deliver`),
+  each with its own prompt, context, loop mode, tools, and model. Optimize one step without touching
+  the rest.
+- **Context that funnels, not floods** — the prompt is re-tiered every hop (inject in full · hint +
+  fetch · offload) toward *useful reasoning per token*, not maximum context.
+- **Fully inspectable** — each turn emits a structured trace (path, flow, per-stage prompts, lobe
+  activations, tool calls, metacognition, token cost), renderable to a standalone HTML viewer. No
+  black boxes.
+- **Opt-in plugins** — package a whole capability (lobes, stages, flows, tools, even MCP servers) as
+  one plugin, then mount, disable, or replace it. The core ships domain-free.
+- **Durable, long-rail tasks** — a scoped `memory` tool (`turn → conversation → channel → user →
+  bot`) and a task mode that persists working state and resumes across runs.
+- **Provider-agnostic** — Anthropic, OpenAI-compatible, MiniMax, and a deterministic fake behind one
+  interface; the side-effect-free core ports cleanly to other languages.
+- **Benchmarkable** — live, ground-truth benchmarks (`taskbench`, `coding-agent-bench`) grade real
+  behavior against verifiable outcomes, not stubs.
 
 ## Install
 
