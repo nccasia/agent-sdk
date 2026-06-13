@@ -36,7 +36,13 @@ run () { local name="$1"; shift; echo "── $name ─────────�
          python3 "benchmarks/$name/run.py" "$@" > "$OUT/$name.log" 2>&1; echo $? > "$OUT/$name.exit"; \
          grep -aE "verdict (READY|NOT_READY|UNMEASURED)" "$OUT/$name.log" | tail -1 || tail -1 "$OUT/$name.log"; }
 
+# free / deterministic benches (no provider needed — they read the engine's pure functions)
+run corgictionbech     --report
+run flowbench          --report
+run attentionbench     --report
+# live benches (real provider)
 run skillbench         --live --report --trials "$TRIALS" "${MODEL_ARGS[@]}"
+run toolbench          --live --report "${MODEL_ARGS[@]}"
 run taskbench          --live
 run agentbench         --live --report "${MODEL_ARGS[@]}"
 run extensionbench     --live --report "${MODEL_ARGS[@]}"
