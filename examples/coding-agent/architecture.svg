@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 800" font-family="Helvetica, Arial, sans-serif">
+  <title>Coding agent architecture — flows contain stages; each stage runs on the PreAct engine</title>
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b5b5b"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="920" height="800" fill="#ffffff"/>
+
+  <!-- request -->
+  <rect x="370" y="14" width="180" height="36" rx="18" fill="#0E0E0C"/>
+  <text x="460" y="37" text-anchor="middle" font-size="13" font-weight="600" fill="#ffffff">user request</text>
+  <path d="M460,50 L460,70" stroke="#5b5b5b" stroke-width="1.6" fill="none" marker-end="url(#ah)"/>
+
+  <!-- recognize flow -->
+  <rect x="310" y="72" width="300" height="46" rx="10" fill="#FAFAF7" stroke="#0E0E0C" stroke-width="1.4"/>
+  <text x="460" y="93" text-anchor="middle" font-size="14" font-weight="600" fill="#0E0E0C">recognize flow</text>
+  <text x="460" y="109" text-anchor="middle" font-size="11" fill="#555">free · deterministic signal</text>
+  <path d="M460,118 L460,138" stroke="#5b5b5b" stroke-width="1.6" fill="none" marker-end="url(#ah)"/>
+
+  <!-- ===================== FLOWS (each contains its stages) ===================== -->
+  <rect x="24" y="138" width="872" height="282" rx="12" fill="none" stroke="#B8845B" stroke-width="1.4" stroke-dasharray="5 4"/>
+  <text x="40" y="158" font-size="12" font-weight="600" fill="#7a583b">flows — each flow is an ordered sequence of stages</text>
+
+  <!-- row 1: question -->
+  <rect x="40" y="172" width="118" height="42" rx="8" fill="#FBF1E7" stroke="#B8845B" stroke-width="1.3"/>
+  <text x="99" y="198" text-anchor="middle" font-size="12.5" font-weight="600" fill="#5b3f28">question</text>
+  <rect x="176" y="172" width="96" height="42" rx="6" fill="#EAF3EE" stroke="#1F6B4A" stroke-width="1.2"/>
+  <text x="224" y="198" text-anchor="middle" font-size="11" font-weight="600" fill="#1F6B4A">answer</text>
+
+  <!-- row 2: quick_fix -->
+  <rect x="40" y="234" width="118" height="42" rx="8" fill="#FBF1E7" stroke="#B8845B" stroke-width="1.3"/>
+  <text x="99" y="260" text-anchor="middle" font-size="12.5" font-weight="600" fill="#5b3f28">quick_fix</text>
+  <rect x="176" y="234" width="96" height="42" rx="6" fill="#EAF3EE" stroke="#1F6B4A" stroke-width="1.2"/>
+  <text x="224" y="260" text-anchor="middle" font-size="11" font-weight="600" fill="#1F6B4A">explore</text>
+  <path d="M272,255 L292,255" stroke="#5b5b5b" stroke-width="1.4" fill="none" marker-end="url(#ah)"/>
+  <rect x="292" y="234" width="96" height="42" rx="6" fill="#EAF3EE" stroke="#1F6B4A" stroke-width="1.2"/>
+  <text x="340" y="260" text-anchor="middle" font-size="11" font-weight="600" fill="#1F6B4A">implement</text>
+  <path d="M388,255 L408,255" stroke="#5b5b5b" stroke-width="1.4" fill="none" marker-end="url(#ah)"/>
+  <rect x="408" y="234" width="96" height="42" rx="6" fill="#EAF3EE" stroke="#1F6B4A" stroke-width="1.2"/>
+  <text x="456" y="260" text-anchor="middle" font-size="11" font-weight="600" fill="#1F6B4A">verify</text>
+  <path d="M504,255 L524,255" stroke="#5b5b5b" stroke-width="1.4" fill="none" marker-end="url(#ah)"/>
+  <rect x="524" y="234" width="96" height="42" rx="6" fill="#EAF3EE" stroke="#1F6B4A" stroke-width="1.2"/>
+  <text x="572" y="260" text-anchor="middle" font-size="11" font-weight="600" fill="#1F6B4A">summarize</text>
+
+  <!-- row 3: feature -->
+  <rect x="40" y="296" width="118" height="42" rx="8" fill="#FBF1E7" stroke="#B8845B" stroke-width="1.3"/>
+  <text x="99" y="322" text-anchor="middle" font-size="12.5" font-weight="600" fill="#5b3f28">feature</text>
+  <rect x="176" y="296" width="96" height="42" rx="6" fill="#EAF3EE" stroke="#1F6B4A" stroke-width="1.2"/>
+  <text x="224" y="322" text-anchor="middle" font-size="11" font-weight="600" fill="#1F6B4A">explore</text>
+  <path d="M272,317 L292,317" stroke="#5b5b5b" stroke-width="1.4" fill="none" marker-end="url(#ah)"/>
+  <rect x="292" y="296" width="96" height="42" rx="6" fill="#EAF3EE" stroke="#1F6B4A" stroke-width="1.2"/>
+  <text x="340" y="322" text-anchor="middle" font-size="11" font-weight="600" fill="#1F6B4A">plan</text>
+  <path d="M388,317 L408,317" stroke="#5b5b5b" stroke-width="1.4" fill="none" marker-end="url(#ah)"/>
+  <rect x="408" y="296" width="96" height="42" rx="6" fill="#EAF3EE" stroke="#1F6B4A" stroke-width="1.2"/>
+  <text x="456" y="322" text-anchor="middle" font-size="11" font-weight="600" fill="#1F6B4A">implement</text>
+  <path d="M504,317 L524,317" stroke="#5b5b5b" stroke-width="1.4" fill="none" marker-end="url(#ah)"/>
+  <rect x="524" y="296" width="96" height="42" rx="6" fill="#EAF3EE" stroke="#1F6B4A" stroke-width="1.2"/>
+  <text x="572" y="322" text-anchor="middle" font-size="11" font-weight="600" fill="#1F6B4A">verify</text>
+  <path d="M620,317 L640,317" stroke="#5b5b5b" stroke-width="1.4" fill="none" marker-end="url(#ah)"/>
+  <rect x="640" y="296" width="96" height="42" rx="6" fill="#EAF3EE" stroke="#1F6B4A" stroke-width="1.2"/>
+  <text x="688" y="322" text-anchor="middle" font-size="11" font-weight="600" fill="#1F6B4A">summarize</text>
+
+  <!-- row 4: understand -->
+  <rect x="40" y="358" width="118" height="42" rx="8" fill="#FBF1E7" stroke="#B8845B" stroke-width="1.3"/>
+  <text x="99" y="384" text-anchor="middle" font-size="12.5" font-weight="600" fill="#5b3f28">understand</text>
+  <rect x="176" y="358" width="96" height="42" rx="6" fill="#EAF3EE" stroke="#1F6B4A" stroke-width="1.2"/>
+  <text x="224" y="384" text-anchor="middle" font-size="11" font-weight="600" fill="#1F6B4A">survey</text>
+  <path d="M272,379 L292,379" stroke="#5b5b5b" stroke-width="1.4" fill="none" marker-end="url(#ah)"/>
+  <rect x="292" y="358" width="96" height="42" rx="6" fill="#EAF3EE" stroke="#1F6B4A" stroke-width="1.2"/>
+  <text x="340" y="384" text-anchor="middle" font-size="11" font-weight="600" fill="#1F6B4A">plan</text>
+  <path d="M388,379 L408,379" stroke="#5b5b5b" stroke-width="1.4" fill="none" marker-end="url(#ah)"/>
+  <rect x="408" y="358" width="96" height="42" rx="6" fill="#EAF3EE" stroke="#1F6B4A" stroke-width="1.2"/>
+  <text x="456" y="384" text-anchor="middle" font-size="11" font-weight="600" fill="#1F6B4A">investigate</text>
+  <path d="M504,379 L524,379" stroke="#5b5b5b" stroke-width="1.4" fill="none" marker-end="url(#ah)"/>
+  <rect x="524" y="358" width="96" height="42" rx="6" fill="#EAF3EE" stroke="#1F6B4A" stroke-width="1.2"/>
+  <text x="572" y="384" text-anchor="middle" font-size="11" font-weight="600" fill="#1F6B4A">document</text>
+
+  <!-- flows -> stage detail -->
+  <path d="M460,420 L460,452" stroke="#5b5b5b" stroke-width="1.6" fill="none" marker-end="url(#ah)"/>
+  <text x="468" y="440" font-size="11" fill="#555">every stage runs on the PreAct engine ↓</text>
+
+  <!-- ===================== INSIDE A STAGE ===================== -->
+  <rect x="120" y="454" width="680" height="150" rx="12" fill="#EAF3EE" stroke="#1F6B4A" stroke-width="1.5"/>
+  <text x="134" y="476" font-size="13" font-weight="600" fill="#1F6B4A">inside a stage — PreAct engine</text>
+
+  <rect x="140" y="490" width="262" height="98" rx="8" fill="#ffffff" stroke="#1F6B4A" stroke-width="1.3"/>
+  <text x="271" y="524" text-anchor="middle" font-size="14" font-weight="600" fill="#0E0E0C">lobe slice</text>
+  <text x="271" y="543" text-anchor="middle" font-size="11" fill="#555">→ stage system prompt</text>
+  <text x="271" y="561" text-anchor="middle" font-size="10.5" fill="#777">triage · explore · plan · …</text>
+
+  <rect x="452" y="490" width="330" height="98" rx="8" fill="#ffffff" stroke="#1F6B4A" stroke-width="1.3"/>
+  <text x="617" y="522" text-anchor="middle" font-size="14" font-weight="600" fill="#0E0E0C">agentic loop</text>
+  <text x="617" y="541" text-anchor="middle" font-size="11" fill="#555">funnel · working-set budget</text>
+  <text x="617" y="558" text-anchor="middle" font-size="11" fill="#555">· stall-break · tool allowlist</text>
+  <path d="M402,539 L450,539" stroke="#5b5b5b" stroke-width="1.6" fill="none" marker-end="url(#ah)"/>
+
+  <!-- engine <-> tools -->
+  <path d="M660,588 L660,660" stroke="#5b5b5b" stroke-width="1.6" fill="none" marker-end="url(#ah)"/>
+  <text x="668" y="628" font-size="10.5" fill="#555">tool call</text>
+  <path d="M520,660 L520,588" stroke="#5b5b5b" stroke-width="1.6" fill="none" marker-end="url(#ah)"/>
+  <text x="512" y="628" text-anchor="end" font-size="10.5" fill="#555">observation → hint</text>
+
+  <!-- tools -->
+  <rect x="120" y="662" width="680" height="120" rx="12" fill="#EAF0F6" stroke="#3B5D82" stroke-width="1.5"/>
+  <text x="134" y="684" font-size="13" font-weight="600" fill="#3B5D82">tools/ — sandboxed Workspace</text>
+  <rect x="140" y="696" width="200" height="72" rx="8" fill="#ffffff" stroke="#3B5D82" stroke-width="1.3"/>
+  <text x="240" y="728" text-anchor="middle" font-size="14" font-weight="600" fill="#0E0E0C">fs</text>
+  <text x="240" y="748" text-anchor="middle" font-size="10.5" fill="#555">Read · Write · Edit · LS</text>
+  <rect x="360" y="696" width="170" height="72" rx="8" fill="#ffffff" stroke="#3B5D82" stroke-width="1.3"/>
+  <text x="445" y="728" text-anchor="middle" font-size="14" font-weight="600" fill="#0E0E0C">search</text>
+  <text x="445" y="748" text-anchor="middle" font-size="10.5" fill="#555">Glob · Grep</text>
+  <rect x="550" y="696" width="200" height="72" rx="8" fill="#ffffff" stroke="#3B5D82" stroke-width="1.3"/>
+  <text x="650" y="728" text-anchor="middle" font-size="14" font-weight="600" fill="#0E0E0C">shell</text>
+  <text x="650" y="748" text-anchor="middle" font-size="10.5" fill="#555">Bash</text>
+
+  <!-- output (loop result) -->
+  <path d="M782,532 L800,532" stroke="#5b5b5b" stroke-width="1.6" fill="none" marker-end="url(#ah)"/>
+  <rect x="802" y="510" width="110" height="46" rx="14" fill="#0E0E0C"/>
+  <text x="857" y="530" text-anchor="middle" font-size="12" font-weight="600" fill="#ffffff">result</text>
+  <text x="857" y="546" text-anchor="middle" font-size="8.5" fill="#cdcdcd">answer · edits · tests</text>
+
+  <!-- left rail: repo map + memory -->
+  <rect x="10" y="470" width="98" height="54" rx="8" fill="#FAFAF7" stroke="#999" stroke-width="1.2"/>
+  <text x="59" y="493" text-anchor="middle" font-size="11" font-weight="600" fill="#444">repo map</text>
+  <text x="59" y="509" text-anchor="middle" font-size="9.5" fill="#666">→ prompt prefix</text>
+  <path d="M108,499 L138,508" stroke="#999" stroke-width="1.4" fill="none" stroke-dasharray="4 3" marker-end="url(#ah)"/>
+
+  <rect x="10" y="536" width="98" height="60" rx="8" fill="#F3EEF7" stroke="#6B4A8A" stroke-width="1.2"/>
+  <text x="59" y="559" text-anchor="middle" font-size="11" font-weight="600" fill="#4a3363">Memory</text>
+  <text x="59" y="575" text-anchor="middle" font-size="9.5" fill="#6b4a8a">plan · findings</text>
+  <text x="59" y="589" text-anchor="middle" font-size="8.5" fill="#6b4a8a">remember / recall</text>
+  <path d="M108,560 L138,560" stroke="#6B4A8A" stroke-width="1.4" fill="none" marker-start="url(#ah)" marker-end="url(#ah)"/>
+
+  <!-- right rail: guards -->
+  <rect x="812" y="688" width="100" height="76" rx="8" fill="#FBECEC" stroke="#B05B5B" stroke-width="1.2"/>
+  <text x="862" y="710" text-anchor="middle" font-size="11" font-weight="600" fill="#8a3b3b">guards</text>
+  <text x="862" y="726" text-anchor="middle" font-size="9" fill="#a05050">DocWriteGuard</text>
+  <text x="862" y="739" text-anchor="middle" font-size="9" fill="#a05050">DocGroundingGuard</text>
+  <text x="862" y="755" text-anchor="middle" font-size="8.5" fill="#a05050">gate tool calls</text>
+  <path d="M812,724 L800,724" stroke="#B05B5B" stroke-width="1.4" fill="none" stroke-dasharray="4 3" marker-end="url(#ah)"/>
+</svg>

@@ -27,6 +27,14 @@ See [`EVALUATION.md`](./EVALUATION.md) for a candid assessment of the SDK
 (API ergonomics, live MiniMax performance numbers, behavior findings, and
 prioritized improvement suggestions) produced by building this.
 
+## Architecture
+
+One turn flows top-down: recognize the intent (free, deterministic) → run that flow's stage
+sequence → each stage composes a lobe slice into its prompt and drives a bounded PreAct loop over
+the workspace tools. Memory, the repo map, and the guards are the cross-cutting seams.
+
+![Coding agent architecture](./architecture.svg)
+
 ## Shape
 
 ```
@@ -37,20 +45,45 @@ request ──▶ recognize flow (free, deterministic)
             └─ understand → survey → plan → investigate → document   (writes ARCHITECTURE.md)
 ```
 
-The capability is one installable `CodingPlugin` (`coding_agent/agent.py`) over a few
-focused subpackages — the same `lobes` / `flows`+`stages` / `tools` split the SDK itself uses:
+The capability is one installable [`CodingPlugin`](./coding_agent/agent.py) over a few focused
+subpackages — the same `lobes` / `flows`+`stages` / `tools` split the SDK itself uses. Each
+flow, stage, and lobe is its own file; open the one you want.
 
-- **`coding_agent/agent.py`** — assembly: `INSTRUCTIONS`, `CodingPlugin` (its `install(setup)`
-  calls `add_lobe`/`add_stage`/`add_flow`/`add_tool`/`add_tool_filter`), and `build_coding_agent`.
-- **`coding_agent/lobes/`** — the coding disciplines as context workers, grouped by network
-  layer: `cognition.py` (`triage`, `explore`, `plan`, `implement`, `surveyor`) and
-  `expression.py` (`verify`, `summarize`, `documenter`).
-- **`coding_agent/flows/`** — `stages.py` (each stage = a lobe slice + tool allowlist + loop +
-  hop budget) and the intents (`feature` / `quick_fix` / `understand` / `question`) in `__init__.py`.
-- **`coding_agent/tools/`** — Claude Code's canonical `Read`/`Write`/`Edit`/`LS`/`Glob`/`Grep`/
-  `Bash` over a sandboxed `Workspace` (`workspace.py`), split into `fs.py` · `search.py` · `shell.py`.
-- **`coding_agent/repomap.py`** — a deterministic repo map injected into the prompt prefix so the
-  agent orients on the *real* tree instead of guessing a conventional layout.
+### Flows — intents recognized free + deterministically · [`flows/__init__.py`](./coding_agent/flows/__init__.py)
+
+- [**feature**](./coding_agent/flows/__init__.py) — a multi-step change (feature / refactor / new code): explore → plan → implement → verify → summarize
+- [**quick_fix**](./coding_agent/flows/__init__.py) — a small bug fix: explore → implement → verify → summarize
+- [**understand**](./coding_agent/flows/__init__.py) — map a whole system + write `ARCHITECTURE.md`: survey → plan → investigate → document
+- [**question**](./coding_agent/flows/__init__.py) — answer a question about the code (no edits): answer
+
+### Stages — bounded units of work (a lobe slice + tool allowlist + loop + hop budget) · [`flows/stages/`](./coding_agent/flows/stages)
+
+- [**explore**](./coding_agent/flows/stages/explore.py) — navigate + read the codebase to ground the work (agentic, 50 hops)
+- [**plan**](./coding_agent/flows/stages/plan.py) — decompose a multi-step change into ordered steps (single)
+- [**implement**](./coding_agent/flows/stages/implement.py) — make the change on disk (agentic, 80 hops)
+- [**verify**](./coding_agent/flows/stages/verify.py) — run the tests and fix failures (agentic, 40 hops)
+- [**answer**](./coding_agent/flows/stages/answer.py) — deeply explore, then answer a question about the code (agentic, 80 hops)
+- [**summarize**](./coding_agent/flows/stages/summarize.py) — report what changed + the test result (single)
+- [**survey**](./coding_agent/flows/stages/survey.py) — map the repository structure top-down (agentic, 40 hops)
+- [**investigate**](./coding_agent/flows/stages/investigate.py) — read each subsystem, save findings to memory (agentic, 80 hops)
+- [**document**](./coding_agent/flows/stages/document.py) — aggregate findings + write the architecture document (agentic, 50 hops)
+
+### Lobes — the coding disciplines as context workers · [`lobes/`](./coding_agent/lobes)
+
+- [**triage**](./coding_agent/lobes/triage.py) — classify the request: a question, a quick fix, or a feature
+- [**explore**](./coding_agent/lobes/explore.py) — read the relevant code before proposing or making changes
+- [**plan**](./coding_agent/lobes/plan.py) — decompose a multi-step change into concrete, ordered steps
+- [**implement**](./coding_agent/lobes/implement.py) — write minimal, correct code that matches the surrounding style
+- [**surveyor**](./coding_agent/lobes/surveyor.py) — map a large codebase's structure breadth-first before diving in
+- [**verify**](./coding_agent/lobes/verify.py) — run the real test suite and report the result honestly
+- [**summarize**](./coding_agent/lobes/summarize.py) — state concisely what changed and the test result
+- [**documenter**](./coding_agent/lobes/documenter.py) — aggregate findings into a clear architecture document
+
+Plus [**tools/**](./coding_agent/tools) — Claude Code's canonical `Read`/`Write`/`Edit`/`LS`/`Glob`/
+`Grep`/`Bash` over a sandboxed [`Workspace`](./coding_agent/tools/workspace.py)
+([fs](./coding_agent/tools/fs.py) · [search](./coding_agent/tools/search.py) ·
+[shell](./coding_agent/tools/shell.py)) — and [**repomap.py**](./coding_agent/repomap.py), a
+deterministic repo map injected into the prompt so the agent orients on the *real* tree.
 
 ## Run it
 
