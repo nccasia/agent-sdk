@@ -40,6 +40,7 @@ class SubagentsPlugin:
         rows: Sequence[Mapping[str, object]] | None = None,
         agents_dir: str | None = None,
         flow: bool = True,
+        auto_delegate: bool = True,
     ):
         if isinstance(agents, SubagentRegistry):
             registry = agents
@@ -51,11 +52,16 @@ class SubagentsPlugin:
             registry.register(agent)
         self.registry = registry
         self._flow = flow
+        # Delegation is this plugin's purpose, so the agent auto-delegates on complex queries
+        # by default (deterministic complexity signal). Set False for cue-only delegation.
+        self._auto_delegate = auto_delegate
 
     def install(self, setup: AgentSetup) -> None:
         # Delegate the meta faculty (lobe + reflect/fanout stages + meta_control tool),
         # wiring the registry so fan_out can resolve named subagents.
-        MetacognitionPlugin(subagents=self.registry, flow=self._flow).install(setup)
+        MetacognitionPlugin(
+            subagents=self.registry, flow=self._flow, auto_delegate=self._auto_delegate
+        ).install(setup)
         # Surface the catalog into the reflect step (the meta_reflect stage already lists
         # the optional ``subagent_catalog`` lobe id).
         setup.add_lobe(SubagentCatalogLobe(self.registry))

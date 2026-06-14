@@ -17,6 +17,7 @@
 | The model | [`preact.md`](./preact.md) | The one-page mental model — start here. |
 | Public API | [`api.md`](./api.md) | The complete public API reference. |
 | Contracts | [`contracts.md`](./contracts.md) | The per-turn data contracts / protocols (`LlmCall`, `TurnContext`, `ToolRuntime`, memo models). |
+| Subagents | [`sdk/subagents.md`](./sdk/subagents.md) | How subagent fan-out & delegation work, how they're implemented, and how to use them (in-code / `.claude/agents/*.md` / auto-delegation). |
 | Concepts | [`concepts/`](./concepts/README.md) | The numbered deep-dives — the *why & how* behind each idea. See the [concepts README](./concepts/README.md). |
 | Build a harness | [`building-a-harness.md`](./building-a-harness.md) | Wiring the SDK into an app, with benches & evals. |
 | Porting | [`porting.md`](./porting.md) | Reimplementing PreAct in another language (Rust / Go / JS / …). |

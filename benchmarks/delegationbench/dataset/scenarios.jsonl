@@ -1,0 +1,16 @@
+{"id": "compare-3countries-3metrics", "category": "comparison", "query": "Compare the capital, currency, and primary language of Japan, Brazil, and Egypt, then note which has the most native speakers of its language.", "expect": {"delegate": true, "answer_contains": ["Tokyo", "Cairo", "Portuguese"]}}
+{"id": "compare-landarea-largest", "category": "comparison", "query": "Compare the land areas of Russia, Canada, and China, and say which is largest.", "expect": {"delegate": true, "answer_contains": ["Russia", "Canada", "China"]}}
+{"id": "foreach-3langs", "category": "multi-entity", "query": "For each of Python, Rust, and Go, name one key strength and one common use case.", "expect": {"delegate": true, "answer_contains": ["Python", "Rust", "Go"]}}
+{"id": "research-3renewables", "category": "research", "query": "Research three renewable energy sources independently — solar, wind, and hydro — and give one advantage of each.", "expect": {"delegate": true, "answer_contains": ["solar", "wind", "hydro"]}}
+{"id": "summarize-3organs", "category": "research", "query": "Summarize the main role of the heart, the lungs, and the kidneys, one sentence each.", "expect": {"delegate": true, "answer_contains": ["heart", "lungs", "kidneys"]}}
+{"id": "evaluate-3workmodes", "category": "audit", "query": "Evaluate the pros and cons of remote work, hybrid work, and office work for team productivity.", "expect": {"delegate": true, "answer_contains": ["remote", "hybrid", "office"]}}
+{"id": "audit-3dimensions", "category": "audit", "query": "Audit a typical web app across three dimensions — security, performance, and cost — and give one concrete risk per dimension.", "expect": {"delegate": true, "answer_contains": ["security", "performance", "cost"]}}
+{"id": "plan-3subjects", "category": "planning", "query": "Plan a weekly study schedule covering math, history, and biology: for each subject give one focus topic and one resource.", "expect": {"delegate": true, "answer_contains": ["math", "history", "biology"]}}
+{"id": "capitals-4countries", "category": "multi-entity", "query": "What are the capitals of France, Germany, Italy, and Spain?", "expect": {"delegate": true, "answer_contains": ["Paris", "Berlin", "Rome", "Madrid"]}}
+{"id": "single-capital", "category": "simple", "query": "What is the capital of France?", "expect": {"delegate": false, "answer_contains": ["Paris"]}}
+{"id": "single-arith", "category": "simple", "query": "What is 2 + 2?", "expect": {"delegate": false, "answer_contains": ["4"]}}
+{"id": "single-author", "category": "simple", "query": "Who painted the Mona Lisa?", "expect": {"delegate": false, "answer_contains": ["Leonardo"]}}
+{"id": "near-two-trivial-facets", "category": "near-neighbor", "query": "What is the capital and currency of Japan?", "expect": {"delegate": false, "answer_contains": ["Tokyo"]}}
+{"id": "near-idiom-compare", "category": "near-neighbor", "query": "Compare apples and oranges.", "expect": {"delegate": false}}
+{"id": "near-three-word", "category": "near-neighbor", "query": "List three prime numbers.", "expect": {"delegate": false}}
+{"id": "single-definition", "category": "simple", "query": "Define osmosis in one sentence.", "expect": {"delegate": false, "answer_contains": ["osmosis"]}}

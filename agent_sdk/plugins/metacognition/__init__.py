@@ -39,13 +39,18 @@ class MetacognitionPlugin:
 
     name = "metacognition"
 
-    def __init__(self, *, flow: bool = True, subagents: object | None = None):
+    def __init__(
+        self, *, flow: bool = True, subagents: object | None = None, auto_delegate: bool = False
+    ):
         # ``flow=False`` contributes only the lobe + stages + tool (compose ``meta_reflect``
         # into your own flow) without registering the standalone ``meta`` flow/recognizer.
         # ``subagents`` is an optional ``SubagentRegistry`` — pass it to let ``fan_out`` items
         # delegate to named subagents (resolved deterministically by the enactor).
+        # ``auto_delegate`` adds the deterministic complexity signal so the agent reflects-then-
+        # fans-out on complex queries without an explicit cue (off ⇒ conservative cue-only).
         self._flow = flow
         self._subagents = subagents
+        self._auto_delegate = auto_delegate
 
     def lobes(self) -> list:
         return [META_CONTEXT_LOBE]
@@ -57,4 +62,6 @@ class MetacognitionPlugin:
         for st in meta_stages():
             setup.add_stage(st)
         if self._flow:
-            setup.add_flow(meta_flow())
+            from agent_sdk.plugins.metacognition.path import make_recognize
+
+            setup.add_flow(meta_flow(make_recognize(auto_delegate=self._auto_delegate)))

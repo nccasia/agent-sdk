@@ -19,8 +19,12 @@ def test_to_item_projection_only_sets_declared_fields():
     a = Subagent("reviewer", instructions="Review.", tools=["read", "grep"], hops=5)
     item = a.to_item(input="check x.py")
     assert item == {
-        "id": "reviewer", "label": "reviewer", "input": "check x.py",
-        "system_prompt": "Review.", "tools": ["read", "grep"], "hops": 5,
+        "id": "reviewer",
+        "label": "reviewer",
+        "input": "check x.py",
+        "system_prompt": "Review.",
+        "tools": ["read", "grep"],
+        "hops": 5,
     }
     # unset fields (lobes/model/max_tokens) are absent ⇒ they fall through to stage defaults
     assert "lobes" not in item and "model" not in item and "max_tokens" not in item
@@ -102,8 +106,13 @@ class _SeedRT:
         self._items, self._key = items, key
 
     def get_tool_specs(self) -> list[dict]:
-        return [{"name": "seed", "description": "seed the work-list",
-                 "input_schema": {"type": "object", "properties": {}}}]
+        return [
+            {
+                "name": "seed",
+                "description": "seed the work-list",
+                "input_schema": {"type": "object", "properties": {}},
+            }
+        ]
 
     async def call_tool(self, name, inp, retrieved_chunks=None, already_read=None) -> str:
         from agent_sdk.engine import current_turn
@@ -119,8 +128,13 @@ class _GrabRT:
     seen: list[tuple[str, list[str]]] = []
 
     def get_tool_specs(self) -> list[dict]:
-        return [{"name": "grab", "description": "retrieve a chunk",
-                 "input_schema": {"type": "object", "properties": {"tag": {"type": "string"}}}}]
+        return [
+            {
+                "name": "grab",
+                "description": "retrieve a chunk",
+                "input_schema": {"type": "object", "properties": {"tag": {"type": "string"}}},
+            }
+        ]
 
     async def call_tool(self, name, inp, retrieved_chunks=None, already_read=None) -> str:
         tag = str(inp.get("tag") or "x")
@@ -148,20 +162,31 @@ def _grab_model():
 def _fanout_agent(items, *, parallel, isolated):
     return PreactAgent(
         client=scripted(_grab_model()),
-        instructions="bot", tools=[_SeedRT(items), _GrabRT()],
+        instructions="bot",
+        tools=[_SeedRT(items), _GrabRT()],
         flows=[flow("f", stages=["seedstage", "fan"], signal={"const": 1.0})],
         stages=[
             stage("seedstage", lobes=["synthesize"], loop="agentic", tools=["seed"], hops=3),
-            stage("fan", lobes=["synthesize"], loop="map", fanout_key="items", tools=["grab"],
-                  fanout_parallel=parallel, fanout_isolated=isolated, hops=3),
+            stage(
+                "fan",
+                lobes=["synthesize"],
+                loop="map",
+                fanout_key="items",
+                tools=["grab"],
+                fanout_parallel=parallel,
+                fanout_isolated=isolated,
+                hops=3,
+            ),
         ],
     )
 
 
 async def test_isolated_workers_have_no_cross_worker_leakage():
     _GrabRT.seen = []
-    items = [{"label": "A", "input": "alpha", "tools": ["grab"]},
-             {"label": "B", "input": "beta", "tools": ["grab"]}]
+    items = [
+        {"label": "A", "input": "alpha", "tools": ["grab"]},
+        {"label": "B", "input": "beta", "tools": ["grab"]},
+    ]
     agent = _fanout_agent(items, parallel=True, isolated=True)
     rec = await probe(agent, "go", label="t")
     assert rec.status == "answered"
@@ -173,8 +198,10 @@ async def test_isolated_workers_have_no_cross_worker_leakage():
 async def test_shared_pool_default_leaks_across_workers():
     # Parity: the default (non-isolated) sequential map shares the turn evidence pool.
     _GrabRT.seen = []
-    items = [{"label": "A", "input": "alpha", "tools": ["grab"]},
-             {"label": "B", "input": "beta", "tools": ["grab"]}]
+    items = [
+        {"label": "A", "input": "alpha", "tools": ["grab"]},
+        {"label": "B", "input": "beta", "tools": ["grab"]},
+    ]
     agent = _fanout_agent(items, parallel=False, isolated=False)
     await probe(agent, "go", label="t")
     pools = dict(_GrabRT.seen)
@@ -182,8 +209,11 @@ async def test_shared_pool_default_leaks_across_workers():
 
 
 async def test_parallel_and_sequential_produce_same_result_set():
-    items = [{"label": "A", "input": "alpha"}, {"label": "B", "input": "beta"},
-             {"label": "C", "input": "gamma"}]
+    items = [
+        {"label": "A", "input": "alpha"},
+        {"label": "B", "input": "beta"},
+        {"label": "C", "input": "gamma"},
+    ]
 
     def model(sid, sy, m, t):
         last = str(m[-1]["content"]) if m else ""
@@ -195,12 +225,21 @@ async def test_parallel_and_sequential_produce_same_result_set():
 
     def build(parallel):
         return PreactAgent(
-            client=scripted(model), instructions="bot", tools=[_SeedRT(items)],
+            client=scripted(model),
+            instructions="bot",
+            tools=[_SeedRT(items)],
             flows=[flow("f", stages=["seedstage", "fan"], signal={"const": 1.0})],
             stages=[
                 stage("seedstage", lobes=["synthesize"], loop="agentic", tools=["seed"], hops=3),
-                stage("fan", lobes=["synthesize"], loop="map", fanout_key="items",
-                      fanout_parallel=parallel, fanout_isolated=parallel, hops=2),
+                stage(
+                    "fan",
+                    lobes=["synthesize"],
+                    loop="map",
+                    fanout_key="items",
+                    fanout_parallel=parallel,
+                    fanout_isolated=parallel,
+                    hops=2,
+                ),
             ],
         )
 
@@ -212,9 +251,11 @@ async def test_parallel_and_sequential_produce_same_result_set():
 
 
 async def test_bounded_failure_one_worker_times_out_others_survive():
-    items = [{"label": "OK1", "input": "fine"},
-             {"label": "BAD", "input": "boom", "timeout": 0.0001},
-             {"label": "OK2", "input": "fine"}]
+    items = [
+        {"label": "OK1", "input": "fine"},
+        {"label": "BAD", "input": "boom", "timeout": 0.0001},
+        {"label": "OK2", "input": "fine"},
+    ]
 
     def model(sid, sy, m, t):
         last = str(m[-1]["content"]) if m else ""
@@ -225,12 +266,21 @@ async def test_bounded_failure_one_worker_times_out_others_survive():
         return "done"
 
     agent = PreactAgent(
-        client=scripted(model), instructions="bot", tools=[_SeedRT(items)],
+        client=scripted(model),
+        instructions="bot",
+        tools=[_SeedRT(items)],
         flows=[flow("f", stages=["seedstage", "fan"], signal={"const": 1.0})],
         stages=[
             stage("seedstage", lobes=["synthesize"], loop="agentic", tools=["seed"], hops=3),
-            stage("fan", lobes=["synthesize"], loop="map", fanout_key="items",
-                  fanout_parallel=True, fanout_isolated=True, hops=2),
+            stage(
+                "fan",
+                lobes=["synthesize"],
+                loop="map",
+                fanout_key="items",
+                fanout_parallel=True,
+                fanout_isolated=True,
+                hops=2,
+            ),
         ],
     )
     rec = await probe(agent, "go", label="t")
@@ -247,21 +297,36 @@ async def test_named_delegation_resolves_subagents_in_meta_fanout():
         last = str(m[-1]["content"]) if m else ""
         if sid == "meta_reflect":
             if "Sub-task" not in last and "fan_out" not in last:
-                return {"tools": [{"name": "meta_control", "input": {"action": "fan_out", "items": [
-                    {"agent": "reviewer", "input": "review X"},
-                    {"agent": "tester", "input": "test X"},
-                ]}}]}
+                return {
+                    "tools": [
+                        {
+                            "name": "meta_control",
+                            "input": {
+                                "action": "fan_out",
+                                "items": [
+                                    {"agent": "reviewer", "input": "review X"},
+                                    {"agent": "tester", "input": "test X"},
+                                ],
+                            },
+                        }
+                    ]
+                }
             return "reflected"
         if "Sub-task" in last:
             return "worker saw: " + str(sy)[:80]
         return "FINAL"
 
     agent = PreactAgent(
-        client=scripted(model), instructions="bot",
-        plugins=[SubagentsPlugin([
-            Subagent("reviewer", description="reviews code", instructions="You REVIEW."),
-            Subagent("tester", description="writes tests", instructions="You TEST."),
-        ])],
+        client=scripted(model),
+        instructions="bot",
+        plugins=[
+            SubagentsPlugin(
+                [
+                    Subagent("reviewer", description="reviews code", instructions="You REVIEW."),
+                    Subagent("tester", description="writes tests", instructions="You TEST."),
+                ]
+            )
+        ],
     )
     rec = await probe(agent, "step back and rethink your approach to this task", label="t")
     assert rec.status == "answered"
@@ -281,14 +346,25 @@ async def test_unknown_subagent_name_returns_tool_error():
             if "Error: unknown subagent" in last:
                 return "acknowledged"
             if "Sub-task" not in last and "fan_out" not in last:
-                return {"tools": [{"name": "meta_control", "input": {"action": "fan_out", "items": [
-                    {"agent": "ghost", "input": "nope"},
-                ]}}]}
+                return {
+                    "tools": [
+                        {
+                            "name": "meta_control",
+                            "input": {
+                                "action": "fan_out",
+                                "items": [
+                                    {"agent": "ghost", "input": "nope"},
+                                ],
+                            },
+                        }
+                    ]
+                }
             return "reflected"
         return "FINAL"
 
     agent = PreactAgent(
-        client=scripted(model), instructions="bot",
+        client=scripted(model),
+        instructions="bot",
         plugins=[SubagentsPlugin([Subagent("reviewer", description="reviews")])],
     )
     rec = await probe(agent, "step back and reconsider your approach", label="t")
@@ -296,3 +372,56 @@ async def test_unknown_subagent_name_returns_tool_error():
     assert rec.status == "answered"
     outputs = " ".join(str(tc.get("output", "")) for tc in rec.tool_calls)
     assert "unknown subagent" in outputs and "ghost" in outputs
+
+
+# ── auto-delegation: the deterministic complexity decision ────────────────────
+def test_complexity_recognizer_precision_and_recall():
+    from agent_sdk.plugins.metacognition.path import complexity_score
+
+    delegate = [
+        "Compare the GDP, population, and land area of Canada, Australia, and Brazil.",
+        "For each of Python, Rust, and Go, name one strength and one use case.",
+        "Research three renewable sources — solar, wind, and hydro — and give one advantage of each.",
+        "What are the capitals of France, Germany, Italy, and Spain?",
+    ]
+    single = [
+        "What is the capital of France?",
+        "What is 2 + 2?",
+        "What is the capital and currency of Japan?",  # near-neighbor: 2 trivial facets
+        "Compare apples and oranges.",  # idiom near-neighbor
+        "List three prime numbers.",
+    ]
+    assert all(complexity_score(q) >= 0.5 for q in delegate)  # recall
+    assert all(complexity_score(q) < 0.5 for q in single)  # precision
+
+
+def test_make_recognize_off_is_conservative_default():
+    from agent_sdk.plugins.metacognition.path import make_recognize, recognize
+
+    off = make_recognize(auto_delegate=False)
+    assert off is recognize  # byte-identical to the default — parity for a bare install
+    on = make_recognize(auto_delegate=True)
+    complex_q = "Compare the capital, currency, and language of Japan, Brazil, and Egypt."
+    assert off({"query": complex_q}) == 0.0  # conservative: no cue ⇒ no meta
+    assert on({"query": complex_q}) >= 0.5  # auto-delegate fires on complexity
+    assert on({"query": "What is the capital of France?"}) == 0.0  # but not on a simple query
+
+
+async def test_auto_delegate_routes_complex_query_to_meta_flow():
+    from agent_sdk.plugins.subagents import SubagentsPlugin
+
+    agent = PreactAgent(
+        client=scripted(lambda sid, sy, m, t: "ok"),
+        instructions="bot",
+        plugins=[SubagentsPlugin([Subagent("researcher", description="answers one sub-question")])],
+    )
+    # A complex, realistic query (no explicit "step back" cue) routes to the meta flow…
+    complex_rec = await probe(
+        agent,
+        "Compare the GDP, population, and land area of Canada, Australia, and Brazil.",
+        label="c",
+    )
+    assert complex_rec.flow == "meta"
+    # …a simple one does not (no over-delegation).
+    simple_rec = await probe(agent, "What is the capital of France?", label="s")
+    assert simple_rec.flow != "meta"

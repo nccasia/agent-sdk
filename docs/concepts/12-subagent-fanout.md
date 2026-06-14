@@ -196,16 +196,18 @@ This builds on machinery that already exists; the default path is unchanged.
 
 ## Benchmarking
 
-Live-only, per repo convention. `agentbench` and `taskbench` already exercise the `map` path
-(plan-builds-rail-then-map-runs-each-item). A future **`fanoutbench`** slice would gate the properties
-this concept adds, with the same verdict contract:
+`agentbench` and `taskbench` already exercise the `map` path (plan-builds-rail-then-map-runs-each-item).
+**`benchmarks/delegationbench/`** is the dedicated slice: a *free* tier gates the delegation
+**decision** (the complexity recognizer's precision/recall over a labeled dataset) plus the fan-out
+engine invariants under the `FakeClient`; a *live* tier gates the **execution** (real delegation
+precision/recall + fan-in fidelity). The properties, with the same verdict contract:
 
 ```txt
-Fan-in fidelity      claims surviving decompose → fan-out → synthesize   → ≥ floor (no facet dropped)
-Parallel speedup     wall-clock(parallel) / wall-clock(sequential)       → < 1 on independent work
-Isolation            no cross-worker leakage (worker A's chunks in B)    → 0
-Bounded failure      one slow/failing worker doesn't sink the turn       → degrade, never lose
-Compression          bytes crossing the boundary / bytes explored        → memo-bounded, not O(explored)
+Delegation decision  delegate iff multi-facet (recognizer precision/recall)  → free, ≥ floor
+Fan-in fidelity      facets surviving decompose → fan-out → synthesize       → ≥ floor (no facet dropped)
+Isolation            no cross-worker leakage (worker A's chunks in B)        → 0 (free)
+Bounded failure      one slow/failing worker doesn't sink the turn           → degrade, never lose (free)
+Ordering             parallel results flush in submission order              → deterministic (free)
 ```
 
 ## Related

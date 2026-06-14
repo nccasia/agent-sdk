@@ -15,7 +15,7 @@ network is never mutated — you opt in by mounting the plugin or composing the 
 from __future__ import annotations
 
 from agent_sdk.flow_def import flow
-from agent_sdk.plugins.metacognition.path import recognize
+from agent_sdk.plugins.metacognition.path import recognize  # noqa: F401  (re-exported default)
 from agent_sdk.stages import stage
 
 __all__ = ["meta_stages", "meta_flow", "FANOUT_KEY"]
@@ -69,12 +69,14 @@ def meta_stages() -> list:
     ]
 
 
-def meta_flow():
+def meta_flow(recognizer=None):
+    """The opt-in ``meta`` flow. ``recognizer`` overrides the default cue-only signal — e.g.
+    ``make_recognize(auto_delegate=True)`` to also fire on complex (decomposable) queries."""
     return flow(
         "meta",
         use_when="reason about and reshape the approach before doing the task",
         stages=["meta_reflect", "meta_fanout", "synthesize"],
         grounds=True,
         threshold=0.5,
-        signal=recognize,
+        signal=recognizer or recognize,
     )
