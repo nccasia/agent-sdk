@@ -382,6 +382,9 @@ class Engine:
         # Grounding/citation seams owned by a plugin (RagPlugin), not the core.
         self._finalize_hooks: list[Any] = []
         self._tool_result_hooks: list[Any] = []
+        # Per-stage deterministic output filters ``(stage, fn)`` — applied to the
+        # rendered reply (the respond-bearing/terminal stage). Set by the façade.
+        self._output_filters: list[Any] = []
         self.require_citations = require_citations
         self.share_history = share_history
         # The conversation-trim window the respond/terminal stage sees (primacy +
@@ -1082,6 +1085,27 @@ class Engine:
                     yield stamp(CitationFound(citation=c), trace_id)
                 if stage_text:
                     yield stamp(TextDelta(text=stage_text), trace_id)
+
+            # Output filters: deterministic ``(text) -> text`` reshapes registered
+            # by a plugin. ``stage="respond"`` targets the reply-rendering stage
+            # (the terminal stage, which carries the respond framing — pinned or
+            # explicit); others match by (flow-qualified or base) stage id. Composed
+            # in registration order; pure presentation, so a raise never loses the
+            # turn (keep the unfiltered text).
+            if stage_text and self._output_filters:
+                _base_id = stage.id.rsplit(":", 1)[-1]
+                for _target, _fn in self._output_filters:
+                    _match = (
+                        is_last_stage
+                        if _target == "respond"
+                        else _target in (stage.id, _base_id)
+                    )
+                    if not _match:
+                        continue
+                    with contextlib.suppress(Exception):
+                        _filtered = _fn(stage_text)
+                        if isinstance(_filtered, str):
+                            stage_text = _filtered
 
             if stage_text:
                 # Every non-final stage's output carries forward as a labeled note

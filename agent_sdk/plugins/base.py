@@ -78,6 +78,13 @@ class AgentSetup:
         # uses instead of the engine carrying citation logic in its core.
         self.finalize_hooks: list[Callable[..., Any]] = []
         self.tool_result_hooks: list[Callable[[str, str], Any]] = []
+        # Per-stage output filters: deterministic ``(text) -> text`` transforms the
+        # engine applies to a stage's produced text, keyed by the stage they target
+        # (``"respond"`` ⇒ the stage that renders the reply — the one carrying the
+        # respond lobe, or the terminal stage when respond is pinned). The seam a
+        # platform uses to reshape the rendered answer (e.g. a chat surface's markup
+        # subset) without an extra LLM pass. Stored as ``(stage, fn)`` pairs.
+        self.output_filters: list[tuple[str, Callable[[str], str]]] = []
         self.workspace: Workspace | None = None
         # Builtin capabilities a plugin owns/overrides and wants subtracted from
         # the resolved network (by id/name). Pinned lobes are never removed.
@@ -183,6 +190,20 @@ class AgentSetup:
         turn's citation list. The seam for extracting citations a tool emits in its
         output (e.g. a KB tool returning ``{"citations": [...]}``)."""
         self.tool_result_hooks.append(hook)
+
+    def add_output_filter(
+        self, fn: Callable[[str], str], *, stage: str = "respond"
+    ) -> None:
+        """Register a deterministic ``fn(text) -> text`` output filter for a stage.
+
+        The engine applies it to that stage's produced text (composed in
+        registration order). ``stage="respond"`` (the default) targets the stage
+        that renders the reply — the one carrying the ``respond`` lobe, or the
+        flow's terminal stage when the respond framing is pinned onto it — so a
+        platform can normalize the final answer (e.g. to a chat surface's markup
+        subset) with no extra LLM call. A filter only reshapes text; it cannot
+        refuse or touch citations (use a finalize hook for those)."""
+        self.output_filters.append((stage, fn))
 
     def bind_workspace(self, workspace: Workspace) -> None:
         self.workspace = workspace
