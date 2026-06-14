@@ -335,39 +335,29 @@ The loader records `SkillPack.source_dir` (so the compiled-surface cache can per
 parses nested `checklist` / `context_vars` from YAML, and raises `SkillLoadError` on a malformed
 bundle (no frontmatter, missing `name`/`description`, no `SKILL.md`).
 
-### Subagents (named fan-out workers — Claude Code's `.claude/agents/*.md`)
+### Subagents (general-purpose fan-out — the `Subagent()` tool)
 
-A **`Subagent`** is a named, reusable scoped worker — the typed form of a `map` work-item:
-`name` + `description` (when to delegate) + `instructions` (its system prompt) + a restricted
-`tools`/`lobes` belt + `model`/`max_tokens`/`hops` budget. It runs in its own context and returns a
-compressed result, never its raw working set. Define once, delegate by name many times.
+A **subagent** is a fresh, general-purpose worker the model spawns on demand to handle one
+independent sub-problem in its own isolated context, returning a concise result (no predefined
+registry — what it does is the `task` it's handed). `SubagentsPlugin` exposes the **`Subagent(task=…)`**
+tool plus a two-stage **fanout → fanin** flow:
 
 ```python
-from agent_sdk import Subagent, SubagentRegistry, load_agents_dir
+from agent_sdk import PreactAgent
 from agent_sdk.plugins.subagents import SubagentsPlugin
 
-# in code …
-registry = SubagentRegistry([
-    Subagent("reviewer", description="reviews code for bugs", instructions="You REVIEW code.",
-             tools=["read", "grep"]),
-])
-registry.add_row({"name": "tester", "description": "writes tests"})   # declarative row
-
-# … or from .claude/agents/*.md (frontmatter: name/description/tools/model; body = prompt)
-registry = SubagentRegistry(load_agents_dir(".claude/agents"))
-
 agent = PreactAgent(client=…, instructions="…",
-                    plugins=[SubagentsPlugin(registry)])   # or SubagentsPlugin(agents_dir="…")
+                    plugins=[SubagentsPlugin()])              # pure-reasoning workers
+# plugins=[SubagentsPlugin(worker_tools=["search"])]         # give workers tools
 ```
 
-`SubagentsPlugin` wires the registry into the metacognition `meta_control(action=fan_out)` enactor:
-the model delegates by name (`items=[{"agent": "reviewer", "input": "review module X"}]`), the
-enactor resolves the name deterministically (unknown name → a clear tool error), and the
-`meta_fanout` stage runs the workers **parallel + context-isolated**. A `subagent_catalog` lobe
-surfaces the available subagents to the reflect step. Routing stays deterministic — no LLM judges
-the pipeline; the model only *names* a subagent inside the existing `meta_control` call. `cite` /
-`filter` ground the *aggregated* results — grounding is never a worker's decision. Full model:
-[`concepts/12-subagent-fanout.md`](concepts/12-subagent-fanout.md).
+A deterministic complexity signal routes a multi-faceted query to the `subagents` flow; in `fanout`
+the model calls `Subagent(task=…)` once per part (the engine runs the spawned workers **parallel +
+context-isolated**); in `fanin` the model calls `subagent_results()` to review every worker's
+`{label, status, result}` — all finished — and composes one answer. `cite`/`filter` ground the
+**aggregate**, never a worker. Routing is deterministic (no LLM judges the pipeline); a simple query
+stays single-shot. Full model + the `fanout_spawn`/`fanout_isolated` mechanics:
+[`sdk/subagents.md`](sdk/subagents.md) · [`concepts/12-subagent-fanout.md`](concepts/12-subagent-fanout.md).
 
 ### Tools — the `@tool` decorator
 
@@ -474,6 +464,18 @@ language) — the leaf carries no host copy.
 via `MCPToolRuntime.status` (a `ConnectionStatus`: `connected` · `unauthorized` · `unreachable` ·
 `timeout` · `bad_response` · `unconfigured`), so a host can surface it in a "test connection" UI or
 record it in `trace.degraded`.
+
+**Conditional capabilities.** When a host installs several servers but wants only a subset live per
+turn (by channel / deployment / a context flag), `agent_sdk.plugins.mcp.select_active` filters items
+by a declarative `activation` dict against an opaque per-turn context bag:
+
+```python
+from agent_sdk.plugins.mcp import select_active
+
+active = select_active(installations, {"channel_id": "c1", "onboarding": True})
+# activation keys: channel_ids / deployment_ids / context_flags
+# pass flag_check=(flag, ctx)->bool for custom flag semantics (e.g. is_dm) — kept out of the leaf
+```
 
 ### Pre-turn gate — refusal rules + golden known-answers
 

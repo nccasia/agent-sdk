@@ -32,7 +32,12 @@ from agent_sdk.plugins.guardrails import (
     PluginGuardrails,
     make_answer_leak_check,
 )
-from agent_sdk.plugins.mcp import HTTPMCPToolRuntime, PluginMCP
+from agent_sdk.plugins.mcp import (
+    HTTPMCPToolRuntime,
+    PluginMCP,
+    activation_matches,
+    select_active,
+)
 from agent_sdk.plugins.metacognition import MetacognitionPlugin
 from agent_sdk.plugins.otel import PluginOTel
 from agent_sdk.plugins.registry import PluginRegistry
@@ -85,6 +90,8 @@ __all__ = [
     "FormatPlugin",
     "PluginWorkspace",
     "PluginMCP",
+    "select_active",
+    "activation_matches",
     "PluginOTel",
     "PluginGuardrails",
     "make_answer_leak_check",

@@ -12,8 +12,12 @@ from typing import Any
 
 from agent_sdk.mcp import MCPError, MCPServerSpec, MCPToolRuntime
 from agent_sdk.plugins.base import AgentSetup
+from agent_sdk.plugins.mcp.resolver import activation_matches, select_active
 
-__all__ = ["PluginMCP", "HTTPMCPToolRuntime", "MCPToolRuntime", "MCPServerSpec", "MCPError"]
+__all__ = [
+    "PluginMCP", "HTTPMCPToolRuntime", "MCPToolRuntime", "MCPServerSpec", "MCPError",
+    "select_active", "activation_matches",
+]
 
 
 class HTTPMCPToolRuntime:
