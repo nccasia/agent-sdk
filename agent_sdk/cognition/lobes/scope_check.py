@@ -29,21 +29,20 @@ logger = logging.getLogger(__name__)
 # the refusal message when the query is clearly out of domain, else None.
 # FN-safe: anything but an explicit OUT_OF_SCOPE verdict (incl. empty /
 # truncated reasoning / provider error) is in-scope — never a false refusal.
-# Prompt + refusal copy are per-bot config (`policy.scope_prompt`,
-# `policy.scope_refusal_message`); the engine defaults below keep existing
-# bots byte-identical. Model resolves via the simple_answer stage (legacy).
+# Domain-free: the SDK ships only a GENERIC classifier scaffold. A bot that
+# enables scope gating supplies the actual domain via per-bot config
+# (`policy.scope_prompt`, `policy.scope_refusal_message`), passed through as
+# ``system_prompt`` / ``refusal_message``; the defaults below name no domain and
+# only stand in when a host enables the gate without configuring it.
 
-DEFAULT_SYSTEM_PROMPT = """Bạn là bộ phân loại phạm vi cho trợ lý học tập FUNiX.
-Trợ lý CHỈ trả lời câu hỏi về đào tạo tại FUNiX: quy chế đào tạo, bảo lưu, tốt nghiệp, thi cử, chấm bài và điểm, học phí, đăng ký môn, kỷ luật học vụ, hướng dẫn học tập, mentor/Hannah/MOOC, và các môn hoặc chương trình (WEB101x, NJS301x, RJS301x, Fullstack, SE, Fresher, xSeries).
-Phân loại câu hỏi của người dùng:
-- IN_SCOPE: liên quan đến đào tạo, quy chế, môn học hoặc việc học tại FUNiX.
-- OUT_OF_SCOPE: thời tiết, nấu ăn, lập trình chung chung, trường khác, chính trị, y tế, tài chính/đầu tư, dịch thuật, giải toán, trò chuyện phiếm — hoặc bất cứ điều gì không thuộc đào tạo FUNiX.
-Chỉ trả lời đúng MỘT từ: IN_SCOPE hoặc OUT_OF_SCOPE."""
+DEFAULT_SYSTEM_PROMPT = """You are a scope classifier for an assistant that only answers questions within its configured domain.
+Classify the user's question:
+- IN_SCOPE: it is about the assistant's domain.
+- OUT_OF_SCOPE: it is unrelated to that domain (off-topic small talk, a different subject, etc.).
+Reply with exactly one word: IN_SCOPE or OUT_OF_SCOPE."""
 
 DEFAULT_REFUSAL = (
-    "Mình là trợ lý học tập của FUNiX nên chỉ hỗ trợ các câu hỏi về chương "
-    "trình và quy chế đào tạo của FUNiX thôi nhé. Bạn cứ hỏi mình về việc học "
-    "tại FUNiX nha!"
+    "I can only help with questions within my area. Please ask me something in that scope."
 )
 
 USER_TEMPLATE = "Query: {query}"

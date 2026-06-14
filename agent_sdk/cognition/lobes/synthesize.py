@@ -48,38 +48,23 @@ RULES:
 
 USER_TEMPLATE = "Original query: {query}\n\nResearch memos:\n{memos}"
 
-SIMPLE_SYSTEM_PROMPT = """Answer the user's question using ONLY information found through the retrieval tools.
+# Domain-free: name no specific tools and no language. When the agent has retrieval
+# tools they are listed in the prompt's capabilities section, and a host RAG skill
+# (e.g. agent-core's kb_lookup) supplies the concrete tool ladder. This lobe only
+# states the generic answer-from-evidence contract.
+SIMPLE_SYSTEM_PROMPT = """Answer the user's question using ONLY information found through the tools available to you.
 Do not make up information. If the tools return no relevant results, explicitly say you cannot find the answer.
-Always cite your sources using [chunk_id](source_ref) notation.
+When you used a source, cite it using [chunk_id](source_ref) notation.
 
-You have these retrieval tools:
-
-Document navigation:
-- list_documents: See all documents in the knowledge base with titles and metadata
-- browse_toc: View the Table of Contents of a document — see chapters, articles, sections
-- search_toc: Search across all TOCs by heading text (e.g., "Điều 5", "tốt nghiệp")
-- get_document_chunks: Read ALL chunks from a document (for summarization)
-- read_page: Read all chunks from a specific page of a PDF
-
-Search & read:
-- semantic_search: Find chunks by meaning/concept similarity. Returns abbreviated snippets.
-- keyword_search: Find chunks by exact keyword matching. Returns abbreviated snippets.
-- read_chunk: Read the full text of specific chunks by ID. Use after search to get complete content.
-
-Strategy — choose based on question type:
-- Comparing specific articles (e.g. "Điều 1 vs Điều 5"): search_toc for EACH article → read_chunk on matched chunk_ids. Do NOT load the entire document.
-- For specific articles/sections: search_toc with the article name → read_chunk on matched chunk IDs
-- For structured documents (regulations, policies): browse_toc first → find relevant section → read_chunk
-- For summarization of an entire document: list_documents → get_document_chunks
-- For open-ended questions: semantic_search → keyword_search → read_chunk
-- ALWAYS call read_chunk on relevant chunk IDs before answering (search tools return snippets only)
-- Efficiency: prefer search_toc + read_chunk (2 calls) over get_document_chunks (loads everything)
-- Non-English queries: lead with keyword_search and search_toc (exact lexical / heading match — robust across languages); semantic_search recall is weaker cross-lingual, so don't rely on it alone. If the first search misses, retry keyword_search on the key noun phrase (e.g. "bảo lưu", "tốt nghiệp") before giving up.
+Strategy:
+- Search for relevant material, then read the FULL content of the most promising results before answering — search results are often abbreviated snippets.
+- For a specific named section or item, look it up directly rather than loading an entire document.
+- If the first search misses, try a different query or a different search tool before giving up.
 
 Critical rules:
 - NEVER fabricate facts, numbers, dates, or names. Every claim must be supported by retrieved text.
 - If the question contains a false premise (asks about something that doesn't exist or states something incorrect), say so and correct the premise using retrieved evidence.
-- If multiple searches return no relevant chunks, refuse to answer rather than guess.
+- If searches return no relevant results, refuse to answer rather than guess.
 - Prefer precision over recall: a short correct answer beats a long speculative one.
 - Do NOT use markdown tables. Present comparisons and structured data as short bullet lists instead."""
 
