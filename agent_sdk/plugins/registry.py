@@ -60,6 +60,12 @@ class PluginRegistry:
         p = self._plugins.get(name)
         return p is not None and name not in self._disabled and getattr(p, "enabled", True)
 
+    def is_disabled(self, name: str) -> bool:
+        """Whether ``name`` was explicitly turned off (``disable(name)``) — lets a
+        default-on capability plugin (e.g. ``disable("rag")``) be suppressed even
+        when it was never registered on this registry."""
+        return name in self._disabled
+
     def get(self, name: str) -> Any | None:
         return self._plugins.get(name)
 

@@ -40,6 +40,7 @@ from agent_sdk.plugins.mcp import (
 )
 from agent_sdk.plugins.metacognition import MetacognitionPlugin
 from agent_sdk.plugins.otel import PluginOTel
+from agent_sdk.plugins.rag import RagPlugin
 from agent_sdk.plugins.registry import PluginRegistry
 from agent_sdk.plugins.safety import SafetyPlugin
 from agent_sdk.plugins.support_triage import PluginSupportTriage
@@ -54,11 +55,13 @@ from agent_sdk.plugins.workspace import (
 
 
 def default_capability_plugins() -> list:
-    """The *default-on but toggleable* extensions whose lobes round out the production network on
-    top of the core (``lobes/_core_lobe_objects``): :class:`SafetyPlugin` (``cite``/``filter``
-    grounding) and :class:`FormatPlugin` (``format`` styling). The intrinsic lobes — cognition,
-    tools, skills, task, memory, reply — are core, not plugins. Disable either via a
-    :class:`PluginRegistry`."""
+    """The *default-on but toggleable* extensions: :class:`SafetyPlugin` (the ``filter``
+    output-safety lobe — every agent wants it) and :class:`FormatPlugin` (``format`` styling).
+    Their lobes round out the production network on top of the core (``lobes/_core_lobe_objects``).
+    **Retrieval grounding is NOT here** — :class:`RagPlugin` (``cite`` + the citation contract)
+    is opt-in, since most agents have no retrieval; plug it in explicitly or via
+    ``require_citations=True``. The intrinsic lobes — cognition, tools, skills, task, memory,
+    reply — are core, not plugins. Disable either via a :class:`PluginRegistry`."""
     return [SafetyPlugin(), FormatPlugin()]
 
 
@@ -84,6 +87,7 @@ __all__ = [
     "builtin_registry",
     "default_capability_plugins",
     "capability_lobes",
+    "RagPlugin",
     "SafetyPlugin",
     "TaskPlugin",
     "MetacognitionPlugin",

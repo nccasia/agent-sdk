@@ -15,9 +15,7 @@ import asyncio
 import contextlib
 import contextvars
 import inspect
-import json
 import re
-import unicodedata
 import uuid
 from collections.abc import AsyncIterator
 from typing import Any
@@ -133,27 +131,6 @@ def _xml_tag(source: str) -> str:
     return re.sub(r"[^a-z0-9_]", "_", tag) or "section"
 
 
-# Inline grounding markers the model emits — ``[<chunk_id>]``, ``[id1, id2]``
-# (uuid or short-hex), ``[golden:<case>]``. They drive citation EXTRACTION; once
-# citations are on the result they are internal noise in the user-facing text, so
-# they are stripped from the final answer (the citations ride in result.citations /
-# message metadata and are rendered separately by the client).
-_CITE_MARKER_RE = re.compile(
-    r"\s*\[\s*(?:golden:[^\]]+"
-    r"|[0-9a-fA-F][0-9a-fA-F-]{5,}(?:\s*,\s*[0-9a-fA-F][0-9a-fA-F-]{5,})*)\s*\]"
-)
-
-
-def _strip_citation_markers(text: str) -> str:
-    """Remove inline ``[chunk_id]`` / ``[golden:…]`` grounding markers from the
-    user-facing answer (citations are preserved in the result, rendered separately).
-    Leaves ordinary brackets ([1], [2025], markdown links) untouched."""
-    if not text or "[" not in text:
-        return text
-    cleaned = _CITE_MARKER_RE.sub("", text)
-    return re.sub(r"\n{3,}", "\n\n", cleaned).strip()
-
-
 __all__ = ["Engine"]
 
 _WH = ("what", "why", "how", "when", "where", "who", "which", "can ", "is ", "do ", "does ")
@@ -202,81 +179,6 @@ def _text_of(msg: Any) -> str:
         for b in getattr(msg, "content", []) or []
         if getattr(b, "type", None) == "text"
     ).strip()
-
-
-def _citations_from_text(text: str, chunks: list[dict]) -> list[Citation]:
-    """Citations for a one-shot (single-loop) answer: each evidence chunk whose
-    ``[chunk_id]`` literally appears in the answer becomes a Citation. Lets a
-    one-shot RAG stage ground from a prefetch-seeded evidence channel, the way the
-    agentic path grounds from tool-output citations. No tool loop required."""
-    if not text or not chunks:
-        return []
-    out: list[Citation] = []
-    seen: set[str] = set()
-    for ch in chunks:
-        cid = str(ch.get("chunk_id") or "")
-        if cid and cid not in seen and f"[{cid}]" in text:
-            seen.add(cid)
-            out.append(Citation(
-                chunk_id=cid,
-                source_ref=str(ch.get("source_ref") or ""),
-                supporting_span=(0, len(text)),
-            ))
-    return out
-
-
-_BACKFILL_MIN_ANSWER_CHARS = 60   # a refusal/one-liner is shorter ⇒ never backfilled
-_BACKFILL_MAX_ADD = 6             # cap added citations (wide enough to include the
-                                  # expected doc when a relevant chunk ranks lower)
-_BACKFILL_MIN_OVERLAP = 3         # ≥ this many distinctive chunk tokens in the answer
-
-
-def _content_tokens(text: str) -> set[str]:
-    """Distinctive content tokens (NFC-lower, len≥4, deduped) for overlap scoring.
-    Generic — no language-specific stopword list; the length filter drops most
-    function words while keeping content syllables/words."""
-    norm = unicodedata.normalize("NFC", text or "").lower()
-    return {t for t in re.split(r"[^0-9a-zà-ỹ_]+", norm) if len(t) >= 4}
-
-
-def _backfill_citations(
-    answer: str, chunks: list[dict], existing: list[Citation]
-) -> list[Citation]:
-    """Cite the retrieved chunks an answer actually USED but didn't `[chunk_id]`-mark.
-
-    A grounded answer that paraphrases (the model omitted the marker) still needs
-    its source cited for grounding/scoring. For each not-yet-cited evidence chunk
-    (top score first), attach a Citation when enough of the chunk's distinctive
-    content tokens appear in the answer — so a refusal/one-liner (too short) or a
-    chitchat answer (no KB-content overlap) gets ZERO backfill. Capped. Domain-free.
-    """
-    if not answer or len(answer) < _BACKFILL_MIN_ANSWER_CHARS or not chunks:
-        return []
-    cited = {c.chunk_id for c in existing}
-    ans_tokens = _content_tokens(answer)
-    if not ans_tokens:
-        return []
-    ranked = sorted(chunks, key=lambda c: float(c.get("score") or 0), reverse=True)
-    out: list[Citation] = []
-    for ch in ranked:
-        cid = str(ch.get("chunk_id") or "")
-        if not cid or cid in cited:
-            continue
-        ctoks = _content_tokens(ch.get("text") or "")
-        if not ctoks:
-            continue
-        shared = len(ctoks & ans_tokens)
-        # absolute overlap, or (for short chunks) a strong relative overlap
-        if shared >= _BACKFILL_MIN_OVERLAP or (shared and shared >= 0.5 * len(ctoks)):
-            cited.add(cid)
-            out.append(Citation(
-                chunk_id=cid,
-                source_ref=str(ch.get("source_ref") or ""),
-                supporting_span=(0, len(answer)),
-            ))
-            if len(out) >= _BACKFILL_MAX_ADD:
-                break
-    return out
 
 
 def _tool_uses(msg: Any) -> list[Any]:
@@ -925,6 +827,7 @@ class Engine:
         running_msgs = list(base_msgs)
         notes: list[str] = []
         citations: list[Citation] = []
+        emitted_cite_ids: set[str] = set()  # CitationFound already streamed (avoid dup post-finalize)
         flow_stages_trace: list[dict] = []
         meta_actions: list[dict] = []
         llm_calls: list[dict] = []
@@ -1112,13 +1015,10 @@ class Engine:
                             yield stamp(Final(result=_res), trace_id)
                             return
                 steps.append({"kind": "answer", "text": stage_text})
-                # One-shot grounding: a single-loop answer carries no tool-driven
-                # citations, so resolve [chunk_id] mentions against the (prefetch-
-                # seeded) evidence channel — lets a one-shot RAG stage ground like
-                # the agentic path. No-op when the answer cites nothing.
-                for _c in _citations_from_text(stage_text, retrieved_chunks):
-                    citations.append(_c)
-                    yield stamp(CitationFound(citation=_c), trace_id)
+                # One-shot grounding (resolving [chunk_id] mentions against the
+                # prefetch-seeded evidence channel) is the RagPlugin's job now — it
+                # runs in the finalize hook over the final answer, so a single-loop
+                # stage carries no citation logic in the engine core.
                 llm_calls.append({
                     "stage": stage.id, "hop": 0,
                     "stop_reason": getattr(resp, "stop_reason", "end_turn"),
@@ -1159,8 +1059,10 @@ class Engine:
                     # _agentic mutated stage_msgs (== running_msgs) with the
                     # tool exchanges; record the stage's final answer turn too.
                     running_msgs.append({"role": "assistant", "content": stage_text})
+                # Tool-emitted citations (collected by a plugin's tool-result hook).
                 for c in holder["citations"]:
                     citations.append(c)
+                    emitted_cite_ids.add(getattr(c, "chunk_id", ""))
                     yield stamp(CitationFound(citation=c), trace_id)
                 if stage_text:
                     yield stamp(TextDelta(text=stage_text), trace_id)
@@ -1238,13 +1140,8 @@ class Engine:
             if isinstance(_bias, str) and _bias:
                 state.meta_flow_bias = _bias
 
-        # Citation backfill: a grounded answer that drew on the retrieved chunks
-        # but didn't emit [chunk_id] markers (the model paraphrased) still needs
-        # its source cited. Overlap-gated + capped, so refusals/chitchat get none.
-        for _bc in _backfill_citations(answer, retrieved_chunks, citations):
-            citations.append(_bc)
-            yield stamp(CitationFound(citation=_bc), trace_id)
-
+        # Citation extraction/backfill + ground-or-refuse run in the finalize hook
+        # (RagPlugin), not here — the engine core carries no citation logic.
         result = await self._finalize(
             trace_id,
             answer,
@@ -1260,6 +1157,13 @@ class Engine:
             scratchpad=(turn_ctx.scratchpad.snapshot() if getattr(turn_ctx, "scratchpad", None) else None),
             retrieved_chunks=retrieved_chunks,
         )
+        # Stream CitationFound for any citation a finalize hook added (one-shot text
+        # extraction + backfill) that wasn't already emitted during the loop.
+        for c in result.citations:
+            cid = getattr(c, "chunk_id", "")
+            if cid not in emitted_cite_ids:
+                emitted_cite_ids.add(cid)
+                yield stamp(CitationFound(citation=c), trace_id)
         yield stamp(Final(result=result), trace_id)
 
     def _select_flow(self, path: dict) -> Flow:
@@ -1578,7 +1482,8 @@ class Engine:
                     steps.append({"kind": "tool_result", "name": name, "output": out})
                     yield stamp(ToolResult(id=tid, name=name, output=out), trace_id)
                     holder["tool_calls"].append({"name": name, "input": inp, "output": out})
-                    self._extract_citations(out, holder["citations"])
+                    # Citations a tool emits ({"citations": [...]}) are pulled by a
+                    # plugin's tool-result hook (RagPlugin) — not engine core logic.
                     for _trh in self._tool_result_hooks:
                         _cits = _trh(name, out)
                         if _cits:
@@ -1972,20 +1877,6 @@ class Engine:
             if isinstance(dg, list):
                 dg.append(f"fanout:{failed_n}_failed")
 
-    @staticmethod
-    def _extract_citations(tool_output: str, out: list[Citation]) -> None:
-        """A KB-style tool may surface citations as JSON ``{"citations": [...]}``."""
-        try:
-            data = json.loads(tool_output)
-        except (json.JSONDecodeError, TypeError):
-            return
-        if isinstance(data, dict):
-            for c in data.get("citations", []) or []:
-                try:
-                    out.append(Citation(**c) if isinstance(c, dict) else c)
-                except Exception:
-                    continue
-
     # ── finalize ─────────────────────────────────────────────────────────────
     def _usage_snapshot(self) -> ProviderUsage:
         u = getattr(self.client, "total_usage", None)
@@ -2031,10 +1922,6 @@ class Engine:
             answer, citations, refusal_reason = res
             if refusal_reason:
                 break
-        # Citations are already extracted onto ``citations`` by this point; strip the
-        # inline [chunk_id]/[golden:…] grounding markers from the user-facing text so
-        # the prose is clean (sources render separately from message metadata).
-        answer = _strip_citation_markers(answer)
         after = self._usage_snapshot()
         diff = ProviderUsage(
             input_tokens=after.input_tokens - usage_before.input_tokens,
@@ -2069,14 +1956,15 @@ class Engine:
             skill_selection=skill_selection,
             degraded=list(degraded or []),
         )
-        # Ground-or-refuse: a finalize hook may force a refusal (a grounding plugin's
-        # no-citations gate), or the engine's own fallback gate fires.
-        if refusal_reason or (self.require_citations and flow.grounds and not citations):
+        # Ground-or-refuse is the RagPlugin's contract: a finalize hook returns a
+        # refusal_reason when a grounding turn requires citations but found none.
+        # The engine core has no citation gate of its own.
+        if refusal_reason:
             return AgentResult(
                 text="I cannot confirm that from the available sources.",
                 status="refused",
                 refusal=Refusal(
-                    reason=refusal_reason or "no_citations",
+                    reason=refusal_reason,
                     message="No supporting sources were found.",
                 ),
                 usage=usage,

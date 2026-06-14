@@ -98,10 +98,20 @@ def test_plugin_can_subtract_builtin_path():
     assert "research" not in caps["flow"]
 
 
-@pytest.mark.parametrize("pinned", ["cite", "filter", "synthesize"])
+@pytest.mark.parametrize("pinned", ["filter", "synthesize"])
 def test_pinned_lobe_never_removed(pinned):
+    # filter (safety, default-on) + synthesize (core) survive a removal attempt.
     caps = _caps(_agent([_Remover(lobes=[pinned])]))
     assert pinned in caps["lobe"]
+
+
+def test_cite_pinned_within_rag_plugin():
+    # cite is opt-in (RagPlugin) — absent by default, present + unremovable with it.
+    from agent_sdk.plugins import RagPlugin
+
+    assert "cite" not in _caps(_agent())["lobe"]
+    caps = _caps(_agent([RagPlugin(), _Remover(lobes=["cite"])]))
+    assert "cite" in caps["lobe"]
 
 
 def test_no_plugin_parity():

@@ -4,7 +4,8 @@ the model omitted the [chunk_id] marker; refusals/chitchat get NO backfill."""
 from __future__ import annotations
 
 from agent_sdk.contracts.memo import Citation
-from agent_sdk.engine import _backfill_citations, _citations_from_text
+from agent_sdk.plugins.rag.citation import backfill_citations as _backfill_citations
+from agent_sdk.plugins.rag.citation import citations_from_text as _citations_from_text
 
 _CHUNKS = [
     {

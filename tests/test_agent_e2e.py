@@ -18,6 +18,7 @@ from agent_sdk import (
     tool,
 )
 from agent_sdk.clients import FakeClient
+from agent_sdk.plugins import RagPlugin
 from agent_sdk.stores import MemoryStoreInMemory, SessionStoreInMemory
 
 _MIN = dict(lobes=Lobes.minimal(), stages=Stages.minimal(), flows=Flows.minimal())
@@ -81,6 +82,7 @@ async def test_research_flow_with_tools():
         ),
         instructions="Researcher.",
         tools=[search],
+        plugins=[RagPlugin()],  # grounding is opt-in: the rag plugin extracts tool citations
         **_MIN,
     )
     tool_calls = []

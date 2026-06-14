@@ -185,6 +185,18 @@ class PreactAgent:
         # ``plugins`` may be a list OR a PluginRegistry — a registry resolves to its enabled
         # (active) set, so enable/disable/override is managed there.
         active_plugins = plugins.active() if hasattr(plugins, "active") else list(plugins or [])
+        # Grounding is opt-in (RagPlugin) — most agents have no retrieval. But
+        # ``require_citations=True`` is an explicit grounding intent, so auto-enable
+        # the RAG plugin (its finalize hook owns extraction + ground-or-refuse)
+        # unless it is already present or a registry disabled it by name.
+        if require_citations and not any(
+            getattr(p, "name", "") == "rag" for p in active_plugins
+        ):
+            disabled = plugins.is_disabled("rag") if hasattr(plugins, "is_disabled") else False
+            if not disabled:
+                from agent_sdk.plugins.rag import RagPlugin
+
+                active_plugins = [*active_plugins, RagPlugin()]
         for plugin in active_plugins:
             if getattr(plugin, "enabled", True) is False:
                 continue
@@ -194,6 +206,14 @@ class PreactAgent:
             for server in getattr(plugin, "mcp_servers", None) or []:
                 setup.add_mcp_server(server)
         resolved_lobes.extend(setup.lobes)
+        # Dedup lobes by id (keep first): a plugin may re-contribute a lobe the
+        # chosen network already carries (e.g. RagPlugin's ``cite`` on a minimal
+        # network that still lists an inline cite) — one spec per id.
+        _seen_lobe_ids: set[str] = set()
+        resolved_lobes = [
+            lb for lb in resolved_lobes
+            if not (lb.id in _seen_lobe_ids or _seen_lobe_ids.add(lb.id))
+        ]
         resolved_stages.extend(setup.stages)
         resolved_flows.extend(setup.flows)
         self._event_hooks = list(setup.event_hooks)
