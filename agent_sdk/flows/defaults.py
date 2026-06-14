@@ -9,8 +9,8 @@ complexity tier (docs/concepts/15-standard-flow.md):
 - **standard tier** — ``qna`` = ``[act]`` · ``clarify`` = ``[understand, act]`` (condense resolves
   the referent, then the workhorse). One agentic ``act`` loop over the full toolset.
 - **deep tier** — ``research`` = ``[act, cite, filter]`` — gather, then ground + ground-or-refuse.
-- ``fallback`` = ``[act]`` (the universal emergent answer); ``onboarding`` = ``[synthesize]`` (steward
-  mode, admin.* tools, reached only via ``config_mode``).
+- ``fallback`` = ``[act]`` (the universal emergent answer). (Steward/self-config — ``onboarding`` —
+  is a host capability contributed by agent-core's Admin plugin, not a generic default flow.)
 
 ``act`` is the canonical workhorse state (one agentic ReAct loop); ``cite``/``filter`` are the pinned
 grounding states; ``respond`` is the cheap terminal reply. The dynamic state machine (Layer 1,
@@ -25,7 +25,6 @@ from agent_sdk.flows.flow import Flow
 from agent_sdk.flows.stages import (
     act,
     clarify_synthesize,
-    onboarding_synthesize,
     relational_synthesize,
     research_cite,
     research_filter,
@@ -68,10 +67,7 @@ def default_flows() -> list[Flow]:
             steps=(act(),),
             promotable=False,
         ),
-        # onboarding — steward mode: admin.* toolset, no KB recall (reached only via config_mode).
-        Flow(
-            name="onboarding",
-            description="onboarding — self-configuration steward mode (admin.* tools)",
-            steps=(onboarding_synthesize(),),
-        ),
+        # NOTE: steward/self-config (``onboarding``) is NOT a generic flow — it's a
+        # host/platform capability (admin.* tools) contributed by agent-core's Admin
+        # plugin (add_flow + add_stage), not shipped in the SDK default network.
     ]

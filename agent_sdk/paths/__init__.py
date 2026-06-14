@@ -8,7 +8,6 @@ primary, and unmatched shapes resolve to an emergent path.
 from agent_sdk.paths import (
     clarify,
     common,
-    onboarding,
     qna,
     relational,
     research,
@@ -16,12 +15,13 @@ from agent_sdk.paths import (
 
 # The paths this domain owns, in recognition order. ``network.py`` aggregates
 # ``default_paths`` from here. ``common`` is shared recognizer helpers, not a path.
-PATHS = [qna.PATH, research.PATH, clarify.PATH, relational.PATH, onboarding.PATH]
+# Steward/self-config (``onboarding``) is NOT a generic path — it's a host/platform
+# concern (admin.* tools) contributed by agent-core's Admin plugin.
+PATHS = [qna.PATH, research.PATH, clarify.PATH, relational.PATH]
 
 __all__ = [
     "clarify",
     "common",
-    "onboarding",
     "qna",
     "relational",
     "research",

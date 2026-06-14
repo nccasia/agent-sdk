@@ -20,7 +20,6 @@ from agent_sdk.flows.stages.respond import respond_step
 from agent_sdk.flows.stages.synthesize import (
     clarify_synthesize,
     fallback_synthesize,
-    onboarding_synthesize,
     qna_synthesize,
     relational_synthesize,
     research_synthesize,
@@ -35,7 +34,6 @@ __all__ = [
     "clarify_synthesize",
     "fallback_synthesize",
     "research_investigate",
-    "onboarding_synthesize",
     "qna_synthesize",
     "relational_synthesize",
     "research_cite",

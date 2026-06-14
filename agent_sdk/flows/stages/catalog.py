@@ -19,7 +19,6 @@ from agent_sdk.flows.stages.research import ResearchInvestigate
 from agent_sdk.flows.stages.synthesize import (
     ClarifySynthesize,
     FallbackSynthesize,
-    OnboardingSynthesize,
     QnaSynthesize,
     RelationalSynthesize,
     ResearchSynthesize,
@@ -27,6 +26,8 @@ from agent_sdk.flows.stages.synthesize import (
 
 # Every stage building block, in registry-row form. Extend by adding a class +
 # a row here — never an interpreter branch (the lobe/skill/task doctrine).
+# (Steward/onboarding is a host capability — agent-core's Admin plugin contributes
+# its own onboarding stage, not part of the generic SDK catalog.)
 _STAGE_CLASSES: tuple[type[Stage], ...] = (
     QnaSynthesize,
     FallbackSynthesize,
@@ -36,7 +37,6 @@ _STAGE_CLASSES: tuple[type[Stage], ...] = (
     ResearchFilter,
     ClarifySynthesize,
     RelationalSynthesize,
-    OnboardingSynthesize,
 )
 
 

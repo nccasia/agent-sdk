@@ -117,52 +117,6 @@ class RelationalSynthesize(Stage):
     lobes = ("synthesize",)
 
 
-class OnboardingSynthesize(Stage):
-    """Steward mode — configure the bot + remember channel facts (admin.* tools).
-
-    Grounded in tool results, not retrieval — with one carve-out: the
-    ``standard_answer_update`` (relearn) skill needs to re-derive a corrected
-    answer, so read-only KB retrieval (``kb.retrieve``/``kb.read_chunk``) and
-    ``search_golden`` are available. They're inert on a normal config turn (the
-    steward never calls them) and only fire while the relearn skill drives.
-    ``memory_recall`` here is the SCOPED-MEMORY index (the per-turn ``## Memory``
-    block). Step name stays "synthesize" so the eager admin_management skill
-    block injects unchanged.
-    """
-
-    id = "synthesize"
-    flow = "onboarding"
-    description = "onboarding: steward mode — configure the bot + remember facts"
-    use_when = "the conversation is flagged config_mode (the steward/onboarding path)"
-    how = "agentic loop with admin.* + tasks.* + memory tools; KB read for relearn drafting"
-    loop = "agentic"
-    lobes = (
-        "synthesize",
-        "skill_select",
-        "skill_active",
-        "session_recall",
-        "task_state",
-        "memory_recall",
-    )
-    tools = (
-        "admin.overview",
-        "admin.configure_channel",
-        "admin.list_rules",
-        "admin.upsert_rule",
-        "admin.delete_rule",
-        "admin.update_persona",
-        "tasks.create",
-        "tasks.list",
-        "tasks.update",
-        "tasks.cancel",
-        "memory",
-        # relearn (standard_answer_update) — re-derive a corrected answer:
-        "kb.retrieve",
-        "kb.read_chunk",
-        "search_golden",
-    )
-
-
 def qna_synthesize() -> FlowStep:
     return QnaSynthesize().spec
 
@@ -181,7 +135,3 @@ def clarify_synthesize() -> FlowStep:
 
 def relational_synthesize() -> FlowStep:
     return RelationalSynthesize().spec
-
-
-def onboarding_synthesize() -> FlowStep:
-    return OnboardingSynthesize().spec
