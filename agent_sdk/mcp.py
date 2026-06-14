@@ -20,9 +20,39 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
-__all__ = ["MCPServerSpec", "MCPToolRuntime", "MCPError"]
+__all__ = ["MCPServerSpec", "MCPToolRuntime", "MCPError", "ConnectionStatus"]
+
+# Why a server is (not) contributing tools this turn — a richer signal than a bare
+# bool, so a host can record the reason in ``trace.degraded`` or a "test connection"
+# UI. ``connected`` ⇒ handshake + schema OK; the rest classify the failure.
+#   unauthorized — handshake rejected for auth (401/403/auth error)
+#   unreachable  — connection refused / DNS / network error
+#   timeout      — no response within the deadline
+#   bad_response — reachable but the reply wasn't valid JSON-RPC / had no tools
+#   unconfigured — the spec has no endpoint to probe
+ConnectionStatus = Literal[
+    "connected",
+    "unauthorized",
+    "unreachable",
+    "timeout",
+    "bad_response",
+    "unconfigured",
+]
+
+
+def _classify_error(exc: Exception) -> ConnectionStatus:
+    """Map a connect/discover exception onto a :data:`ConnectionStatus`."""
+    name = type(exc).__name__
+    text = f"{name}: {exc}".lower()
+    if "timeout" in name.lower() or "timeout" in text:
+        return "timeout"
+    if any(t in text for t in ("401", "403", "unauthor", "forbidden", "auth")):
+        return "unauthorized"
+    if isinstance(exc, MCPError):
+        return "bad_response"
+    return "unreachable"
 
 _JSONRPC = "2.0"
 _PROTOCOL_VERSION = "2025-06-18"  # MCP protocol revision the client advertises
@@ -87,6 +117,9 @@ class MCPToolRuntime:
         self.spec = MCPServerSpec.from_obj(spec)
         self._transport = transport
         self.connected = False
+        # A transport-backed runtime (embedded / test double) needs no endpoint.
+        _configured = bool(self.spec.endpoint) or self._transport is not None
+        self.status: ConnectionStatus = "unreachable" if _configured else "unconfigured"
         self.error: str | None = None
         self.server_info: dict = {}
         self._specs: list[dict] = []
@@ -148,9 +181,11 @@ class MCPToolRuntime:
             self.server_info = (result or {}).get("serverInfo", {})
             await self._rpc("notifications/initialized", notify=True)
             self.connected = True
+            self.status = "connected"
             self.error = None
         except Exception as exc:  # connection/handshake failure → degrade, don't crash the turn
             self.connected = False
+            self.status = _classify_error(exc)
             self.error = f"{type(exc).__name__}: {exc}"
         return self.connected
 
@@ -163,6 +198,7 @@ class MCPToolRuntime:
             tools = (result or {}).get("tools", []) or []
             self._specs = [self._to_spec(t) for t in tools if isinstance(t, dict) and t.get("name")]
         except Exception as exc:
+            self.status = "bad_response"
             self.error = f"{type(exc).__name__}: {exc}"
             self._specs = []
         return self._specs

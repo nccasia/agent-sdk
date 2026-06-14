@@ -470,6 +470,11 @@ Secret/email/phone detection is locale-neutral; the commitment/refusal lexicons 
 and are fully injectable (pass `commitment_cues=` / `negation_cues=` / `markers=` for another
 language) — the leaf carries no host copy.
 
+`PluginMCP` never crashes a turn on a bad server (graceful degrade); the runtime classifies *why*
+via `MCPToolRuntime.status` (a `ConnectionStatus`: `connected` · `unauthorized` · `unreachable` ·
+`timeout` · `bad_response` · `unconfigured`), so a host can surface it in a "test connection" UI or
+record it in `trace.degraded`.
+
 `PluginWorkspace` gives the agent a persistent, sandboxed file tree for artifacts and working
 documents and wires the `fs.read`/`fs.write`/`fs.list`/`fs.edit` tools + the heavy-document path
 (`react/docworkspace`). Its `driver` selects the backend (`virtual` ephemeral · `local` disk ·
