@@ -1,9 +1,10 @@
 """format — B5 style lobe: channel-shaped answer formatting.
 
 Behavior: restyles the final answer for fixed-format surfaces
-(`_should_format_response` — e.g. the Mezon chat shape). Fires iff the policy
-declares a fixed format; the `task_execute` path biases it +0.2 (fired-task
-output is delivered to a channel).
+(`_should_format_response` — any channel with markdown/length constraints). Fires
+iff the policy declares a fixed format; the `task_execute` path biases it +0.2
+(fired-task output is delivered to a channel). Domain-free: the channel's concrete
+constraints are a policy field (`format_constraints`), not a hardcoded deployment.
 
 Tuning keys: `prior_format` (0), `min_format` (0.5), `w_fixed_format` (1.0),
 `path_task_execute__format` (0.2).
@@ -23,7 +24,8 @@ from agent_sdk.network.activation import LAYER_EXPRESSION
 
 # ── Behavior contract ────────────────────────────────────────────────────────
 # build_requirements(policy, deployment_id=...) -> str — PURE assembly of the
-#   language/tone/voice/format/Mezon requirement lines from policy fields.
+#   language/tone/voice/format requirement lines from policy fields, plus any
+#   free-text channel constraints the host supplies in `policy.format_constraints`.
 # run(llm, *, answer, requirements, max_tokens) -> str — the rewrite pass;
 #   empty output ships the original answer; a raised call is handled by the
 #   orchestration (degrade to the unformatted answer, never lose the turn).
@@ -50,17 +52,15 @@ Rewrite the answer below to meet ALL requirements. Output ONLY the rewritten ans
 
 USER_TEMPLATE = "Answer to rewrite:\n\n{answer}"
 
-MEZON_REQUIREMENT = """MEZON FORMAT: The final answer will be sent to Mezon chat, which supports only limited markdown.
-- Use plain text with light markdown only.
-- Use `**bold**` for headings or important labels instead of `#` heading lines.
-- Do NOT use markdown tables or pipe columns. Convert every table/comparison into short `- ` bullet items.
-- Do NOT use horizontal-rule dividers such as `---`, `***`, or `___`.
-- Preserve citations exactly as [chunk_id](source_ref)."""
-
 
 def build_requirements(policy: dict, *, deployment_id: str | None = None) -> str:
-    """The requirement lines for the rewrite — pure function of policy +
-    deployment (Mezon gets the chat-markdown constraints)."""
+    """The requirement lines for the rewrite — a PURE function of policy fields.
+
+    Domain-free: language/tone/voice/format come from named policy fields, and a
+    host can append ANY channel-specific constraint via ``policy.format_constraints``
+    (free text — e.g. a chat surface's limited-markdown rules). The SDK names no
+    deployment; a platform layer (e.g. agent-core for Mezon) supplies the constraint
+    text. ``deployment_id`` is kept for the caller's context but is not branched on."""
     reqs: list[str] = []
     lang = policy.get("language", "en")
     if lang != "en":
@@ -79,8 +79,9 @@ def build_requirements(policy: dict, *, deployment_id: str | None = None) -> str
     fmt = policy.get("response_format", "markdown")
     if fmt != "markdown":
         reqs.append(f"FORMAT: Structure the response as {fmt}.")
-    if deployment_id == "mezon":
-        reqs.append(MEZON_REQUIREMENT)
+    constraints = policy.get("format_constraints")
+    if constraints:
+        reqs.append(str(constraints).strip())
     return "\n".join(reqs)
 
 
@@ -99,17 +100,17 @@ async def run(llm: LlmCall, *, answer: str, requirements: str, max_tokens: int =
 
 class FormatLobe(Lobe):
     """Restyle the final answer for fixed-format surfaces (language/tone/voice/
-    Mezon markdown) — a second LLM rewrite pass over the composed answer."""
+    channel constraints) — a second LLM rewrite pass over the composed answer."""
 
     id = "format"
     name = "Format"
     description = "Rewrite the final answer to the channel's required language/tone/format."
-    use_when = "the bot has a non-default language, tone, voice, or output format (e.g. Mezon)"
+    use_when = "the bot has a non-default language, tone, voice, or output format"
     how = (
         "A second LLM pass rewrites the composed answer to meet the bot's format "
-        "requirements (built by build_requirements — language/tone/voice/Mezon). "
-        "Empty output ships the original; a raised call degrades to the unformatted "
-        "answer (never lose the turn)."
+        "requirements (built by build_requirements — language/tone/voice + any "
+        "policy.format_constraints). Empty output ships the original; a raised call "
+        "degrades to the unformatted answer (never lose the turn)."
     )
     system_prompt = SYSTEM_PROMPT
     user_template = USER_TEMPLATE
@@ -120,7 +121,6 @@ class FormatLobe(Lobe):
     # Back-compat module-API members (referenced as LOBE.<NAME>).
     SYSTEM_PROMPT = SYSTEM_PROMPT
     USER_TEMPLATE = USER_TEMPLATE
-    MEZON_REQUIREMENT = MEZON_REQUIREMENT
 
     def activation(self, ctx: dict) -> float:
         return 1.0 if ctx.get("fixed_format") else 0.0

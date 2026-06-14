@@ -58,24 +58,12 @@ class SkillPack:
         return out
 
 
-KB_LOOKUP_SKILL = SkillPack(
-    id="kb_lookup",
-    name="Information lookup",
-    description="Look up facts in the bot's knowledge bases and answer with citations.",
-    stages=("simple_answer", "research", "synthesize"),
-    required_tools=("kb.retrieve", "kb.read_chunk"),
-    instructions="""SKILL: KB lookup with citations
-- Use KB retrieval tools for factual knowledge questions.
-- Start broad with kb.retrieve or search tools, then read exact chunks when needed.
-- Prefer a short grounded answer over a broad speculative answer.
-- Every factual claim must be supported by source chunks.
-- If the retrieved context does not answer the question, say you cannot confirm it from the knowledge base.""",
-)
-
-
-_BUILTIN_SKILLS = {
-    KB_LOOKUP_SKILL.id: KB_LOOKUP_SKILL,
-}
+# No builtin skills ship in the SDK: a skill that names tools (e.g. ``kb.retrieve``)
+# is a host/platform capability, not a generic agent primitive. Retrieval grounding
+# is provided by the host — e.g. agent-core's ``arag`` plugin contributes a
+# ``kb_lookup`` skill bound to the ``kb.*`` MCP contract. A bare SDK agent has no
+# skills until a plugin or DB row adds them.
+_BUILTIN_SKILLS: dict[str, SkillPack] = {}
 
 
 class SkillRegistry:

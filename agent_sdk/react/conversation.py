@@ -156,12 +156,16 @@ _INTENT_CUES: dict[str, tuple[set[str], list[str]]] = {
         ["admin"],
     ),
 }
-_FAMILY_TOOLS = {
-    "channel": [],  # fetch/search tools removed — dialog injected via respond lobe
-    "tasks": ["tasks.list", "tasks.create", "todos.update"],
-    "workspace": ["Glob", "Grep", "Read", "Write"],
-    "admin": ["admin.overview", "admin.connect_mello"],
-    "kb": ["retrieve_kb", "semantic_search", "keyword_search"],
+# Family → tool-names map. Only generic families carry tool names in the SDK; the
+# platform-specific families (tasks/admin/kb name a host's tool contract, e.g.
+# Mezon's ``tasks.*``/``admin.*``/``kb.*``) are left empty here — a host layer
+# populates them (or supplies its own profiler). Keeps the SDK domain-free.
+_FAMILY_TOOLS: dict[str, list[str]] = {
+    "channel": [],  # dialog injected via respond lobe
+    "workspace": ["Glob", "Grep", "Read", "Write"],  # generic dev-agent tools
+    "tasks": [],
+    "admin": [],
+    "kb": [],
 }
 
 

@@ -37,7 +37,6 @@ from agent_sdk.skills.loader import (
     parse_skill_md,
 )
 from agent_sdk.skills.packs import (
-    KB_LOOKUP_SKILL,
     SkillPack,
     SkillRegistry,
     merge_extra_skill_slugs,
@@ -67,7 +66,6 @@ __all__ = [
     "policy_skill_slugs",
     "merge_extra_skill_slugs",
     "stage_matches",
-    "KB_LOOKUP_SKILL",
     # definition
     "Skill",
     # loader (SKILL.md folder → SkillPack)
