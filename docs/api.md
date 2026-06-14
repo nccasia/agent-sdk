@@ -509,6 +509,14 @@ directive. `agent_sdk.react.make_hedge_retry()` builds the `(answer) -> directiv
 the engine's `_answer_retry` seam consumes (English defaults; pass `markers=` / `directive=` for
 another language) — the engine owns the retry loop, the host owns what counts as a hedge.
 
+**Per-stage overrides.** A host tunes the built-in network per stage from config (no re-authoring in
+code): `apply_stage_overrides(stages, overrides)` (in `agent_sdk.stage_overrides`) patches each
+production `Stage` from a `{stage_name: {system_prompt?, temperature?, max_tokens?, loop?,
+budget:{hops?}}}` dict — matched by exact id or bare-suffix (`qna:synthesize` ← `"synthesize"`),
+cloning every other field. `assert_grounded_stages_zero_temp(stages)` enforces the SDK invariant
+(`synthesize`/`cite`/`filter` at `temperature == 0`) and is re-asserted after patching, so an
+override can never break grounding.
+
 `PluginWorkspace` gives the agent a persistent, sandboxed file tree for artifacts and working
 documents and wires the `fs.read`/`fs.write`/`fs.list`/`fs.edit` tools + the heavy-document path
 (`react/docworkspace`). Its `driver` selects the backend (`virtual` ephemeral · `local` disk ·
