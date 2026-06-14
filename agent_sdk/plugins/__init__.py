@@ -27,7 +27,11 @@ from __future__ import annotations
 from agent_sdk.mcp import MCPError, MCPServerSpec, MCPToolRuntime
 from agent_sdk.plugins.base import AgentSetup, Plugin, Workspace
 from agent_sdk.plugins.format import FormatPlugin
-from agent_sdk.plugins.guardrails import GuardrailError, PluginGuardrails
+from agent_sdk.plugins.guardrails import (
+    GuardrailError,
+    PluginGuardrails,
+    make_answer_leak_check,
+)
 from agent_sdk.plugins.mcp import HTTPMCPToolRuntime, PluginMCP
 from agent_sdk.plugins.metacognition import MetacognitionPlugin
 from agent_sdk.plugins.otel import PluginOTel
@@ -83,6 +87,7 @@ __all__ = [
     "PluginMCP",
     "PluginOTel",
     "PluginGuardrails",
+    "make_answer_leak_check",
     "PluginSupportTriage",
     "MCPToolRuntime",
     "MCPServerSpec",

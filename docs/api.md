@@ -454,6 +454,22 @@ PluginGuardrails(pre=[…], post=[…])            # pre/post turn checks
 PluginSupportTriage()                          # worked example: lobe+stage+flow+skill+tool at once
 ```
 
+`PluginGuardrails` is the seam (a check raises to block); the SDK ships a built-in deterministic
+answer-leak post-check via `make_answer_leak_check`:
+
+```python
+from agent_sdk.plugins.guardrails import PluginGuardrails, make_answer_leak_check
+
+guard = make_answer_leak_check(forbidden=["internal-only"], impossible_actions=["delete account"])
+PluginGuardrails(post=[guard])   # blocks secrets / bulk-PII / forbidden substrings / impossible commitments
+```
+
+The detectors are pure functions in `agent_sdk.guards` (`answer_leak_violation`, `secret_violation`,
+`bulk_pii_violation`, `forbidden_violation`, `commitment_violation`, `has_refusal_marker`).
+Secret/email/phone detection is locale-neutral; the commitment/refusal lexicons default to English
+and are fully injectable (pass `commitment_cues=` / `negation_cues=` / `markers=` for another
+language) — the leaf carries no host copy.
+
 `PluginWorkspace` gives the agent a persistent, sandboxed file tree for artifacts and working
 documents and wires the `fs.read`/`fs.write`/`fs.list`/`fs.edit` tools + the heavy-document path
 (`react/docworkspace`). Its `driver` selects the backend (`virtual` ephemeral · `local` disk ·

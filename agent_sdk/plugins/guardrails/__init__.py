@@ -1,4 +1,9 @@
-"""``PluginGuardrails`` — pre/post turn checks (a guardrail raises to block)."""
+"""``PluginGuardrails`` — pre/post turn checks (a guardrail raises to block).
+
+The plugin is the seam; ``make_answer_leak_check`` is the built-in deterministic
+post-check (secret / bulk-PII / forbidden-substring / impossible-action scan) that
+most agents want.
+"""
 
 from __future__ import annotations
 
@@ -6,12 +11,10 @@ from collections.abc import Callable
 from typing import Any
 
 from agent_sdk.plugins.base import AgentSetup
+from agent_sdk.plugins.guardrails.errors import GuardrailError
+from agent_sdk.plugins.guardrails.leak_guard import make_answer_leak_check
 
-__all__ = ["PluginGuardrails", "GuardrailError"]
-
-
-class GuardrailError(Exception):
-    """Raised by a guardrail check to block a turn."""
+__all__ = ["PluginGuardrails", "GuardrailError", "make_answer_leak_check"]
 
 
 class PluginGuardrails:
