@@ -503,6 +503,12 @@ as data, the embedder + `GoldenHead` from the host) — no ACL/tenant type enter
 `GoldenHead` is a curated cosine known-answer index (distinct from `SemanticCache`, which keys
 exact query-embedding → cached result).
 
+**Anti-hedge retry.** When a grounded one-shot answer *finds* the material but opens with an apology
+(reading as a refusal, dropping the citation), the engine retries it once with a forced-answer
+directive. `agent_sdk.react.make_hedge_retry()` builds the `(answer) -> directive | None` callable
+the engine's `_answer_retry` seam consumes (English defaults; pass `markers=` / `directive=` for
+another language) — the engine owns the retry loop, the host owns what counts as a hedge.
+
 `PluginWorkspace` gives the agent a persistent, sandboxed file tree for artifacts and working
 documents and wires the `fs.read`/`fs.write`/`fs.list`/`fs.edit` tools + the heavy-document path
 (`react/docworkspace`). Its `driver` selects the backend (`virtual` ephemeral · `local` disk ·
