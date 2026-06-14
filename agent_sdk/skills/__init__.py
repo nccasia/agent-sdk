@@ -5,6 +5,7 @@ The pieces, by concern:
 
 - **logic** (`packs`)      — ``SkillPack``, ``SkillRegistry``, slug/stage resolution.
 - **definition** (`definition`) — the authoring façade ``Skill`` (compiles to a pack).
+- **loader** (`loader`)    — ``load_skill_pack`` / ``load_skill_packs``: read a ``SKILL.md`` folder.
 - **parser** (`parser`)    — sections / ToC / token estimate / ``search_bundle`` (layered reading).
 - **context** (`context`)  — render a skill's live workspace state (context_vars).
 - **prompt** (`prompt`)    — ``build_skill_prompt_block``: how skills enter the reasoning context.
@@ -29,6 +30,12 @@ from agent_sdk.skills.compiler import (
 )
 from agent_sdk.skills.context import render_context_var, render_context_vars_block
 from agent_sdk.skills.definition import Skill
+from agent_sdk.skills.loader import (
+    SkillLoadError,
+    load_skill_pack,
+    load_skill_packs,
+    parse_skill_md,
+)
 from agent_sdk.skills.packs import (
     KB_LOOKUP_SKILL,
     SkillPack,
@@ -59,6 +66,8 @@ __all__ = [
     "stage_matches", "KB_LOOKUP_SKILL",
     # definition
     "Skill",
+    # loader (SKILL.md folder → SkillPack)
+    "load_skill_pack", "load_skill_packs", "parse_skill_md", "SkillLoadError",
     # parser
     "Section", "split_sections", "file_toc", "file_purpose", "search_bundle",
     "split_frontmatter", "est_tokens", "FULL_FILE_TOKENS",

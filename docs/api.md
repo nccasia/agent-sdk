@@ -319,6 +319,22 @@ folder/section/ToC chunking, the activation strategies, the skill lobe state mac
 how a skill's content is injected back into context — full reference in
 [`concepts/09-skills.md`](concepts/09-skills.md).
 
+**Loading from disk.** A `SKILL.md` folder (YAML frontmatter + markdown body + sibling text
+reference files) loads into a `SkillPack` via the loader — the code-first source-of-truth path that
+complements `SkillRegistry.from_rows` (the DB/override path):
+
+```python
+from agent_sdk.skills import load_skill_pack, load_skill_packs, parse_skill_md
+
+pack  = load_skill_pack("skills/code_review")    # one <dir>/SKILL.md bundle → SkillPack
+packs = load_skill_packs("skills")               # every immediate-subdir bundle under a root
+front, body = parse_skill_md(text)               # low-level: (frontmatter dict, body)
+```
+
+The loader records `SkillPack.source_dir` (so the compiled-surface cache can persist a sidecar),
+parses nested `checklist` / `context_vars` from YAML, and raises `SkillLoadError` on a malformed
+bundle (no frontmatter, missing `name`/`description`, no `SKILL.md`).
+
 ### Subagents (named fan-out workers — Claude Code's `.claude/agents/*.md`)
 
 A **`Subagent`** is a named, reusable scoped worker — the typed form of a `map` work-item:

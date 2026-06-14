@@ -2,7 +2,7 @@
 
 The whole point of the standalone SDK is that it is a *leaf*: it may import the
 standard library and third-party deps (``anthropic``, ``numpy``, ``pydantic``,
-``cachetools``, optionally ``openai`` / ``redis``) plus other ``agent_sdk``
+``cachetools``, ``pyyaml``, optionally ``openai`` / ``redis``) plus other ``agent_sdk``
 modules — but never the Mezon project packages (``rag_core`` / ``arag_core`` /
 ``ingest_core`` / ``agent_core``). This AST walk fails on the first violation.
 """
