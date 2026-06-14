@@ -10,7 +10,7 @@ Two tools (kept minimal so the catalog stays lean at scale):
   ``decision`` written at ``scope=conversation`` is durable (long-term); the default is flash.
 
 These are ESSENTIALS — adaptive tool selection never drops them (a digest must always be
-re-expandable). See ``docs/concepts/universal-memory.md``.
+re-expandable). See ``docs/concepts/06-universal-memory.md``.
 """
 
 from __future__ import annotations

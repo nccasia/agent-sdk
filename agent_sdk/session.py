@@ -53,6 +53,12 @@ class SessionState:
     # the skill_active lobe keeps driving a loaded SOP across turns (set by the
     # engine from the turn's ``skills_in_use`` at the ActivateSkill moment).
     skills_in_use: list[str] = field(default_factory=list)
+    # Flow/path bias the metacognition meta-control tool recorded last turn. Flow
+    # is resolved once at turn start (a pure function of (spec, context)), so a
+    # mid-turn meta decision cannot retarget the current turn — it is persisted
+    # here and folded into the next turn's recognition context as a deterministic
+    # signal (the MetacognitionPlugin's path recognizer reads it). Empty ⇒ no bias.
+    meta_flow_bias: str = ""
 
     def messages(
         self, *, first_n: int = 1, last_m: int = 6, max_turn_chars: int = 2000
@@ -116,6 +122,7 @@ class SessionState:
             "facts": self.facts,
             "context": self.context,
             "skills_in_use": self.skills_in_use,
+            "meta_flow_bias": self.meta_flow_bias,
         }
 
     @classmethod
@@ -127,6 +134,7 @@ class SessionState:
             facts=list(d.get("facts", [])),
             context=list(d.get("context", [])),
             skills_in_use=list(d.get("skills_in_use", [])),
+            meta_flow_bias=str(d.get("meta_flow_bias", "")),
         )
 
 

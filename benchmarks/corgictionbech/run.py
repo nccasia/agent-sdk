@@ -13,6 +13,8 @@ engine snapshot). See ``METHOD.md``.
 from __future__ import annotations
 
 import argparse
+import asyncio
+import json
 import sys
 from pathlib import Path
 
@@ -28,9 +30,11 @@ from agent_sdk.inspection import (  # noqa: E402
     LobeInspection,
 )
 from agent_sdk.metacognition import MetaController, MetaObservation, monitor, regulate  # noqa: E402
-from benchmarks._shared import compose_verdict, write_consolidated  # noqa: E402
+from benchmarks._shared import compose_verdict, load_provider  # noqa: E402
+from benchmarks.corgictionbech import scoring  # noqa: E402
 
 RESULTS = HERE / "results"
+DATASET = HERE / "dataset" / "scenarios.jsonl"
 
 
 def _ck(cid: str, ok: bool, detail: str) -> dict:
@@ -121,36 +125,121 @@ def run_channel() -> dict:
     return _payload(checks)
 
 
+# ── plugin surface (deterministic): the MetacognitionPlugin matches the implementation ───────────
+def run_plugin_surface() -> dict:
+    """The shipped plugin assembles its surface and its tool enactors write the right turn-state
+    keys (reason → write → enact); cite/filter are never reshapeable. Free — no provider."""
+    return _payload(scoring.plugin_surface_checks())
+
+
+# ── live (single-arm): the equipped agent makes the right meta choices ────────────────────────────
+def _load_scenarios() -> list[dict]:
+    return [json.loads(line) for line in DATASET.read_text().splitlines() if line.strip()]
+
+
+def _make_agent(model):
+    from agent_sdk import PreactAgent
+    from agent_sdk.clients import make_client
+    from agent_sdk.plugins.metacognition import MetacognitionPlugin
+
+    return PreactAgent(client=make_client(model), plugins=[MetacognitionPlugin()], metacognition="apply")
+
+
+async def run_live(model: str, trials: int) -> tuple[dict, list]:
+    """Measure the EQUIPPED agent (the best configuration): it answers every scenario correctly
+    (the gate), and we record how often it reaches for the expected meta lever (decision_hit_rate,
+    transparency — NOT a gate, since forcing a lever on a trivial turn would be overreach)."""
+    from agent_sdk import probe
+
+    agent = _make_agent(model)
+    gate_checks: list[dict] = []  # correctness of the best configuration — the live gate
+    rows: list[dict] = []
+    probes: list = []
+    lever_hits = lever_total = 0
+    for sc in _load_scenarios():
+        # pool decision quality across trials (live variance); correctness from the last trial
+        dq_ok, dq_detail, rec = False, "", None
+        for t in range(trials):
+            rec = await probe(agent, sc["query"], label=f"{sc['id']}·t{t}")
+            probes.append(rec)
+            ok, dq_detail = scoring.decision_quality(rec, sc["expect"])
+            dq_ok = dq_ok or ok
+        if not sc["expect"].get("control"):  # lever scenario — record hit-rate (non-gating)
+            lever_total += 1
+            lever_hits += int(dq_ok)
+            print(f"  [{'lever' if dq_ok else ' -- '}] decision.{sc['id']:<22} {dq_detail}")
+        gate_checks.append(_ck(f"answer.{sc['id']}", scoring.answered_correctly(rec, sc["expect"]),
+                               f"answer ok={scoring.answered_correctly(rec, sc['expect'])}"))
+        rows.append(scoring.live_row(rec, sc["expect"]))
+    metrics = scoring.live_metrics(rows)
+    if lever_total:
+        metrics["decision_hit_rate"] = round(lever_hits / lever_total, 3)
+    return _payload(gate_checks, metrics), probes
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--report", action="store_true", help="write results/corgictionbech.html")
     ap.add_argument("--label", default="base")
-    # accepted for ladder uniformity; this bench is deterministic (no provider)
-    ap.add_argument("--live", action="store_true")
+    ap.add_argument("--live", action="store_true",
+                    help="also run the live measurement of the equipped agent (needs a provider token)")
     ap.add_argument("--model", default=None)
     ap.add_argument("--trials", type=int, default=1)
     args = ap.parse_args()
 
-    payloads = {"monitor": run_monitor(), "regulate": run_regulate(),
-                "pinned": run_pinned(), "channel": run_channel()}
-    verdict = compose_verdict(payloads, record={"pinned": ["pinned_steps"]})
+    # Deterministic floor — the kernel monitor→regulate table + the shipped plugin surface.
+    # These always run (no provider) and keep the bench READY in the no-cred ladder.
+    payloads: dict[str, dict | None] = {
+        "monitor": run_monitor(), "regulate": run_regulate(),
+        "pinned": run_pinned(), "channel": run_channel(),
+        "plugin_surface": run_plugin_surface(),
+    }
+    probes: list = []
+    if args.live:
+        resolved = load_provider()
+        if resolved is None:
+            print("[corgictionbech] --live given but no provider token — running the deterministic "
+                  "floor only (live A/B skipped).", file=sys.stderr)
+        else:
+            model = args.model or resolved
+            trials = max(1, int(args.trials))
+            print(f"[corgictionbech] live (equipped agent) · model={model} · trials={trials}\n")
+            live_payload, probes = asyncio.run(run_live(model, trials))
+            payloads["live"] = live_payload
+
+    verdict = compose_verdict(
+        payloads,
+        record={"pinned": ["pinned_steps"],
+                "live": ["accuracy", "decision_hit_rate", "meta_tokens_avg"]},
+    )
 
     print("── corgictionbech ─────────────────────────────────────────────")
     total = ok = 0
     for p in payloads.values():
+        if p is None:
+            continue
         for c in p["checks"]:
-            print(f"  [{'PASS' if c['ok'] else 'FAIL'}] {c['id']:<32} {c['detail'][:42]}")
+            print(f"  [{'PASS' if c['ok'] else 'FAIL'}] {c['id']:<34} {c['detail'][:48]}")
         total += p["n"]
         ok += p["pass"]
     print(f"\ncorgictionbech: {ok}/{total} checks pass · verdict {verdict['status']}")
+    if verdict["metrics"]:
+        print("metrics:", verdict["metrics"])
     if verdict["reasons"]:
         print("reasons:", "; ".join(verdict["reasons"]))
 
     if args.report:
+        from agent_sdk.viewer import write_viewer
+
         RESULTS.mkdir(exist_ok=True)
-        write_consolidated(path=str(RESULTS / "corgictionbech.html"), verdict=verdict,
-                           modes=payloads, probes=[], label="corgictionbech · metacognition")
-        print(f"report: {RESULTS / 'corgictionbech.html'}")
+        out = RESULTS / "corgictionbech.html"
+        modes = {m: p for m, p in payloads.items() if p is not None}
+        label = (f"corgictionbech · live · {args.model or ''}" if probes
+                 else "corgictionbech · metacognition")
+        # One unified two-page report (Overview + Inspect); Inspect is the live probe
+        # detail when present, an empty-state on a deterministic floor-only run.
+        write_viewer(out, probes, label=label, verdict=verdict, modes=modes)
+        print(f"report: {out}")
 
     return 0 if verdict["status"] == "READY" else 1
 

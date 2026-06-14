@@ -44,6 +44,7 @@ from agent_sdk.skills.parser import (
     file_purpose,
     file_toc,
     search_bundle,
+    split_frontmatter,
     split_sections,
 )
 from agent_sdk.skills.prompt import (
@@ -60,7 +61,7 @@ __all__ = [
     "Skill",
     # parser
     "Section", "split_sections", "file_toc", "file_purpose", "search_bundle",
-    "est_tokens", "FULL_FILE_TOKENS",
+    "split_frontmatter", "est_tokens", "FULL_FILE_TOKENS",
     # context
     "render_context_var", "render_context_vars_block",
     # prompt

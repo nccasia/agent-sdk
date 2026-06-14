@@ -54,7 +54,7 @@ trade-off:
 
 When adding a capability, ask: is it intrinsic to *every* agent (core) or an optional add-on
 (extension)? When in doubt, prefer an extension — it keeps the core lean and the capability
-toggleable. See [`docs/concepts/plugins.md`](./docs/concepts/plugins.md).
+toggleable. See [`docs/concepts/10-plugins.md`](./docs/concepts/10-plugins.md).
 
 ## Commit & PR conventions
 

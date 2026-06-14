@@ -6,7 +6,7 @@ the response stage, and this lobe frames it to write the NEXT message of the
 conversation — continuing the dialogue, never restarting or re-greeting, composed
 from the information gathered this turn.
 
-It pairs two ways (full customization, see `docs/concepts/reply-flow.md`):
+It pairs two ways (full customization, see `docs/concepts/03-reply-flow.md`):
 
 - **flow decides** — a flow can list a real ``respond`` stage
   (`flows/stages/respond.py`) as its terminal step;

@@ -22,7 +22,8 @@ sys.path.insert(0, str(HERE.parents[1]))
 
 from agent_sdk import Harness, PreactAgent, Scenario  # noqa: E402
 from agent_sdk.clients import FakeClient  # noqa: E402
-from benchmarks._shared import compose_verdict, write_consolidated  # noqa: E402
+from agent_sdk.viewer import write_viewer  # noqa: E402
+from benchmarks._shared import compose_verdict  # noqa: E402
 
 RESULTS = HERE / "results"
 
@@ -131,8 +132,8 @@ async def main() -> int:
 
     if args.report:
         RESULTS.mkdir(exist_ok=True)
-        write_consolidated(path=str(RESULTS / "flowbench.html"), verdict=verdict, modes=payloads,
-                           probes=[], label="flowbench · flow axis (OX)")
+        write_viewer(RESULTS / "flowbench.html", [], label="flowbench · flow axis (OX)",
+                     verdict=verdict, modes=payloads)
         print(f"report: {RESULTS / 'flowbench.html'}")
     return 0 if verdict["status"] == "READY" else 1
 

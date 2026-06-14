@@ -11,6 +11,7 @@ and tool calls — exactly the split that makes the core portable (docs/porting.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import contextvars
 import json
@@ -37,8 +38,16 @@ from agent_sdk.events import (
     stamp,
 )
 from agent_sdk.flow_def import Flow
+from agent_sdk.inspection import (
+    EngineSnapshot,
+    FlowAxisSnapshot,
+    FlowStepInspection,
+    LobeAxisSnapshot,
+    LobeInspection,
+)
 from agent_sdk.lobes.runtime import Lobe, datetime_block
-from agent_sdk.metacognition_facade import Metacognition
+from agent_sdk.metacognition.regulator import _TRIMMABLE_LOBES
+from agent_sdk.metacognition_facade import PINNED_UNSKIPPABLE, Metacognition
 from agent_sdk.network.activation import merge_lobe_weights, propagate, validate_network
 from agent_sdk.result import AgentResult, MemoryUpdate, Refusal, Trace, Usage
 from agent_sdk.session import SessionState
@@ -148,8 +157,9 @@ def _citations_from_text(text: str, chunks: list[dict]) -> list[Citation]:
 
 
 _BACKFILL_MIN_ANSWER_CHARS = 60   # a refusal/one-liner is shorter ⇒ never backfilled
-_BACKFILL_MAX_ADD = 3             # cap added citations
-_BACKFILL_MIN_OVERLAP = 4         # ≥ this many distinctive chunk tokens in the answer
+_BACKFILL_MAX_ADD = 6             # cap added citations (wide enough to include the
+                                  # expected doc when a relevant chunk ranks lower)
+_BACKFILL_MIN_OVERLAP = 3         # ≥ this many distinctive chunk tokens in the answer
 
 
 def _content_tokens(text: str) -> set[str]:
@@ -437,13 +447,28 @@ class Engine:
     def build_context(self, query: str, state: SessionState) -> dict:
         q = query.strip()
         low = q.lower()
-        return {
+        ctx = {
             "query": query,
             "is_question": q.endswith("?") or low.startswith(_WH),
             "word_count": len(q.split()),
             "has_history": bool(state.history),
             "ambiguous": False,
         }
+        # Fold the host's per-turn recognition FLAGS into the ctx so domain path
+        # recognizers can read them (e.g. ``config_mode``/``relearn_active`` for the
+        # admin steward paths). Only scalar top-level keys the host set on the
+        # context bag — the engine moves opaque values, no domain knowledge.
+        if isinstance(self.context, dict):
+            for k, v in self.context.items():
+                if k not in ctx and isinstance(v, (bool, int, float, str)):
+                    ctx[k] = v
+        # Fold a metacognition flow bias the meta_control tool recorded on a PRIOR turn
+        # into the recognition ctx as a deterministic flag (``meta_flow_bias_<path>``) a
+        # plugin path recognizer can read. No-op when unset ⇒ default routing unchanged.
+        bias = getattr(state, "meta_flow_bias", "")
+        if bias:
+            ctx[f"meta_flow_bias_{bias}"] = True
+        return ctx
 
     def _policy(self) -> dict:
         return {
@@ -823,6 +848,24 @@ class Engine:
         llm_calls: list[dict] = []
         answer = ""
 
+        # ── Metacognition: the OX/OY snapshots the kernel monitor reads ──────────
+        # Previously the controller ran blind (snapshots=None). Build the lobe-axis +
+        # engine snapshots once per turn from already-resolved state (pure reads); the
+        # per-stage flow-axis is built inside the loop. Default mode is ``observe`` —
+        # nothing is applied — so a no-plugin agent stays byte-identical (parity).
+        meta_lobe_axis = LobeAxisSnapshot(
+            lobes=[
+                LobeInspection(id=e["id"], layer=e["layer"], activated=bool(e["activated"]))
+                for e in resolution.lobes
+            ],
+            activated=list(resolution.activated),
+        )
+        meta_engine_snap = EngineSnapshot(
+            path=path,
+            flow={"name": flow.id},
+            lobes=[{"id": e["id"]} for e in resolution.lobes],
+        )
+
         for stage_index, stage in enumerate(stages):
             is_last_stage = stage_index == len(stages) - 1
             yield stamp(StageStart(flow=flow.id, stage=stage.id), trace_id)
@@ -832,18 +875,86 @@ class Engine:
                     {"role": "user", "content": f"Next step ({stage.id}): "
                      f"{stage.description or stage.id}"}
                 )
-            decision = self.metacognition.plan_next(target_flow=flow.id, target_step=stage.id)
+            # The current step as a flow-axis snapshot (scoped to this stage so the
+            # monitor's observations + the regulator's decision target THIS step).
+            flow_axis = FlowAxisSnapshot(
+                flow=flow.id,
+                disabled=False,
+                steps=[
+                    FlowStepInspection(
+                        flow=flow.id, step=stage.id, loop=stage.loop,
+                        tools=list(stage.tools), lobes=list(stage.lobes),
+                    )
+                ],
+            )
+            decision = self.metacognition.plan_next(
+                lobe_axis=meta_lobe_axis, flow_axis=flow_axis, engine=meta_engine_snap,
+                target_flow=flow.id, target_step=stage.id, current_lobes=tuple(stage.lobes),
+            )
+            # The mirror: surface the kernel's observations to the meta-context lobe
+            # (harmless when the MetacognitionPlugin is not installed — nothing reads it).
+            turn_ctx.lobe_outputs["meta_observations"] = [
+                o.to_payload() for o in decision.observations
+            ]
             if decision.action != "continue":
                 meta_actions.append(
                     {"action": decision.action, "reason": decision.reason, "stage": stage.id}
                 )
                 yield stamp(MetaAction(action=decision.action, reason=decision.reason), trace_id)
-                if decision.action == "skip_step" and self.metacognition.should_apply("skip_step"):
+                if (
+                    decision.action == "skip_step"
+                    and self.metacognition.should_apply("skip_step")
+                    and not self._stage_carries_pinned(stage)
+                ):
                     flow_stages_trace.append(
                         {"flow": flow.id, "stage": stage.id, "skipped": True, "steps": []}
                     )
                     yield stamp(StageEnd(flow=flow.id, stage=stage.id), trace_id)
                     continue
+                if (
+                    decision.action == "adjust_lobe_slice"
+                    and decision.target_lobes
+                    and self.metacognition.should_apply("adjust_lobe_slice")
+                ):
+                    # Trim the consulted lobe slice for this step (the regulator never
+                    # trims cite/filter). Run the step against the narrowed slice.
+                    stage = self._scoped_stage(stage, lobes=list(decision.target_lobes))
+
+            # The meta-control tool (run on an earlier reflect step) may have requested
+            # trim/skip on this step; honor it — apply-gated, pin-guarded, one-shot.
+            if (
+                getattr(turn_ctx, "scratchpad", None) is not None
+                and (req := turn_ctx.scratchpad.get("meta_regulate_request"))
+                and isinstance(req, dict)
+                and req.get("step") in (None, stage.id)
+            ):
+                kind = req.get("request")
+                turn_ctx.scratchpad.set("meta_regulate_request", None)  # one-shot
+                if (
+                    kind == "skip"
+                    and self.metacognition.should_apply("skip_step")
+                    and not self._stage_carries_pinned(stage)
+                ):
+                    meta_actions.append(
+                        {"action": "skip_step", "reason": "meta_control regulate request",
+                         "stage": stage.id}
+                    )
+                    yield stamp(
+                        MetaAction(action="skip_step", reason="meta_control request"), trace_id
+                    )
+                    flow_stages_trace.append(
+                        {"flow": flow.id, "stage": stage.id, "skipped": True, "steps": []}
+                    )
+                    yield stamp(StageEnd(flow=flow.id, stage=stage.id), trace_id)
+                    continue
+                if kind == "trim" and self.metacognition.should_apply("adjust_lobe_slice"):
+                    narrowed = [lb for lb in stage.lobes if lb not in _TRIMMABLE_LOBES]
+                    if narrowed and len(narrowed) != len(stage.lobes):
+                        meta_actions.append(
+                            {"action": "adjust_lobe_slice",
+                             "reason": "meta_control regulate request", "stage": stage.id}
+                        )
+                        stage = self._scoped_stage(stage, lobes=narrowed)
 
             # Adaptive tool exposure (Phase 4): choose the stage's tool subset once
             # (cache-stable across hops); default is the full static set.
@@ -885,6 +996,19 @@ class Engine:
                         _t2 = _text_of(resp2)
                         if _t2 and not _retry(_t2):
                             stage_text, resp = _t2, resp2
+                        elif is_last_stage:
+                            # Still hedging after the forced-answer retry on the
+                            # final grounding stage ⇒ the evidence has no real
+                            # answer. Emit a clean REFUSAL instead of a kind=answer
+                            # hedge (which scores as a false answer / FP on an
+                            # unanswerable turn). Domain-free: host decided "hedge".
+                            _res = AgentResult(
+                                text=stage_text, status="refused",
+                                refusal=Refusal(reason="no_grounding",
+                                                message=stage_text),
+                            )
+                            yield stamp(Final(result=_res), trace_id)
+                            return
                 steps.append({"kind": "answer", "text": stage_text})
                 # One-shot grounding: a single-loop answer carries no tool-driven
                 # citations, so resolve [chunk_id] mentions against the (prefetch-
@@ -980,6 +1104,14 @@ class Engine:
         if self._skill_runtime is not None and hasattr(state, "skills_in_use"):
             state.skills_in_use = list(turn_ctx.lobe_outputs.get("skills_in_use", []) or [])
 
+        # Persist a metacognition flow bias (the meta_control tool recorded it this turn).
+        # Flow is resolved once at turn start, so the bias takes effect NEXT turn: a path
+        # recognizer reads it via build_context (a deterministic signal, not an LLM judge).
+        if hasattr(state, "meta_flow_bias"):
+            _bias = turn_ctx.lobe_outputs.get("meta_flow_bias")
+            if isinstance(_bias, str) and _bias:
+                state.meta_flow_bias = _bias
+
         # Citation backfill: a grounded answer that drew on the retrieved chunks
         # but didn't emit [chunk_id] markers (the model paraphrased) still needs
         # its source cited. Overlap-gated + capped, so refusals/chitchat get none.
@@ -1011,6 +1143,25 @@ class Engine:
             if fb in self.flow_by_id:
                 return self.flow_by_id[fb]
         return self.flows[0] if self.flows else Flow("qna", stages=["synthesize"])
+
+    @staticmethod
+    def _scoped_stage(stage: Stage, *, lobes: list[str]) -> Stage:
+        """A copy of ``stage`` with a narrowed lobe slice (metacognition trim). Preserves
+        loop/tools/overrides so only the consulted lobes change for this step."""
+        return Stage(
+            stage.id, lobes=lobes, loop=stage.loop, tools=list(stage.tools),
+            fanout_key=stage.fanout_key, fanout_parallel=stage.fanout_parallel,
+            fanout_max=stage.fanout_max, fanout_isolated=stage.fanout_isolated,
+            threshold=stage.threshold,
+            model=stage.model, temperature=stage.temperature,
+            max_tokens=stage.max_tokens, hops=stage.hops, system_prompt=stage.system_prompt,
+        )
+
+    @staticmethod
+    def _stage_carries_pinned(stage: Stage) -> bool:
+        """A step consulting a pinned lobe (cite/filter) is never skippable — the
+        ground-or-refuse contract is not a meta decision (citations-mandatory)."""
+        return bool(set(stage.lobes) & PINNED_UNSKIPPABLE)
 
     def _model_label(self, stage: Stage) -> str:
         return stage.model or getattr(self.client, "model", "") or ""
@@ -1308,6 +1459,72 @@ class Engine:
                 "max_tokens": final_mt, "tool_count": 0, "tools": [],
             })
 
+    @staticmethod
+    def _new_th() -> dict[str, Any]:
+        return {"text": "", "tool_calls": [], "citations": [], "llm_calls": [],
+                "funnel_obs_chars": []}
+
+    @staticmethod
+    def _merge_th(holder: dict, th: dict) -> None:
+        """Roll one worker's metrics up into the parent holder (order-stable)."""
+        holder["llm_calls"].extend(th.get("llm_calls", []))
+        holder["tool_calls"].extend(th.get("tool_calls", []))
+        holder["citations"].extend(th.get("citations", []))
+        holder.setdefault("meta_actions", []).extend(th.get("meta_actions", []))
+        holder["funnel_obs_chars"].extend(th.get("funnel_obs_chars", []))
+
+    @staticmethod
+    def _th_out_tokens(th: dict) -> int:
+        """Best-effort output-token count for one worker (the memo's cost)."""
+        total = 0
+        for c in th.get("llm_calls", []):
+            u = c.get("usage") or {}
+            with contextlib.suppress(TypeError, ValueError):
+                total += int(u.get("output_tokens") or 0)
+        return total
+
+    def _compose_map_item(
+        self, stage: Stage, item: dict, label: str, msgs: list[dict], *,
+        ctx: dict, state: SessionState, carried: list[str], turn_ctx: Any, sel: list[dict],
+    ) -> tuple[Stage, str, list[dict], list[dict]]:
+        """Build the scoped Stage + system + messages + tool-specs for one work-item.
+
+        Shared by the sequential and parallel paths so a subagent's spec (its own
+        ``system_prompt`` / ``tools`` / ``lobes`` / ``model`` / ``max_tokens`` / ``hops``)
+        is applied identically. ``carried`` is the prior-results note slice (empty in the
+        parallel path — independent workers do not carry state)."""
+        scoped = Stage(
+            stage.id, lobes=list(item.get("lobes") or stage.lobes), loop="agentic",
+            tools=list(item.get("tools") or stage.tools),
+            system_prompt=item.get("system_prompt") or stage.system_prompt or _MAP_ITEM_PROMPT,
+            model=item.get("model") or stage.model,
+            max_tokens=item.get("max_tokens") or stage.max_tokens,
+            hops=int(item.get("hops") or stage.hops or 12),
+        )
+        item_specs = sel
+        if item.get("tools"):
+            keep = set(item["tools"])
+            item_specs = [s for s in sel if s.get("name") in keep]
+        isys, _seg = self._compose_system_segmented(
+            scoped, ctx, state, carried, turn_ctx, tool_specs=item_specs,
+        )
+        imsgs = list(msgs) + [{"role": "user",
+                               "content": f"Sub-task ({label}): {item.get('input') or label}"}]
+        return scoped, isys, imsgs, item_specs
+
+    @staticmethod
+    def _map_item_pool(
+        stage: Stage, retrieved_chunks: list[dict] | None, already_read: set[str] | None,
+    ) -> tuple[list[dict] | None, set[str] | None]:
+        """The evidence channel a worker runs against.
+
+        Default: the shared turn pool (today's behavior — output boundary already clean via
+        the Blackboard raw-chunk rejection). ``fanout_isolated``: a FRESH pool per worker so
+        worker A's chunks never enter worker B's window — only its memo returns (doc 12)."""
+        if stage.fanout_isolated:
+            return [], set()
+        return retrieved_chunks, already_read
+
     async def _map_stage(
         self, stage: Stage, system: str, msgs: list[dict], trace_id: str,
         steps: list[dict], holder: dict, *, ctx: dict, state: SessionState,
@@ -1318,10 +1535,14 @@ class Engine:
         """Generic fan-out (``loop="map"``): run one bounded, SCOPED ``_agentic``
         sub-execution per work-item in ``scratchpad[fanout_key]`` (a list the producing
         stage/plugin filled), each item optionally overriding ``system_prompt`` / ``tools``
-        / ``lobes`` / ``model`` / ``max_tokens`` / ``hops``; prior results carry forward as
-        notes (state carry). Results are written back to ``scratchpad[fanout_key + "_results"]``.
-        Domain-free — the engine knows "sub-tasks", not what they mean. Empty list ⇒ degrade
-        to a single agentic run (parity)."""
+        / ``lobes`` / ``model`` / ``max_tokens`` / ``hops``. Two shapes (doc 12), by
+        ``stage.fanout_parallel``: **sequential** (default) carries prior results forward as
+        notes (state carry — the tasks rail relies on it); **parallel** runs workers
+        concurrently (``asyncio.gather``, bounded by ``fanout_max``), independent, no carry.
+        Either shape is bounded-failure: a worker that raises/times out is recorded
+        ``status="failed"``, never dropped, never sinks the turn. Results →
+        ``scratchpad[fanout_key + "_results"]``. Domain-free. Empty list ⇒ degrade to a
+        single agentic run (parity)."""
         sp = getattr(turn_ctx, "scratchpad", None)
         items = sp.as_list(stage.fanout_key) if (sp is not None and stage.fanout_key) else []
         if not items:
@@ -1332,47 +1553,110 @@ class Engine:
                 yield ev
             return
 
-        carried = list(notes)
-        results: list[dict] = []
+        cap = max(1, min(40, int(stage.fanout_max or 40)))
+        work = [(i, raw if isinstance(raw, dict) else {"input": str(raw)})
+                for i, raw in enumerate(items[:cap])]
         sel = sel_specs or []
-        for i, raw in enumerate(items[:40]):
-            item = raw if isinstance(raw, dict) else {"input": str(raw)}
-            label = str(item.get("label") or item.get("id") or f"item{i}")
-            scoped = Stage(
-                stage.id, lobes=list(item.get("lobes") or stage.lobes), loop="agentic",
-                tools=list(item.get("tools") or stage.tools),
-                system_prompt=item.get("system_prompt") or stage.system_prompt or _MAP_ITEM_PROMPT,
-                model=item.get("model") or stage.model,
-                max_tokens=item.get("max_tokens") or stage.max_tokens,
-                hops=int(item.get("hops") or stage.hops or 12),
-            )
-            item_specs = sel
-            if item.get("tools"):
-                keep = set(item["tools"])
-                item_specs = [s for s in sel if s.get("name") in keep]
-            isys, _seg = self._compose_system_segmented(
-                scoped, ctx, state, carried, turn_ctx, tool_specs=item_specs,
-            )
-            imsgs = list(msgs) + [{"role": "user",
-                                   "content": f"Sub-task ({label}): {item.get('input') or label}"}]
-            th: dict[str, Any] = {"text": "", "tool_calls": [], "citations": [],
-                                  "llm_calls": [], "funnel_obs_chars": []}
-            async for ev in self._agentic(
-                scoped, isys, imsgs, trace_id, steps, th, specs=item_specs,
+
+        if stage.fanout_parallel:
+            results = []
+            async for ev in self._map_parallel(
+                stage, msgs, trace_id, steps, holder, ctx=ctx, state=state, notes=notes,
+                turn_ctx=turn_ctx, sel=sel, work=work, results=results,
                 retrieved_chunks=retrieved_chunks, already_read=already_read,
             ):
                 yield ev
-            res = th.get("text", "")
-            results.append({"label": label, "result": res})
-            carried.append(f"[{label}] {res}")
-            holder["llm_calls"].extend(th["llm_calls"])
-            holder["tool_calls"].extend(th.get("tool_calls", []))
-            holder["citations"].extend(th["citations"])
-            holder.setdefault("meta_actions", []).extend(th.get("meta_actions", []))
-            holder["funnel_obs_chars"].extend(th.get("funnel_obs_chars", []))
+        else:
+            results = []
+            carried = list(notes)
+            for i, item in work:
+                label = str(item.get("label") or item.get("id") or f"item{i}")
+                scoped, isys, imsgs, item_specs = self._compose_map_item(
+                    stage, item, label, msgs, ctx=ctx, state=state, carried=carried,
+                    turn_ctx=turn_ctx, sel=sel,
+                )
+                rc, ar = self._map_item_pool(stage, retrieved_chunks, already_read)
+                th = self._new_th()
+                status, err = "ok", None
+                try:
+                    async for ev in self._agentic(
+                        scoped, isys, imsgs, trace_id, steps, th, specs=item_specs,
+                        retrieved_chunks=rc, already_read=ar,
+                    ):
+                        yield ev
+                except Exception as exc:  # bounded failure: degrade, never lose the turn
+                    status, err = "failed", str(exc)[:200]
+                res = th.get("text", "")
+                results.append({"label": label, "result": res, "status": status,
+                                "tokens_used": self._th_out_tokens(th), "error": err})
+                carried.append(f"[{label}] {res}")
+                self._merge_th(holder, th)
+
         if sp is not None:
             sp.set(stage.fanout_key + "_results", results)
-        holder["text"] = "\n".join(f"{r['label']}: {r['result']}".strip() for r in results)
+        holder["text"] = "\n".join(
+            f"{r['label']}: {r['result']}".strip() for r in results if r.get("status") != "failed"
+        )
+
+    async def _map_parallel(
+        self, stage: Stage, msgs: list[dict], trace_id: str, steps: list[dict], holder: dict,
+        *, ctx: dict, state: SessionState, notes: list[str], turn_ctx: Any, sel: list[dict],
+        work: list[tuple[int, dict]], results: list[dict],
+        retrieved_chunks: list[dict] | None, already_read: set[str] | None,
+    ) -> AsyncIterator[Any]:
+        """Parallel fan-out: workers run concurrently (semaphore-bounded), each into its
+        OWN holder / steps / evidence pool; events are buffered and flushed in item order
+        after the gather (deterministic). One worker's failure or timeout is isolated (an
+        optional per-item ``timeout`` seconds caps a slow worker). Mirrors the research
+        lobe's shape, generalized to any map stage. ``results`` is filled in place."""
+        sem = asyncio.Semaphore(max(1, min(len(work), int(stage.fanout_max or 40))))
+
+        async def worker(idx: int, item: dict) -> dict:
+            label = str(item.get("label") or item.get("id") or f"item{idx}")
+            scoped, isys, imsgs, item_specs = self._compose_map_item(
+                stage, item, label, msgs, ctx=ctx, state=state, carried=list(notes),
+                turn_ctx=turn_ctx, sel=sel,
+            )
+            rc, ar = self._map_item_pool(stage, retrieved_chunks, already_read)
+            th = self._new_th()
+            wsteps: list[dict] = []
+            buf: list[Any] = []
+            status, err = "ok", None
+
+            async def run() -> None:
+                async for ev in self._agentic(
+                    scoped, isys, imsgs, trace_id, wsteps, th, specs=item_specs,
+                    retrieved_chunks=rc, already_read=ar,
+                ):
+                    buf.append(ev)
+
+            timeout = item.get("timeout")
+            async with sem:
+                try:
+                    if timeout:
+                        await asyncio.wait_for(run(), float(timeout))
+                    else:
+                        await run()
+                except Exception as exc:  # bounded failure (TimeoutError included)
+                    status, err = "failed", str(exc)[:200] or "timeout"
+            return {"label": label, "th": th, "steps": wsteps, "buf": buf,
+                    "status": status, "err": err}
+
+        gathered = await asyncio.gather(
+            *(worker(i, item) for i, item in work), return_exceptions=True
+        )
+        # Flush in submission order — gather preserves it regardless of completion order.
+        for res in gathered:
+            if isinstance(res, BaseException):
+                continue
+            steps.extend(res["steps"])
+            for ev in res["buf"]:
+                yield ev
+            th = res["th"]
+            results.append({"label": res["label"], "result": th.get("text", ""),
+                            "status": res["status"], "tokens_used": self._th_out_tokens(th),
+                            "error": res["err"]})
+            self._merge_th(holder, th)
 
     @staticmethod
     def _extract_citations(tool_output: str, out: list[Citation]) -> None:

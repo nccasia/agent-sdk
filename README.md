@@ -100,12 +100,12 @@ So a turn is a readable pipeline — recognize the intent, run the flow's stages
   <img src="docs/concepts/turn-pipeline.svg" alt="A turn: query → recognize path → select flow → per-stage (context · metacognition · loop) → cite/filter/format → result" width="720">
 </p>
 
-Deeper dives: [the OX/OY plane](./docs/concepts/architecture.md) ·
-[intent &amp; paths](./docs/concepts/intent-and-paths.md) ·
-[context management](./docs/concepts/react-context-management.md) ·
-[memory](./docs/concepts/universal-memory.md) ·
-[long-rail tasks](./docs/concepts/task-execution-mode.md) ·
-[reply flow](./docs/concepts/reply-flow.md).
+Deeper dives: [the OX/OY plane](./docs/concepts/01-architecture.md) ·
+[intent &amp; paths](./docs/concepts/02-intent-and-paths.md) ·
+[context management](./docs/concepts/04-react-context-management.md) ·
+[memory](./docs/concepts/06-universal-memory.md) ·
+[long-rail tasks](./docs/concepts/13-task-execution-mode.md) ·
+[reply flow](./docs/concepts/03-reply-flow.md).
 
 ## Core vs. extensions
 
@@ -120,7 +120,7 @@ The SDK draws a deliberate line between what *every* agent is (the domain-free *
 A plugin contributes the **full capacity surface** — lobes, stages, paths/flows, skills, tools, and
 even its own **MCP servers** (discovered at turn start, then registered like any tool). Manage them
 with a `PluginRegistry` (register / override / enable / disable); an agent with no extra plugins is
-**byte-identical** to the default network. See [`docs/concepts/plugins.md`](./docs/concepts/plugins.md).
+**byte-identical** to the default network. See [`docs/concepts/10-plugins.md`](./docs/concepts/10-plugins.md).
 
 ```python
 from agent_sdk import PreactAgent
@@ -167,16 +167,15 @@ credentials, then e.g. `python benchmarks/extensionbench/run.py --live` (emits `
 - [`docs/porting.md`](./docs/porting.md) — Rust/Go/JS ports
 - [`docs/building-a-harness.md`](./docs/building-a-harness.md) — benches & evals
 
-**The mental model**, axis by axis (in [`docs/concepts/`](./docs/concepts/)) — start with
-[`agent-core-overview.md`](./docs/concepts/agent-core-overview.md), then
-[`architecture.md`](./docs/concepts/architecture.md) (OX/OY plane) ·
-[`intent-and-paths.md`](./docs/concepts/intent-and-paths.md) ·
-[`plugins.md`](./docs/concepts/plugins.md) (core vs. extensions) ·
-[`react-context-management.md`](./docs/concepts/react-context-management.md) (the funnel) ·
-[`universal-memory.md`](./docs/concepts/universal-memory.md) ·
-[`task-execution-mode.md`](./docs/concepts/task-execution-mode.md) ·
-[`reply-flow.md`](./docs/concepts/reply-flow.md) ·
-[`tool-use-at-scale.md`](./docs/concepts/tool-use-at-scale.md).
+**The mental model**, axis by axis — the deep dives live in
+[`docs/concepts/`](./docs/concepts/), numbered in reading order (see its
+[`README`](./docs/concepts/README.md)). Start with
+[`01-architecture.md`](./docs/concepts/01-architecture.md) (the OX/OY plane), then
+[`02-intent-and-paths.md`](./docs/concepts/02-intent-and-paths.md),
+[`04-react-context-management.md`](./docs/concepts/04-react-context-management.md) (the funnel),
+[`06-universal-memory.md`](./docs/concepts/06-universal-memory.md),
+[`10-plugins.md`](./docs/concepts/10-plugins.md) (core vs. extensions), and
+[`08-reasoning-as-a-tool.md`](./docs/concepts/08-reasoning-as-a-tool.md) (skills + metacognition).
 
 ## Contributing
 

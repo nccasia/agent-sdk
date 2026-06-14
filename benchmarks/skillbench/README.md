@@ -5,7 +5,7 @@ HTML report out.** It measures what the agent actually does with skills — no s
 live groups, no LLM judge (behavior is scored deterministically from the `probe()` trace).
 
 A skill is a **Standard Operating Procedure**: a folder indexed by `SKILL.md` (see
-`docs/concepts/skills.md`). skillbench asks whether the engine can turn that SOP into
+`docs/concepts/09-skills.md`). skillbench asks whether the engine can turn that SOP into
 behavior — parse it, map it onto its own stages/tools, activate the right one, follow it,
 and keep its content funneled.
 

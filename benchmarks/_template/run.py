@@ -16,7 +16,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # packages/agent-sdk on path
-from benchmarks._shared import compose_verdict, load_provider, write_consolidated  # noqa: E402
+from agent_sdk.viewer import write_viewer  # noqa: E402
+from benchmarks._shared import compose_verdict, load_provider  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 DATASET = HERE / "dataset"
@@ -80,14 +81,14 @@ def main() -> int:
     verdict = compose_verdict(payloads, record={"free": ["scenarios"], "live": ["answered"]})
     total = sum(p["n"] for p in payloads.values() if p)
     ok = sum(p["pass"] for p in payloads.values() if p)
-    for name, p in payloads.items():
+    for _name, p in payloads.items():
         if p:
             for c in p["checks"]:
                 print(f"  {'ok  ' if c['ok'] else 'FAIL'} {c['id']:<46} {c['detail'][:54]}")
     if a.report:
         RESULTS.mkdir(exist_ok=True)
-        write_consolidated(path=str(RESULTS / f"{a.label}.html"), verdict=verdict, modes=payloads,
-                           probes=[], label=f"<benchname> · {a.label}")
+        write_viewer(RESULTS / f"{a.label}.html", [], label=f"<benchname> · {a.label}",
+                     verdict=verdict, modes=payloads)
         print(f"report: {RESULTS / f'{a.label}.html'}")
     print(f"\n<benchname>: {ok}/{total} checks pass · verdict {verdict['status']}")
     return 0 if verdict["status"] == "READY" else 1

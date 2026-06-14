@@ -54,6 +54,13 @@ from agent_sdk._blocks import (  # noqa: E402
 from agent_sdk.activable import Activable, Layer
 from agent_sdk.agent import PreactAgent
 from agent_sdk.bench import Harness, Report, Scenario, ScenarioResult
+from agent_sdk.context import (
+    AgentContext,
+    Evidence,
+    Scope,
+    bind_context,
+    current_context,
+)
 from agent_sdk.engine import Engine
 from agent_sdk.events import (
     AgentStream,
@@ -90,6 +97,7 @@ from agent_sdk.session import Session, SessionState, Turn
 from agent_sdk.signals import compile_signal, eval_signal
 from agent_sdk.skill_def import Skill
 from agent_sdk.stages import Stage, StageRegistry, stage
+from agent_sdk.subagents import Subagent, SubagentRegistry, load_agents_dir
 from agent_sdk.tools import FunctionToolRuntime, Tool, tool
 from agent_sdk.viewer import render_viewer_html, to_viewer_record, write_viewer
 
@@ -108,6 +116,9 @@ __all__ = [
     "Lobes",
     "Stages",
     "Skill",
+    "Subagent",
+    "SubagentRegistry",
+    "load_agents_dir",
     "Session",
     "SessionState",
     "Turn",
@@ -115,6 +126,12 @@ __all__ = [
     "MemoryItem",
     "Scratchpad",
     "SemanticCache",
+    # shared context (one handle, every component, every scope)
+    "AgentContext",
+    "Scope",
+    "Evidence",
+    "current_context",
+    "bind_context",
     "Metacognition",
     "tool",
     "Tool",

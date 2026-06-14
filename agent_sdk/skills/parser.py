@@ -105,6 +105,39 @@ def file_purpose(content: str) -> str:
     return "(empty)"
 
 
+def split_frontmatter(text: str) -> tuple[dict[str, str], str]:
+    """Split a leading ``---`` … ``---`` frontmatter block from the body.
+
+    Returns ``(fields, body)``. Each ``key: value`` line in the block becomes a string
+    field (lower-cased key); everything after the closing ``---`` is the body. No
+    frontmatter ⇒ ``({}, text)``. Hand-rolled (no YAML dep) — the same approach
+    :func:`file_purpose` already uses to read a frontmatter ``description:``.
+    """
+    t = text or ""
+    if not t.lstrip().startswith("---"):
+        return {}, t
+    # Work from the first line so leading blank lines don't break the open fence.
+    stripped = t.lstrip("\n")
+    lines = stripped.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return {}, t
+    fields: dict[str, str] = {}
+    body_start = None
+    for i, line in enumerate(lines[1:], start=1):
+        if line.strip() == "---":
+            body_start = i + 1
+            break
+        if ":" in line:
+            key, val = line.split(":", 1)
+            key = key.strip().lower()
+            if key:
+                fields[key] = val.strip()
+    if body_start is None:  # no closing fence ⇒ not real frontmatter
+        return {}, t
+    body = "\n".join(lines[body_start:]).strip("\n")
+    return fields, body
+
+
 def _nfc_lower(s: str) -> str:
     return unicodedata.normalize("NFC", s or "").lower()
 

@@ -106,6 +106,13 @@ class FlowStep:
     # Empty/missing list ⇒ degrades to a single agentic run (never loses the
     # turn). Ignored unless ``loop == "map"``.
     fanout_key: str = ""
+    # Fan-out shape (``loop="map"`` only). Defaults reproduce today's behavior:
+    # sequential state-carry over a shared evidence pool. ``fanout_parallel`` runs
+    # workers concurrently (gather, bounded by ``fanout_max``); ``fanout_isolated``
+    # gives each worker a fresh evidence pool (only its memo returns). See doc 12.
+    fanout_parallel: bool = False
+    fanout_max: int = 40
+    fanout_isolated: bool = False
 
     # ── RFC 0017: first-class signal (the merged FlowStepNode common case) ────
     # A step's own activation signal — same shape as a lobe's. The default

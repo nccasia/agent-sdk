@@ -29,6 +29,7 @@ from agent_sdk.plugins.base import AgentSetup, Plugin, Workspace
 from agent_sdk.plugins.format import FormatPlugin
 from agent_sdk.plugins.guardrails import GuardrailError, PluginGuardrails
 from agent_sdk.plugins.mcp import HTTPMCPToolRuntime, PluginMCP
+from agent_sdk.plugins.metacognition import MetacognitionPlugin
 from agent_sdk.plugins.otel import PluginOTel
 from agent_sdk.plugins.registry import PluginRegistry
 from agent_sdk.plugins.safety import SafetyPlugin
@@ -76,6 +77,7 @@ __all__ = [
     "capability_lobes",
     "SafetyPlugin",
     "TaskPlugin",
+    "MetacognitionPlugin",
     "FormatPlugin",
     "PluginWorkspace",
     "PluginMCP",

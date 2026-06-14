@@ -5,7 +5,7 @@ carried forward as notes), this stage renders the next message of the
 conversation — a continuation, composed from the notes — via the ``respond`` lobe
 (`lobes/expression/respond.py`).
 
-Two ways to use it (full customization — see `docs/concepts/reply-flow.md`):
+Two ways to use it (full customization — see `docs/concepts/03-reply-flow.md`):
 
 - **flow decides** — list ``respond_step("<flow>")`` as a flow's terminal step in
   ``flows/defaults.py`` to make rendering an explicit pipeline stage;

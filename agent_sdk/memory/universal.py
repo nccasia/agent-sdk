@@ -7,8 +7,8 @@ by scope — FLASH (``turn``, in-RAM, dropped at turn end) and LONG-TERM
 (``conversation``/``channel``/``user``/``bot``, durable) — and routes large bodies to a
 :class:`~agent_sdk.react.docworkspace.DocWorkspace` so they are sliceable, never resident whole.
 
-See ``docs/concepts/universal-memory.md``. This is the substrate; the ``tool_result`` kind is the
-first application (``docs/concepts/tool-use-at-scale.md``).
+See ``docs/concepts/06-universal-memory.md``. This is the substrate; the ``tool_result`` kind is the
+first application (``docs/concepts/05-tool-use-at-scale.md``).
 """
 
 from __future__ import annotations

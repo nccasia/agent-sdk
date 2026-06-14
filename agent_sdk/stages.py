@@ -53,6 +53,17 @@ class Stage:
     fanout_key: str = ""
     threshold: float = 0.0  # min activation to run; 0 = always-on (default)
 
+    # ── fan-out shape (``loop="map"`` only; defaults reproduce today's behavior) ──
+    # False ⇒ sequential state-carry (each worker sees prior results as notes — the
+    # tasks-plugin rail relies on this). True ⇒ workers run concurrently (asyncio.gather,
+    # bounded by ``fanout_max``), no state-carry — independent fan-out (doc 12).
+    fanout_parallel: bool = False
+    fanout_max: int = 40  # concurrency cap / item ceiling (always clamped ≤ 40)
+    # False ⇒ workers share the turn's evidence pool (today). True ⇒ each worker gets a
+    # FRESH retrieved_chunks/already_read — worker A's chunks never enter worker B's
+    # window; only its result (memo) returns. True per-worker context isolation (doc 12).
+    fanout_isolated: bool = False
+
     # ── per-stage inference overrides (None ⇒ engine/policy default) ─────────
     model: str | None = None
     temperature: float | None = None
@@ -71,6 +82,9 @@ class Stage:
         loop: str | None = None,
         tools: Sequence[str] | None = None,
         fanout_key: str | None = None,
+        fanout_parallel: bool | None = None,
+        fanout_max: int | None = None,
+        fanout_isolated: bool | None = None,
         threshold: float | None = None,
         signal: Callable[[dict], float] | None = None,
         model: str | None = None,
@@ -100,6 +114,12 @@ class Stage:
             self.tools = tuple(tools)
         if fanout_key is not None:
             self.fanout_key = fanout_key
+        if fanout_parallel is not None:
+            self.fanout_parallel = fanout_parallel
+        if fanout_max is not None:
+            self.fanout_max = fanout_max
+        if fanout_isolated is not None:
+            self.fanout_isolated = fanout_isolated
         if threshold is not None:
             self.threshold = threshold
         if model is not None:
@@ -136,6 +156,9 @@ class Stage:
             tools=tuple(self.tools),
             description=self.description,
             fanout_key=self.fanout_key,
+            fanout_parallel=self.fanout_parallel,
+            fanout_max=self.fanout_max,
+            fanout_isolated=self.fanout_isolated,
             signals=lambda ctx, _self=self: {_self.id: _self.signal(ctx)},
             signal_weights={sid: 1.0},
             min_activation=float(self.threshold),
@@ -160,6 +183,9 @@ def stage(
     loop: str = "single",
     tools: Sequence[str] = (),
     fanout_key: str = "",
+    fanout_parallel: bool | None = None,
+    fanout_max: int | None = None,
+    fanout_isolated: bool | None = None,
     threshold: float = 0.0,
     signal: Callable[[dict], float] | None = None,
     model: str | None = None,
@@ -178,6 +204,9 @@ def stage(
         loop=loop,
         tools=tools,
         fanout_key=fanout_key,
+        fanout_parallel=fanout_parallel,
+        fanout_max=fanout_max,
+        fanout_isolated=fanout_isolated,
         threshold=threshold,
         signal=signal,
         model=model,

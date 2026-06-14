@@ -17,6 +17,7 @@ playbooks depend on them, and they test a different subject — the project engi
 | **attentionbench** | lobe/path activation + context selection under traps/floods | SDK-concept | `agent_sdk/network/activation.py` + `agent_sdk/lobes/` | **ported** → `benchmarks/attentionbench/` (deterministic, runnable) |
 | **flowbench** | flow-axis: sequence/customize/handoff/react/fault | SDK-concept | `agent_sdk/flows/` | **ported** → `benchmarks/flowbench/` (deterministic, runnable) |
 | **corgictionbech** | metacognition regulator decision table + pinned-step guards | SDK-concept | `agent_sdk/metacognition/` + `agent_sdk/inspection.py` | **ported** → `benchmarks/corgictionbech/` (deterministic, runnable) |
+| **fanoutbench** | subagent fan-out: isolation / bounded-failure / determinism + live fan-in fidelity | SDK-concept | `agent_sdk/subagents/` + fan-out in `agent_sdk/engine.py` | **new** → `benchmarks/fanoutbench/` (free + live, runnable) |
 | skillbench | skill activation / uplift / layering | SDK-concept | `agent_sdk/skills/` | already SDK-native (`benchmarks/skillbench/`) — different subject (SDK skills, not bot skills) |
 | taskbench | task **execution** quality | SDK-concept (subject differs) | `agent_sdk` task mode | already SDK-native (`benchmarks/taskbench/`) — monorepo tests the production `bot_tasks` backend |
 | contextbench | scoped memory: save/forget/recall/scope | partial | `agent_sdk/memory/` | candidate (after a memory-bench design pass) |

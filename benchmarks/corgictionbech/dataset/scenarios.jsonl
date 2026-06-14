@@ -1,0 +1,5 @@
+{"id": "fanout-two-part", "category": "fanout", "query": "Rethink how to answer this, then handle both parts: (1) the capital of France, and (2) the capital of Japan.", "expect": {"fanout": true, "answer_contains": "Tokyo"}}
+{"id": "fanout-compare", "category": "fanout", "query": "Step back and break this into parts: compare the populations of Canada and Australia, then say which is larger.", "expect": {"fanout": true, "answer_contains": "Canada"}}
+{"id": "reflect-uses-tool", "category": "reflect", "query": "Reconsider your approach before answering: what is 17 multiplied by 23?", "expect": {"answer_contains": "391"}}
+{"id": "flow-bias-research", "category": "flow_bias", "query": "Your approach should change for follow-ups like this — bias toward research for next time, then tell me the boiling point of water at sea level in Celsius.", "expect": {"flow_bias": "research", "answer_contains": "100"}}
+{"id": "plain-control", "category": "control", "query": "Name the largest planet in our solar system.", "expect": {"control": true, "answer_contains": "Jupiter"}}

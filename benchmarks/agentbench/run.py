@@ -29,7 +29,8 @@ HERE = Path(__file__).resolve().parent
 SDK_ROOT = HERE.parents[1]
 sys.path.insert(0, str(SDK_ROOT))
 
-from benchmarks._shared import compose_verdict, write_consolidated  # noqa: E402
+from agent_sdk.viewer import write_viewer  # noqa: E402
+from benchmarks._shared import compose_verdict  # noqa: E402
 
 DATASET = HERE / "dataset"
 BASE = ("You are the ops assistant for a busy engineering team. Be concise and accurate, and rely on "
@@ -251,11 +252,6 @@ async def run_hard_memory_scale(b: Bench):
     b.check("hard.recall_at_scale", ok, f"needle among 120 facts · {(rec.answer or '')[:34]}")
 
 
-def _stamp() -> str:
-    from datetime import UTC, datetime
-    return datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
-
-
 async def _amain(args) -> int:
     from benchmarks._shared import load_provider
 
@@ -282,8 +278,8 @@ async def _amain(args) -> int:
     v.setdefault("metrics", {}).update({f"agent.{k}": val for k, val in b.metrics.items()})
     print(f"\nagentbench: {n_ok}/{len(b.checks)} behaviors pass · verdict {v['status']}")
     if args.report is not None:
-        out = write_consolidated(args.report, verdict=v, modes={"agentbench": payload}, probes=b.probes,
-                                 label=f"agentbench · live · {model}", generated_at=_stamp())
+        out = write_viewer(args.report, b.probes, label=f"agentbench · live · {model}",
+                           verdict=v, modes={"agentbench": payload})
         print(f"report: {out}")
     return 0 if payload["all_pass"] else 1
 

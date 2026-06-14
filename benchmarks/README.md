@@ -21,6 +21,7 @@ never the host project (enforced by `tests/test_sdk_isolation.py`).
 | [`attentionbench`](attentionbench/) | context (OY) | free | node selection (relevant outranks flooders) + lobe activation (recall always-on, grounding on grounded paths) |
 | [`flowbench`](flowbench/) | flows (OX) | free | each intent → right flow + step order, the cite→filter grounding contract, determinism, graceful fallback |
 | [`corgictionbech`](corgictionbech/) | metacognition | free | monitor→regulate decision table, apply/observe channel, the pinned-step guard (`cite`/`filter` never skippable) |
+| [`fanoutbench`](fanoutbench/) | subagent fan-out | free + live | per-worker context isolation (zero leakage), bounded failure, ordering determinism, registry resolution; live decompose→fan-out→synthesize fidelity |
 | [`toolbench`](toolbench/) | tool use | free + live | `@tool` specs, `FunctionToolRuntime`/`CompositeToolRuntime`/embedded MCP, `ToolSelectLobe` adaptive exposure, the live agentic `tool_loop` |
 | [`skillbench`](skillbench/) | skills | live | skill activation precision/recall, follow (answer obeys mandates), funnel (navigate not dump) |
 | [`taskbench`](taskbench/) | tasks | live | long-rail task planning + execution |

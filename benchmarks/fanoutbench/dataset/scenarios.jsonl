@@ -1,0 +1,5 @@
+{"id": "fanin-two-capitals", "category": "fanout", "query": "Answer both, fanning out as needed: (1) what is the capital of France, and (2) what is the capital of Japan? Give both.", "expect": {"fanout": true, "answer_contains": "Tokyo"}}
+{"id": "fanin-compare-two", "category": "fanout", "query": "Break this into parts: which has the larger land area, Canada or Australia? Name both, then state which is larger.", "expect": {"fanout": true, "answer_contains": "Canada"}}
+{"id": "fanin-three-facets", "category": "fanout", "query": "Cover three independent facets of the planet Mars: its number of moons, its position from the Sun, and its nickname. Give all three.", "expect": {"fanout": true, "answer_contains": "two"}}
+{"id": "single-no-fanout", "category": "near-neighbor", "query": "What is 2 + 2?", "expect": {"fanout": false, "answer_contains": "4"}}
+{"id": "single-one-fact", "category": "near-neighbor", "query": "What is the chemical symbol for gold?", "expect": {"fanout": false, "answer_contains": "Au"}}

@@ -5,7 +5,7 @@ density recall is the one the model never has to ask for: a scope-ordered index
 of the relevant facts, already in the prompt. This hook loads the store at turn
 start into ``TurnContext.memory_items`` so the ``memory_recall`` lobe renders
 those facts as context nodes — most recalls then cost zero tool calls
-(``docs/concepts/context-memory.md``).
+(``docs/concepts/06-universal-memory.md``).
 
 Scope order is broad → specific (``bot → user → channel → conversation``) so the
 attention builder's per-scope boosts let the most specific fact win on conflict.

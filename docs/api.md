@@ -244,6 +244,14 @@ stages = [
 `hops`, `system_prompt`. Because the Stage's `signal` is part of the `Activable` contract, a flow
 can list a stage that only fires under its own condition — same gating rule as lobes and skills.
 
+A `loop="map"` stage fans out one scoped sub-execution per work-item in `scratchpad[fanout_key]`.
+Three fan-out knobs (all default to today's behavior): `fanout_parallel` (run workers concurrently
+via `asyncio.gather`, semaphore-bounded; default sequential with state-carry), `fanout_max` (the
+concurrency / item cap, ≤ 40), and `fanout_isolated` (each worker gets a fresh evidence pool — no
+cross-worker leakage; default shares the turn pool). Either shape is bounded-failure: a worker that
+raises or exceeds a per-item `timeout` is recorded `status="failed"`, never dropped. See
+**Subagents** below and `docs/concepts/12-subagent-fanout.md`.
+
 #### How an `agentic` loop ends
 
 A `loop="agentic"` stage runs hop-by-hop until one of these terminates it:
@@ -311,6 +319,40 @@ folder/section/ToC chunking, the activation strategies, the skill lobe state mac
 how a skill's content is injected back into context — full reference in
 [`concepts/09-skills.md`](concepts/09-skills.md).
 
+### Subagents (named fan-out workers — Claude Code's `.claude/agents/*.md`)
+
+A **`Subagent`** is a named, reusable scoped worker — the typed form of a `map` work-item:
+`name` + `description` (when to delegate) + `instructions` (its system prompt) + a restricted
+`tools`/`lobes` belt + `model`/`max_tokens`/`hops` budget. It runs in its own context and returns a
+compressed result, never its raw working set. Define once, delegate by name many times.
+
+```python
+from agent_sdk import Subagent, SubagentRegistry, load_agents_dir
+from agent_sdk.plugins.subagents import SubagentsPlugin
+
+# in code …
+registry = SubagentRegistry([
+    Subagent("reviewer", description="reviews code for bugs", instructions="You REVIEW code.",
+             tools=["read", "grep"]),
+])
+registry.add_row({"name": "tester", "description": "writes tests"})   # declarative row
+
+# … or from .claude/agents/*.md (frontmatter: name/description/tools/model; body = prompt)
+registry = SubagentRegistry(load_agents_dir(".claude/agents"))
+
+agent = PreactAgent(client=…, instructions="…",
+                    plugins=[SubagentsPlugin(registry)])   # or SubagentsPlugin(agents_dir="…")
+```
+
+`SubagentsPlugin` wires the registry into the metacognition `meta_control(action=fan_out)` enactor:
+the model delegates by name (`items=[{"agent": "reviewer", "input": "review module X"}]`), the
+enactor resolves the name deterministically (unknown name → a clear tool error), and the
+`meta_fanout` stage runs the workers **parallel + context-isolated**. A `subagent_catalog` lobe
+surfaces the available subagents to the reflect step. Routing stays deterministic — no LLM judges
+the pipeline; the model only *names* a subagent inside the existing `meta_control` call. `cite` /
+`filter` ground the *aggregated* results — grounding is never a worker's decision. Full model:
+[`concepts/12-subagent-fanout.md`](concepts/12-subagent-fanout.md).
+
 ### Tools — the `@tool` decorator
 
 Turn a typed function into a tool; the SDK introspects the signature/types/docstring into an
@@ -374,12 +416,17 @@ Built-in plugins:
 ```python
 from agent_sdk.plugins import (
     SafetyPlugin, FormatPlugin,                 # default-on, toggleable (grounding / styling)
+    TaskPlugin, MetacognitionPlugin,            # opt-in capability plugins
     PluginWorkspace, PluginMCP, PluginOTel, PluginGuardrails, PluginSupportTriage,
     PluginRegistry, builtin_registry,
 )
 
 SafetyPlugin()                                 # cite/filter grounding (default-on; disable for non-RAG)
 FormatPlugin()                                 # channel/language/tone styling (default-on)
+TaskPlugin()                                   # todo-driven task execution (plan→execute→deliver)
+MetacognitionPlugin()                          # think-about-thinking: meta_context lobe + meta_reflect
+                                               #   stage + meta_control tool (pick skills / bias flow /
+                                               #   fan out / trim-skip); opt-in, traced, cite/filter pinned
 PluginWorkspace(driver="virtual")              # a virtual FS + fs.* tools (read/write/list/edit)
 PluginWorkspace(driver="local", root="/data/agent-fs")    # persisted to disk
 PluginWorkspace(driver="s3", bucket="…")

@@ -4,8 +4,11 @@
 > *how* the task is approached. Metacognition is the module that gives an agent — or a subagent — the
 > **lobe, stage, and tool** to think about its own thinking and reshape it.
 
-> **Status: direction.** Today's metacognition is the deterministic kernel supervisor; the capacity
-> module described here is designed-but-not-shipped. See *Implementation status* below.
+> **Status: shipped (opt-in plugin).** The capacity module described here is implemented as
+> `MetacognitionPlugin` (`agent_sdk/plugins/metacognition/`): the meta-context lobe, the
+> meta-reflect/meta-fanout stages + `meta` flow, and the `meta_control` tool with its enactors.
+> The always-on deterministic kernel supervisor remains the floor underneath it. See
+> *Implementation status* below for what is live vs. still deferred.
 
 ## Meta thinking vs agent thinking
 
@@ -129,34 +132,49 @@ engine and an unpredictable one.
 
 ## Implementation status
 
-This lands on machinery that already exists; the default agent is unchanged.
+This landed on machinery that already existed; the default (no-plugin) agent is byte-identical.
 
-**Live (the substrate).**
-- The plugin capacity surface — `Plugin` / `AgentSetup` (`add_lobe`/`add_stage`/`add_flow`/`add_tool`,
-  `plugins/base.py`), `PluginRegistry` toggling (`plugins/registry.py`). Templates: `tasks` (lobe +
-  stages + flow + tool) and `support_triage` (full surface).
-- Today's **deterministic kernel metacognition** — `monitor → regulate`, `observe`/`apply` modes +
+**Live.**
+- The plugin capacity surface — `Plugin` / `AgentSetup` (`add_lobe`/`add_stage`/`add_flow`/
+  `add_tool`/`add_tool_runtime`, `plugins/base.py`), `PluginRegistry` toggling.
+- The **deterministic kernel metacognition** — `monitor → regulate`, `observe`/`apply` modes +
   precedence, pinned `cite`/`filter` (`metacognition_facade.py` `PINNED_UNSKIPPABLE`,
   `metacognition/controller.py` `_DEFAULT_APPLY_ACTIONS={adjust_lobe_slice}`).
-- The **reason → write → enact** pattern — already live for skills (`skill_strategy="reason"` →
-  `lobe_outputs["skills_in_use"]` → `skill_active`).
+- Metacognition **as a plugin** — `MetacognitionPlugin` (`agent_sdk/plugins/metacognition/`):
+  the `meta_context` lobe, the `meta_reflect` + `meta_fanout` stages, the `meta` flow, and the
+  `meta_control` tool.
+- The meta-control tool's **enactors** — **skills** (writes `lobe_outputs["skills_in_use"]`,
+  driven by the existing `skill_active` lobe), **flow** (`bias_flow` → persisted `meta_flow_bias`,
+  read next turn by the plugin's path recognizer), **subagent** (`fan_out` → `scratchpad["meta_fanout"]`,
+  run by the generic `loop="map"` `_map_stage`), and **regulate** (`trim`/`skip` honored at the
+  engine seam, apply-gated + pin-guarded).
+- **The controller now sees what it regulates** — the engine builds real `LobeAxisSnapshot` /
+  `FlowAxisSnapshot` / `EngineSnapshot` at the stage seam and passes them (+ `current_lobes`) to
+  `plan_next`; the observations are surfaced to the meta-context lobe (the mirror finally enters the
+  prompt). `adjust_lobe_slice` is **applied** (was infra-ready, unapplied).
+- **Per-subagent capacity (by borrow)** — a `fan_out` item may carry `lobes=["meta_context", …]` /
+  `tools=["meta_control", …]`; `_map_stage` scopes the sub-execution to them, so the subagent gains
+  its own meta faculty from the globally-installed module.
 
-**To build.**
-- Package metacognition **as a plugin** — the meta-context lobe, the meta step, the meta-control tool.
-- The meta-control tool's **enactors** for skills / flow / subagent (skills already have theirs).
-- **Per-subagent capacity scoping** — let a subagent receive the module, not just borrow its lobe/tool.
-- **Feed the controller what it sees** — the deterministic decision at `engine.py:836` is passed only
-  `target_flow`/`target_step`; the lobe/flow/engine snapshots are `None`, so today's monitor runs nearly
-  blind. Wire `adjust_lobe_slice` (infra is ready, unapplied).
-
-**Deferred.**
-- Recursive meta plugins (a meta module that reasons about the meta module).
-- Meta choosing arbitrary *new* flows, or rewriting the pipeline wholesale.
+**Deferred (honest gaps).**
+- **True per-subagent *install*** — a subagent borrows the global lobe/tool; it cannot `install` a
+  private plugin only it sees.
+- **Tool-driven `retry_step`** — the meta tool enacts `trim`/`skip`; `retry_step` stays the
+  deterministic regulator's domain (no low-risk inline re-run seam in the hot stage loop).
+- **Deterministic `adjust_lobe_slice` auto-trigger** — the apply seam is wired, but the engine emits
+  no `context:tight` signal by default (no portable context-window probe), so the deterministic trim
+  fires only when a host supplies one; the tool's `trim` is the live manual lever meanwhile.
+- Recursive meta plugins (a meta module that reasons about the meta module); meta choosing arbitrary
+  *new* flows or rewriting the pipeline wholesale.
 
 ## Boundaries
 
 - **Object-level resolution stays deterministic** (refined invariant 4) — the meta tool writes context;
   it never becomes the resolver.
+- **Flow bias is next-turn, by construction.** The flow is resolved once at turn start (a pure function
+  of `(spec, context)`), so a mid-turn `bias_flow` cannot retarget the current turn — it is persisted
+  (`SessionState.meta_flow_bias`) and folded into the *next* turn's recognition context as a
+  deterministic signal. The meta-context lobe states this honestly ("applies to your next turn").
 - **`cite` / `filter` are pinned** (`SafetyPlugin`) and are **never** a meta decision — ground-or-refuse
   is not reshapeable (`PINNED_UNSKIPPABLE`).
 - **Opt-in and traced** — metacognition is a plugin you add; every meta decision is recorded, as today.

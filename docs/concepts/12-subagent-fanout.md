@@ -3,8 +3,9 @@
 > A subagent explores in its own space and hands back a **memo** — never its raw working set.
 > Fan-out runs N of them; fan-in keeps the conclusions, not the dumps.
 
-> **Status: direction.** The generic `map` fan-out + research path are live; isolated reusable
-> subagents are designed-but-not-shipped. See *Implementation status* below for the split.
+> **Status: shipped (opt-in).** The generic `map` fan-out + research path are live; named
+> reusable subagents, parallel + bounded-failure map, and true per-worker context isolation are
+> now shipped as opt-in surfaces (the default path is unchanged). See *Implementation status*.
 
 ## Why subagents
 
@@ -46,15 +47,15 @@ plans and spawns workers, workers gather in parallel and return findings, the le
 The agent-sdk already implements the *hardest* parts of this model — compression and the
 orchestrator-worker shape — through the `research` flow and the generic `map` loop. The honest scorecard:
 
-| Claude Code principle | SDK mechanism today | Gap |
+| Claude Code principle | SDK mechanism today | Status |
 |---|---|---|
-| Orchestrator-worker shape | `research` flow = `plan → research → synthesize → cite → filter` (`agent_sdk/flows/defaults.py`) | — none; this is the live shape |
-| Return = summary, not dump | the **`Memo`** (`agent_sdk/contracts/memo.py`): claims + `supporting_chunk_ids`, never raw chunks | enforced for research; not generalized to arbitrary workers |
-| Context isolation (boundary) | `Blackboard` rejects `RAW_CHUNK_KINDS` — raw chunks confined to research's receptive field (`network/activation.py:113,494`) | the *output* boundary holds; the *execution* still shares the turn's pool (below) |
-| A composable subagent definition | the per-item dict in a `map` stage (overrides `system_prompt`/`tools`/`lobes`/`model`/`max_tokens`/`hops`) | ad-hoc + unnamed — no reusable `Subagent` unit |
-| Tool restriction per worker | `item["tools"]` filters the worker's specs (`engine.py:1363`) | works; just not declared as a first-class field |
-| Parallel without shared state | the research lobe's `asyncio.gather` (`cognition/lobes/research.py:167`) | only the *research* lobe; the generic `map` is **sequential** |
-| Reusable, model-tiered, restricted | per-item `model` override + the `tasks` plugin's TodoRail | no named/registry-backed definition yet |
+| Orchestrator-worker shape | `research` flow = `plan → research → synthesize → cite → filter` (`agent_sdk/flows/defaults.py`) | live |
+| Return = summary, not dump | the **`Memo`** (`agent_sdk/contracts/memo.py`) for research; the generic map's enriched result (`{label, result, status, tokens_used, error}`) for any worker | live (generalized) |
+| Context isolation (boundary) | `Blackboard` rejects `RAW_CHUNK_KINDS` (`network/activation.py:113,494`) + `Stage.fanout_isolated` gives each worker a fresh evidence pool | live — output **and** execution boundary hold |
+| A composable subagent definition | **`Subagent`** + **`SubagentRegistry`** (`agent_sdk/subagents/`), in-code or `.claude/agents/*.md`; `to_item()` projects to the map-item dict | live (named + reusable) |
+| Tool restriction per worker | `item["tools"]` filters the worker's specs; a first-class `Subagent.tools` field | live |
+| Parallel without shared state | the research lobe's `asyncio.gather`; `Stage.fanout_parallel` for the *generic* map (semaphore-bounded, bounded-failure) | live (generalized) |
+| Reusable, model-tiered, restricted | per-item `model` override + `Subagent` registry rows / markdown defs | live |
 
 ```txt
         ORCHESTRATOR                 WORKERS (fan-out)                FAN-IN
@@ -104,10 +105,11 @@ use when: steps build on each other      use when: facets are independent
 wall-clock = sum of items                wall-clock = slowest item
 ```
 
-The engine's generic `map` is **sequential today** — it carries each worker's result forward as a note so
-the next worker can build on it (the `tasks`-plugin rail relies on this). The research lobe is the
-**parallel** instance. Parallelizing the *generic* map (with per-item failure isolation) is a to-build
-below; the two shapes then differ only by a flag, not by which subsystem you use.
+The engine's generic `map` is **sequential by default** — it carries each worker's result forward as a
+note so the next worker can build on it (the `tasks`-plugin rail relies on this). `Stage.fanout_parallel`
+selects the **parallel** shape (semaphore-bounded `gather` with per-item failure isolation), the research
+lobe's shape generalized to any map stage. The two shapes now differ only by a flag, not by which
+subsystem you use.
 
 ## Context isolation + the compression invariant
 
@@ -118,25 +120,25 @@ confined to the producing worker's receptive field and may not join the shared p
 exactly Claude Code's "return a summary, not the artifacts," enforced *structurally* rather than by
 prompt discipline.
 
-What is **not** yet isolated is the worker's *execution*: today every `map` sub-execution reuses the same
-engine and **shares the turn's evidence channel** — `retrieved_chunks` / `already_read` are threaded into
-each worker (`engine.py:1373-1375`). So the output boundary is clean (memos only), but the input/working
-surface is shared, not a fresh window. True per-worker isolation (each worker gets its own evidence pool;
-only its memo returns) is the central to-build — it closes the gap between "in-turn fan-out" and a
-Claude-Code subagent.
+The worker's *execution* is isolated on demand: by default every `map` sub-execution shares the turn's
+evidence channel (`retrieved_chunks` / `already_read`), but `Stage.fanout_isolated` gives each worker a
+**fresh** pool (`Engine._map_item_pool`) — worker A's chunks never enter worker B's window, and only its
+result crosses back. With both the output boundary (memos only) and the input boundary (fresh window)
+clean, an isolated parallel worker *is* a Claude-Code subagent. The `meta_fanout` stage turns both on.
 
 ## The escalation ladder (mapped to Claude Code)
 
 ```txt
   single agentic loop   →   in-turn fan-out (map)   →   isolated subagents      →   recursive / workflow
   one worker, one ctx       N workers, shared pool      N workers, fresh ctx        nested fan-out, many
-  (loop="agentic")          (loop="map", LIVE)          summary-only (TO BUILD)     agents (DEFERRED)
+  (loop="agentic")          (loop="map", LIVE)          summary-only (LIVE,         agents (DEFERRED)
+                                                        fanout_isolated)
         Claude Code:  ── subagents ──────────────────▶  ── teams ──▶  ── workflows ──▶
 ```
 
-The SDK sits at "in-turn fan-out" with a clean output boundary. The next rung is isolated subagents
-(fresh evidence pool + summary-only return); beyond that, nested maps and recursive `PreactAgent`
-sub-agents map onto Claude Code's teams/workflows tier.
+The SDK now reaches "isolated subagents" (fresh evidence pool + summary-only return, via
+`fanout_isolated`), with named delegation by `meta_control`. Beyond that, nested maps and recursive
+`PreactAgent` sub-agents map onto Claude Code's teams/workflows tier (still deferred).
 
 ## Implementation status
 
@@ -156,15 +158,23 @@ This builds on machinery that already exists; the default path is unchanged.
   (`agent_sdk/plugins/tasks/`).
 - The work-list accessor — `Scratchpad.as_list` (`memory/scratchpad.py`).
 
-**To build.**
-- A named, reusable **`Subagent`** definition (the map-item dict promoted to a first-class unit:
-  `name`/`description`/`tools`/`model`/`prompt`/`budget`) + a small registry — so subagents are
-  declared once and reused, like Claude Code's `.claude/agents/*.md` / `AgentDefinition`.
-- **Parallel + bounded-failure** for the *generic* map: a per-stage flag to `gather` independent items
-  (the research lobe's shape), with per-item timeout and an explicit drop/retry policy instead of
-  silent loss.
-- **True per-worker context isolation**: each worker gets its own evidence pool; only its `Memo`
-  returns to the parent (close the shared-`retrieved_chunks` gap above).
+**Live today (opt-in; default path unchanged).**
+- A named, reusable **`Subagent`** definition + **`SubagentRegistry`** (`agent_sdk/subagents/`):
+  `name`/`description`/`instructions`/`tools`/`lobes`/`model`/`max_tokens`/`hops`. Declare once in
+  code (`SubagentRegistry.add_row` / `register`) or as `.claude/agents/*.md` files
+  (`load_agents_dir`, reusing the skills frontmatter parser) — Claude Code's `AgentDefinition`.
+  `Subagent.to_item()` projects to the map-item dict the engine already runs (no kernel change).
+- **Parallel + bounded-failure** for the *generic* map — `Stage.fanout_parallel` runs items via
+  `asyncio.gather` bounded by `Stage.fanout_max` (≤ 40), events buffered + flushed in item order
+  (deterministic); a worker that raises or exceeds a per-item `timeout` is recorded
+  `status="failed"`, never dropped, never sinks the turn (`Engine._map_parallel`, `engine.py`).
+- **True per-worker context isolation** — `Stage.fanout_isolated` gives each worker a fresh
+  `retrieved_chunks`/`already_read`; worker A's chunks never enter worker B's window, only its
+  result returns (`Engine._map_item_pool`). Closes the shared-pool gap above.
+- **Named delegation** — `meta_control(action=fan_out, items=[{agent, input}])` resolves names via
+  the registry (`plugins/metacognition/tool.py`); the `meta_fanout` stage runs them parallel +
+  isolated. The `subagents` plugin (`plugins/subagents/`) wires the registry + a `subagent_catalog`
+  lobe that surfaces the available subagents to the reflect step. Routing stays deterministic.
 
 **Deferred.**
 - Nested maps (a worker that itself fans out).

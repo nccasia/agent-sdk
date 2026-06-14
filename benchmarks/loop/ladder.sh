@@ -37,10 +37,11 @@ run () { local name="$1"; shift; echo "── $name ─────────�
          grep -aE "verdict (READY|NOT_READY|UNMEASURED)" "$OUT/$name.log" | tail -1 || tail -1 "$OUT/$name.log"; }
 
 # free / deterministic benches (no provider needed — they read the engine's pure functions)
-run corgictionbech     --report
 run flowbench          --report
 run attentionbench     --report
-# live benches (real provider)
+# live benches (real provider). corgictionbech keeps a deterministic floor (READY with no creds)
+# and adds a single-arm live measurement of the equipped agent when a provider is present.
+run corgictionbech     --live --report "${MODEL_ARGS[@]}"
 run skillbench         --live --report --trials "$TRIALS" "${MODEL_ARGS[@]}"
 run toolbench          --live --report "${MODEL_ARGS[@]}"
 run taskbench          --live

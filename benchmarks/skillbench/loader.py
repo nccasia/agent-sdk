@@ -1,7 +1,7 @@
 """Load a ``SKILL.md`` folder into an SDK :class:`agent_sdk.Skill`.
 
 A skill is a *folder whose index is ``SKILL.md``* (the SOP standard from
-``docs/concepts/skills.md``): YAML frontmatter + a markdown body, plus sibling
+``docs/concepts/09-skills.md``): YAML frontmatter + a markdown body, plus sibling
 ``*.md`` / ``*.txt`` reference files that become the skill's ``files`` bundle.
 
 This is the bench's own loader — it mirrors agent-core's ``load_skill_pack`` but

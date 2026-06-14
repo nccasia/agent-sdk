@@ -50,4 +50,4 @@ def test_backfill_capped():
             for i in range(10)]
     answer = "Cần hoàn thành các môn học bắt buộc và tích lũy tín chỉ theo quy định đào tạo."
     out = _backfill_citations(answer, many, existing=[])
-    assert len(out) <= 3
+    assert len(out) <= 6
