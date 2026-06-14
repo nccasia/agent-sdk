@@ -90,6 +90,38 @@ def plugin_surface_checks() -> list[dict]:
     return checks
 
 
+# ── deterministic: the Layer-1 plan compiler (plan → dynamic state plan) ─────────────────────────
+def state_plan_checks() -> list[dict]:
+    """``compile_state_plan`` turns a plan into a dynamic sequence of states (Layer 1): one ``act``
+    per aspect (the ``act → act → act`` expansion), a folding ``synthesize``, and the PINNED
+    ``cite``/``filter`` appended when the turn grounds. Pure + deterministic — the bench proves the
+    compile, not an LLM."""
+    from agent_sdk.metacognition import compile_state_plan
+
+    one = compile_state_plan([{"id": "main", "question": "what is X?"}])
+    three = compile_state_plan(
+        [{"question": "cost"}, {"question": "scale"}, {"question": "ops"}], grounds=True)
+    states3 = [s["state"] for s in three]
+    subjects3 = [s["subject"] for s in three if s["state"] == "act"]
+    checks = [
+        _ck("plan.single_no_fanout", [s["state"] for s in one] == ["act"],
+            f"one aspect → {[s['state'] for s in one]}"),
+        _ck("plan.expands_act_per_aspect", states3[:3] == ["act", "act", "act"],
+            f"three aspects → {states3}"),
+        _ck("plan.subjects_threaded", subjects3 == ["cost", "scale", "ops"],
+            f"act subjects = {subjects3}"),
+        _ck("plan.synthesize_folds", "synthesize" in states3 and
+            states3.index("synthesize") == 3, f"states={states3}"),
+        _ck("plan.pinned_grounding_appended", states3[-2:] == ["cite", "filter"],
+            f"grounded tail = {states3[-2:]}"),
+        _ck("plan.deterministic",
+            compile_state_plan([{"question": "a"}, {"question": "b"}]) ==
+            compile_state_plan([{"question": "a"}, {"question": "b"}]),
+            "same plan → same compiled states"),
+    ]
+    return checks
+
+
 # ── live (single-arm): read a probe record of the equipped agent ──────────────────────────────────
 def _meta_calls(rec: Any) -> list[dict]:
     return [tc.get("input") or {} for tc in getattr(rec, "tool_calls", []) if tc.get("name") == "meta_control"]

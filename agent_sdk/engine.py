@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import contextvars
+import inspect
 import json
 import re
 import unicodedata
@@ -475,6 +476,9 @@ class Engine:
         self._prefetch_hooks: list[Any] = []
         self._tool_filters: list[Any] = []
         self._turn_hooks: list[Any] = []
+        # Grounding/citation seams owned by a plugin (RagPlugin), not the core.
+        self._finalize_hooks: list[Any] = []
+        self._tool_result_hooks: list[Any] = []
         self.require_citations = require_citations
         self.share_history = share_history
         self.tools_in_prompt = tools_in_prompt
@@ -1241,7 +1245,7 @@ class Engine:
             citations.append(_bc)
             yield stamp(CitationFound(citation=_bc), trace_id)
 
-        result = self._finalize(
+        result = await self._finalize(
             trace_id,
             answer,
             citations,
@@ -1254,6 +1258,7 @@ class Engine:
             llm_calls,
             degraded,
             scratchpad=(turn_ctx.scratchpad.snapshot() if getattr(turn_ctx, "scratchpad", None) else None),
+            retrieved_chunks=retrieved_chunks,
         )
         yield stamp(Final(result=result), trace_id)
 
@@ -1574,6 +1579,10 @@ class Engine:
                     yield stamp(ToolResult(id=tid, name=name, output=out), trace_id)
                     holder["tool_calls"].append({"name": name, "input": inp, "output": out})
                     self._extract_citations(out, holder["citations"])
+                    for _trh in self._tool_result_hooks:
+                        _cits = _trh(name, out)
+                        if _cits:
+                            holder["citations"].extend(_cits)
                     results.append({"type": "tool_result", "tool_use_id": tid, "content": out})
                     call["tool_results"].append({"tool_use_id": tid, "name": name, "output": out})
                 msgs.append({"role": "user", "content": results})
@@ -1991,7 +2000,7 @@ class Engine:
         updates.clear()
         return out
 
-    def _finalize(
+    async def _finalize(
         self,
         trace_id,
         answer,
@@ -2005,7 +2014,23 @@ class Engine:
         llm_calls,
         degraded=None,
         scratchpad=None,
+        retrieved_chunks=None,
     ) -> AgentResult:
+        # Plugin finalize hooks own the grounding/citation contract (extraction,
+        # backfill, marker-strip, ground-or-refuse) — the engine carries none of it.
+        # Each hook may rewrite the answer, replace citations, or force a refusal.
+        refusal_reason: str | None = None
+        for hook in self._finalize_hooks:
+            res = hook(
+                answer, citations, list(retrieved_chunks or []), flow.grounds, self.require_citations
+            )
+            if inspect.isawaitable(res):
+                res = await res
+            if res is None:
+                continue
+            answer, citations, refusal_reason = res
+            if refusal_reason:
+                break
         # Citations are already extracted onto ``citations`` by this point; strip the
         # inline [chunk_id]/[golden:…] grounding markers from the user-facing text so
         # the prose is clean (sources render separately from message metadata).
@@ -2044,12 +2069,16 @@ class Engine:
             skill_selection=skill_selection,
             degraded=list(degraded or []),
         )
-        # Ground-or-refuse: a grounding flow with citations required but none found.
-        if self.require_citations and flow.grounds and not citations:
+        # Ground-or-refuse: a finalize hook may force a refusal (a grounding plugin's
+        # no-citations gate), or the engine's own fallback gate fires.
+        if refusal_reason or (self.require_citations and flow.grounds and not citations):
             return AgentResult(
                 text="I cannot confirm that from the available sources.",
                 status="refused",
-                refusal=Refusal(reason="no_citations", message="No supporting sources were found."),
+                refusal=Refusal(
+                    reason=refusal_reason or "no_citations",
+                    message="No supporting sources were found.",
+                ),
                 usage=usage,
                 trace=trace,
             )

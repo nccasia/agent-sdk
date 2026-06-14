@@ -132,6 +132,13 @@ def run_plugin_surface() -> dict:
     return _payload(scoring.plugin_surface_checks())
 
 
+# ── plan compile (deterministic): plan → dynamic state plan (Layer 1) ────────────────────────────
+def run_plan_compile() -> dict:
+    """The Layer-1 compiler turns a plan into a dynamic sequence of states (``act → act → act`` over
+    subjects + synthesize + pinned grounding). Free — a pure function, no provider."""
+    return _payload(scoring.state_plan_checks())
+
+
 # ── live (single-arm): the equipped agent makes the right meta choices ────────────────────────────
 def _load_scenarios() -> list[dict]:
     return [json.loads(line) for line in DATASET.read_text().splitlines() if line.strip()]
@@ -194,6 +201,7 @@ def main() -> int:
         "monitor": run_monitor(), "regulate": run_regulate(),
         "pinned": run_pinned(), "channel": run_channel(),
         "plugin_surface": run_plugin_surface(),
+        "plan_compile": run_plan_compile(),
     }
     probes: list = []
     if args.live:

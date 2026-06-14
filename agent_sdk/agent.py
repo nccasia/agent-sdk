@@ -331,6 +331,8 @@ class PreactAgent:
         )
         self.engine._prefetch_hooks = prefetch_hooks
         self.engine._tool_filters = list(setup.tool_filters) + list(tool_filters or [])
+        self.engine._finalize_hooks = list(setup.finalize_hooks)
+        self.engine._tool_result_hooks = list(setup.tool_result_hooks)
 
         self._last_trace: Trace | None = None
         self._jobs: dict[str, asyncio.Queue] = {}

@@ -73,6 +73,11 @@ class AgentSetup:
         self.post_checks: list[Callable[[Any], Any]] = []
         self.prefetch_hooks: list[Callable[[str, Any], Any]] = []
         self.tool_filters: list[Callable[[str, str, dict], Any]] = []
+        # Post-answer finalize hooks (own the grounding/citation contract) and
+        # per-tool-result citation extractors — the seams a RAG/grounding plugin
+        # uses instead of the engine carrying citation logic in its core.
+        self.finalize_hooks: list[Callable[..., Any]] = []
+        self.tool_result_hooks: list[Callable[[str, str], Any]] = []
         self.workspace: Workspace | None = None
         # Builtin capabilities a plugin owns/overrides and wants subtracted from
         # the resolved network (by id/name). Pinned lobes are never removed.
@@ -161,6 +166,23 @@ class AgentSetup:
         tool executes; return a string to short-circuit the call with that result
         (e.g. a redundant-write guard), or ``None`` to allow it."""
         self.tool_filters.append(filt)
+
+    def add_finalize_hook(self, hook: Callable[..., Any]) -> None:
+        """A post-answer hook ``hook(answer, citations, chunks, grounds,
+        require_citations) -> (answer, citations, refusal_reason | None) | None``
+        (async or sync) run in ``_finalize`` before the result is built. It may
+        rewrite the answer, augment/replace the citation list, and force a refusal
+        (return a non-empty ``refusal_reason``). This is the seam a grounding/RAG
+        plugin uses to own citation extraction + ground-or-refuse, keeping that
+        logic out of the engine core. Returning ``None`` leaves the turn unchanged."""
+        self.finalize_hooks.append(hook)
+
+    def add_tool_result_hook(self, hook: Callable[[str, str], Any]) -> None:
+        """A per-tool-result hook ``hook(tool_name, output) -> list[Citation] |
+        None`` run after each tool call; returned citations are appended to the
+        turn's citation list. The seam for extracting citations a tool emits in its
+        output (e.g. a KB tool returning ``{"citations": [...]}``)."""
+        self.tool_result_hooks.append(hook)
 
     def bind_workspace(self, workspace: Workspace) -> None:
         self.workspace = workspace
