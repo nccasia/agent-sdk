@@ -1,16 +1,21 @@
-"""respond — the response stage for the OX flow axis.
+"""respond — the response stage (expression domain).
 
 The terminal *response stage*: after the collector stages gather (their output
 carried forward as notes), this stage renders the next message of the
 conversation — a continuation, composed from the notes — via the ``respond`` lobe
-(`lobes/expression/respond.py`).
+(``agent_sdk.expression.lobes.respond``). Lives in the expression domain next to
+its lobe; reuses the generic ``Stage`` base from ``flows.stages.common``.
 
 Two ways to use it (full customization — see `docs/concepts/03-reply-flow.md`):
 
-- **flow decides** — list ``respond_step("<flow>")`` as a flow's terminal step in
-  ``flows/defaults.py`` to make rendering an explicit pipeline stage;
+- **flow decides** — list ``respond_step("<flow>")`` as a flow's terminal step to
+  make rendering an explicit pipeline stage;
 - **stage decides** — otherwise the engine pins the ``respond`` lobe's framing onto
   whatever the flow's terminal stage is (no extra LLM call).
+
+To customize the reply voice/tone, **override the ``respond`` lobe** (a plugin
+contributes a lobe with ``id="respond"``, which replaces the builtin); see the
+override section in `docs/concepts/03-reply-flow.md`.
 
 ``.spec`` compiles to the ``FlowStep`` the registry + runner consume, exactly like
 its sibling stage modules.

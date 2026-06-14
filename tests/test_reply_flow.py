@@ -34,25 +34,26 @@ def test_respond_is_a_real_registered_production_lobe():
     assert "respond" in {lb.id for lb in default_lobe_objects()}
 
 
-def test_respond_lobe_emits_framing_only_not_the_transcript():
-    """The conversation lives once — in the ``messages`` array — so the respond lobe no longer
-    re-injects the transcript into the system prompt (de-dup; keeps the cache prefix stable)."""
+def test_respond_lobe_emits_two_framing_parts_not_the_transcript():
+    """The lobe emits TWO framing contributions (continuation rules + voice/next-step), both
+    tagged ``respond``. The conversation lives once — in the ``messages`` array — so the lobe
+    never re-injects the transcript into the system prompt (de-dup; cache prefix stable)."""
     from agent_sdk.contracts.turn import TurnContext
     from agent_sdk.expression.lobes.respond import LOBE
 
     state = SessionState(history=[Turn("user", "what is X?"), Turn("assistant", "X is foo")])
     contribs = LOBE.prompt(TurnContext(query="and Y?", session_memory=state))
-    assert [c.source for c in contribs] == ["respond"]  # framing only — no "conversation" chunk
-    assert "what is X?" not in "".join(c.text for c in contribs)  # transcript not in system prompt
+    assert [c.source for c in contribs] == ["respond", "respond"]  # two framing parts
+    assert "what is X?" not in "".join(c.text for c in contribs)  # transcript NOT in the prompt
 
-    # no dialog available → still just the framing chunk
+    # no dialog available → still just the framing parts (never a transcript chunk)
     empty = LOBE.prompt(TurnContext(query="hi", session_memory=SessionState()))
-    assert [c.source for c in empty] == ["respond"]
+    assert {c.source for c in empty} == {"respond"} and len(empty) == 2
 
 
 def test_respond_step_is_a_real_stage_module():
     # a flow can list a real respond stage as its terminal ("flow decides stages")
-    from agent_sdk.flows.stages import respond_step
+    from agent_sdk.expression.stages import respond_step
 
     step = respond_step("qna")
     assert step.name == "respond"
@@ -145,3 +146,40 @@ async def test_second_turn_continues_the_conversation():
     assert "what is X?" in blob and "first answer" in blob  # prior turn is in context
     # the terminal system framed the reply as a continuation
     assert "continuing this conversation" in agent.client.calls[-1]["system"]
+
+
+# ── override: a plugin replaces the respond renderer ───────────────────────────
+def test_respond_lobe_is_overridable_by_a_plugin():
+    """A plugin contributes a lobe with id="respond"; it REPLACES the builtin (plugin-wins by
+    id) and its voice flows into the pinned terminal framing."""
+    from agent_sdk.expression.lobes.respond import RespondLobe
+
+    class WarmRespond(RespondLobe):
+        STYLE = "Reply warmly, like a friendly mentor."  # tweak one part — recomposes
+
+    class RespondOverride:
+        name = "respond_override"
+        def install(self, setup):
+            setup.add_lobe(WarmRespond())
+
+    base = PreactAgent(client=FakeClient(default="ok"), universal_memory=False)
+    assert type(base.engine.lobe_by_id["respond"]).__name__ == "RespondLobe"
+
+    agent = PreactAgent(client=FakeClient(default="ok"), universal_memory=False,
+                        plugins=[RespondOverride()])
+    r = agent.engine.lobe_by_id["respond"]
+    assert type(r).__name__ == "WarmRespond"
+    assert sum(1 for lb in agent.engine.lobes if lb.id == "respond") == 1  # replaced, not doubled
+    assert "warmly, like a friendly mentor" in r.system_prompt  # part recomposed
+    assert "do not restart" in r.system_prompt  # continuation contract kept
+    # the override's voice reaches the pinned terminal framing (fallback path uses system_prompt)
+    assert "warmly, like a friendly mentor" in _system(agent, is_last=True)
+
+
+def test_history_window_is_configurable_per_agent():
+    a = PreactAgent(client=FakeClient(default="ok"), universal_memory=False,
+                    history_window={"first_n": 1, "last_m": 2, "max_turn_chars": 100})
+    assert a.engine._history_window == {"first_n": 1, "last_m": 2, "max_turn_chars": 100}
+    # default agent uses SessionState.messages() defaults (empty window)
+    b = PreactAgent(client=FakeClient(default="ok"), universal_memory=False)
+    assert b.engine._history_window == {}

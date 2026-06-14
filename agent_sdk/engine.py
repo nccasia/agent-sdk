@@ -298,6 +298,7 @@ class Engine:
         embed: Any = None,
         require_citations: bool = False,
         share_history: bool = False,
+        history_window: dict | None = None,
         tools_in_prompt: bool = False,
         funnel: bool = False,
         tz: str = "UTC",
@@ -383,6 +384,10 @@ class Engine:
         self._tool_result_hooks: list[Any] = []
         self.require_citations = require_citations
         self.share_history = share_history
+        # The conversation-trim window the respond/terminal stage sees (primacy +
+        # recency: keep first + summary, blur the middle, keep recent). Keys:
+        # first_n / last_m / max_turn_chars. Empty ⇒ SessionState.messages() defaults.
+        self._history_window = dict(history_window or {})
         self.tools_in_prompt = tools_in_prompt
         self.funnel = funnel
         self.tz = tz
@@ -674,9 +679,20 @@ class Engine:
         # (no extra LLM call) — placed after the notes it refers to.
         if is_last and "respond" not in stage.lobes:
             respond = self.lobe_by_id.get("respond")
-            sp = getattr(respond, "system_prompt", None) if respond else None
-            if sp:
-                parts.append(("respond", sp.strip(), "stable"))
+            contribs = []
+            if respond is not None and turn_ctx is not None:
+                with contextlib.suppress(Exception):
+                    contribs = respond.prompt(turn_ctx) or []
+            if contribs:
+                for c in contribs:  # the respond lobe's contributions (its 2 framing parts)
+                    text = (getattr(c, "text", "") or "").strip()
+                    if text:
+                        parts.append((getattr(c, "source", "") or "respond", text,
+                                      getattr(c, "stability", "stable")))
+            else:  # fallback: the composed framing (e.g. no turn_ctx in a bare compose call)
+                sp = getattr(respond, "system_prompt", None) if respond else None
+                if sp:
+                    parts.append(("respond", sp.strip(), "stable"))
         parts.append(("datetime", datetime_block(self.tz, self.lang), "turn"))
 
         # Canonical layer order: a stable instruction prefix leads; the turn-volatile tail trails
@@ -819,7 +835,7 @@ class Engine:
             if _blk:
                 turn_ctx.prefetch_context = str(_blk)
 
-        base_msgs = state.messages() + [{"role": "user", "content": query}]
+        base_msgs = state.messages(**self._history_window) + [{"role": "user", "content": query}]
         # ``share_history`` threads the running message + tool history across
         # stages so a later stage sees what earlier stages actually did (read,
         # edited, ran) instead of re-discovering it. Default off preserves the

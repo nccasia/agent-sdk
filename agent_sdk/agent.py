@@ -100,6 +100,7 @@ class PreactAgent:
         budgets: dict | None = None,
         require_citations: bool = False,
         share_history: bool = False,
+        history_window: dict | None = None,
         tools_in_prompt: bool = False,
         funnel: bool = True,
         universal_memory: bool = True,
@@ -131,6 +132,7 @@ class PreactAgent:
             budgets=budgets,
             require_citations=require_citations,
             share_history=share_history,
+            history_window=history_window,
             tools_in_prompt=tools_in_prompt,
             funnel=funnel,
             universal_memory=universal_memory,
@@ -206,14 +208,17 @@ class PreactAgent:
             for server in getattr(plugin, "mcp_servers", None) or []:
                 setup.add_mcp_server(server)
         resolved_lobes.extend(setup.lobes)
-        # Dedup lobes by id (keep first): a plugin may re-contribute a lobe the
-        # chosen network already carries (e.g. RagPlugin's ``cite`` on a minimal
-        # network that still lists an inline cite) — one spec per id.
-        _seen_lobe_ids: set[str] = set()
-        resolved_lobes = [
-            lb for lb in resolved_lobes
-            if not (lb.id in _seen_lobe_ids or _seen_lobe_ids.add(lb.id))
-        ]
+        # Dedup by id, PLUGIN-WINS (the override seam): a plugin-contributed lobe
+        # (added after the base network) with an existing id REPLACES the builtin —
+        # so a host can swap a lobe, e.g. override the ``respond`` reply renderer with
+        # its own voice/tone, or re-contribute ``cite`` on a minimal network. Last
+        # occurrence wins; the engine re-sorts by ``(layer, order)`` so position is
+        # unaffected. Removal-protection (cite/filter safety floor) is handled
+        # separately below and is not weakened — override is by replacement, not removal.
+        _by_lobe_id: dict[str, Any] = {}
+        for lb in resolved_lobes:
+            _by_lobe_id[lb.id] = lb  # later (plugin) wins over an earlier (builtin) same id
+        resolved_lobes = list(_by_lobe_id.values())
         resolved_stages.extend(setup.stages)
         resolved_flows.extend(setup.flows)
         self._event_hooks = list(setup.event_hooks)
@@ -341,6 +346,7 @@ class PreactAgent:
             system_addendum=(MEMORY_DIRECTIVE if universal_memory else ""),
             require_citations=require_citations,
             share_history=share_history,
+            history_window=history_window,
             tools_in_prompt=tools_in_prompt,
             funnel=funnel,
             tz=tz,
