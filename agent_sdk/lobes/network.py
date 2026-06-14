@@ -44,9 +44,10 @@ def _core_lobe_objects() -> list[BaseLobe]:
     each domain's ``LOBES``: memory recall, skills, adaptive tool selection, the
     cognition reasoning spine, and the reply flow (``respond``). Not toggleable.
 
-    Output styling (``format``), grounding (``cite``/``filter``), and task execution are
-    *toggleable* plugin capabilities — ``FormatPlugin`` / ``SafetyPlugin`` (default-on) and the
-    opt-in ``TaskPlugin`` — not core. See ``default_lobe_objects``."""
+    Output styling (``format``), output safety (``filter``), citation grounding (``cite``), and
+    task execution are *toggleable* plugin capabilities — ``FormatPlugin`` / ``SafetyPlugin``
+    (default-on) and the opt-in ``RagPlugin`` (``cite``) / ``TaskPlugin`` — not core. See
+    ``default_lobe_objects``."""
     objs: list[BaseLobe] = []
     for domain in _CORE_LOBE_DOMAINS:
         objs.extend(domain.LOBES)
@@ -54,10 +55,11 @@ def _core_lobe_objects() -> list[BaseLobe]:
 
 
 def default_lobe_objects() -> list[BaseLobe]:
-    """The full default network = the core lobes + the default-on extension lobes (``cite`` /
-    ``filter`` grounding from ``SafetyPlugin``, ``format`` styling from ``FormatPlugin``), woven
-    into canonical ``(layer, order)`` order. The engine re-sorts to this order regardless of
-    contribution order, so an extension lobe lands in its canonical DAG position."""
+    """The full default network = the core lobes + the default-on extension lobes (``filter``
+    output safety from ``SafetyPlugin``, ``format`` styling from ``FormatPlugin``), woven into
+    canonical ``(layer, order)`` order. Citation grounding (``cite``) is NOT here — it is opt-in
+    via ``RagPlugin``. The engine re-sorts to this order regardless of contribution order, so an
+    extension lobe lands in its canonical DAG position."""
     # Lazy import: the extension plugins import low-level lobe primitives only — no cycle.
     from agent_sdk.plugins import capability_lobes
 

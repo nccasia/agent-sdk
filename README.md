@@ -91,7 +91,7 @@ progresses** — with **metacognition** supervising both:
 - **`lobes` — the context axis (OY).** Small thinking units that fire the right context + local behavior for one slice of the turn.
 - **`stages` / `flows` — the time axis (OX).** A flow is an ordered pipeline; each stage owns its lobe slice, loop mode, and tools. *New capability is a registry row, not an interpreter branch.*
 - **`intent` — the router.** Each turn an intent biases the lobes and selects the flow — recognized however you choose: fast deterministic signals or an **LLM classifier**.
-- **`metacognition` — always on.** `monitor → regulate`: adjust the lobe slice, retry, or skip a step — but never skip a pinned safety step (`cite` / `filter`).
+- **`metacognition` — always on.** `monitor → regulate`: adjust the lobe slice, retry, or skip a step — but never skip a pinned output-contract step (`filter` safety, default-on; `cite` grounding, when the opt-in RagPlugin is on).
 - **context that funnels.** Re-tiered every hop (inject · hint + fetch · offload) for *useful reasoning per token*, not maximum context.
 
 So a turn is a readable pipeline — recognize the intent, run the flow's stages, shape the reply:

@@ -84,11 +84,15 @@ A hard, intentional line:
 
 - **Core** = domain-free lobes intrinsic to *every* agent, in the domain packages above
   (`memory`, `skills`, `tools`, `cognition`, `expression`). **Not toggleable.**
-- **Extensions** = `agent_sdk/plugins/`, one folder per plugin (`safety`, `format`, `tasks`, `mcp`,
-  `otel`, `guardrails`, `workspace`, `support_triage`). A plugin contributes a full capacity surface
-  (lobes/stages/flows/skills/tools, even its own MCP servers). `SafetyPlugin` (cite/filter grounding)
-  and `FormatPlugin` (styling) are **default-on but toggleable**; the rest are opt-in. Manage via
-  `PluginRegistry` / `builtin_registry()` (in `agent_sdk/plugins/__init__.py`).
+- **Extensions** = `agent_sdk/plugins/`, one folder per plugin (`safety`, `rag`, `format`, `tasks`,
+  `mcp`, `otel`, `guardrails`, `workspace`, `support_triage`). A plugin contributes a full capacity
+  surface (lobes/stages/flows/skills/tools, even its own MCP servers, plus finalize/tool-result hooks).
+  `SafetyPlugin` (the `filter` output-safety lobe — every agent wants it) and `FormatPlugin` (styling)
+  are **default-on but toggleable**. **`RagPlugin` (`cite` + the citation contract: extraction,
+  backfill, marker-strip, ground-or-refuse) is OPT-IN** — most agents have no retrieval, so grounding
+  is not in the default set; plug it in explicitly or via `require_citations=True` (auto-enables it).
+  Note: **safety ≠ rag** — a non-RAG agent keeps `filter` but has no `cite`/citation logic at all.
+  Manage via `PluginRegistry` / `builtin_registry()` (in `agent_sdk/plugins/__init__.py`).
 
 When adding a capability, ask: intrinsic to every agent (core) or optional add-on (extension)? When
 in doubt, prefer an extension. An agent with no extra plugins is **byte-identical** to the default
@@ -106,9 +110,14 @@ Enforced by the test suite (`CONTRIBUTING.md`):
    the same canonical lobes in the same `(layer, order)`. The default registry is the *degenerate
    network* that reproduces the legacy decision table at default weights. Parity matrix:
    `tests/test_lobe_network.py` — breaking it is a regression, never a tuning outcome.
-3. **Citations-mandatory.** `cite` / `filter` (pinned) + `synthesize` survive any removal — no
-   plugin, weight, or removal strips the ground-or-refuse guarantee. `SafetyPlugin` can be
-   *disabled* by an integrator but never *stripped* by another plugin. `PINNED_LOBES` is canonical.
+3. **Grounding is an opt-in capability, not a kernel guarantee.** Citations live in `RagPlugin`
+   (opt-in): when it is active, `cite` is pinned and the finalize hook enforces ground-or-refuse —
+   no weight or removal can strip them *while the plugin is plugged in*. With it absent the engine
+   carries zero citation logic (correct for a non-RAG agent). Output **safety** is separate and
+   default-on: `filter` (`SafetyPlugin`) + `synthesize` (core) survive any removal. `PINNED_LOBES`
+   ({cite, filter}) is canonical for "pinned when present". (This inverts the old "citations-mandatory
+   in the core" invariant — `cite`/citation extraction/backfill/strip/ground-or-refuse used to live
+   in `engine.py`; they now live in `plugins/rag/`.)
 4. **Determinism in the core.** Intent recognition, activation, attention/budget, and flow
    resolution are pure functions of `(spec, context)` — never an LLM judging the pipeline.
 5. **Benches are live-only** (see above).

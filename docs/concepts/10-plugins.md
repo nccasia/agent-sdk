@@ -19,14 +19,17 @@ The SDK draws a line between what *every* agent is and what you *add*. The **cor
 `agent_sdk/lobes/` — the cognition reasoning spine, tools, skills, task, memory, and the reply flow
 (`respond`) — and are intrinsic, not toggleable. **Extensions** are plugins under
 `agent_sdk/plugins/` composed onto that core. Two are *default-on but toggleable* (their lobes are
-part of the production network): `SafetyPlugin` (`cite` / `filter` grounding) and `FormatPlugin`
-(channel / language / tone styling). The rest are *opt-in integrations*. When you add a capability,
-prefer an extension unless it is genuinely intrinsic to every agent.
+part of the production network): `SafetyPlugin` (the `filter` output-safety lobe) and `FormatPlugin`
+(channel / language / tone styling). Grounding — `RagPlugin` (`cite` + the citation contract) — is an
+*opt-in* extension (most agents have no retrieval); enable it explicitly or via
+`require_citations=True`. The rest are *opt-in integrations*. When you add a capability, prefer an
+extension unless it is genuinely intrinsic to every agent.
 
 ## Layout — a folder per plugin
 
 Each builtin lives in its own subpackage under `agent_sdk/plugins/`, so it owns its code and is
-managed on its own: `safety/` (`SafetyPlugin` — the `cite`/`filter` grounding lobes), `format/`
+managed on its own: `safety/` (`SafetyPlugin` — the `filter` output-safety lobe), `rag/` (`RagPlugin`
+— the `cite` lobe + the citation contract; opt-in), `format/`
 (`FormatPlugin` — the `format` styling lobe), `mcp/` (`PluginMCP`), `workspace/` (`PluginWorkspace`
 + the FS drivers), `otel/` (`PluginOTel`), `guardrails/` (`PluginGuardrails`), `support_triage/`
 (`PluginSupportTriage` — the worked example). `base.py` holds the `Plugin` protocol + `AgentSetup`;
@@ -157,10 +160,12 @@ The output-contract lobes — `cite` and `filter` (`PINNED_LOBES`) and `synthesi
 (`spec.pinned`) — are **never removed**, even if a plugin calls `setup.remove_lobe("cite")`. A
 plugin can reshape the network, but it can never *strip* the SDK's ground-or-refuse guarantee.
 
-Note the difference between *stripping* and *disabling*: `cite`/`filter` ship in the default-on
-`SafetyPlugin`, so an integrator may deliberately turn grounding off for a non-RAG agent
-(`reg.disable("safety")`) — at which point citations-mandatory becomes the caller's responsibility.
-What no *third-party* plugin can do is remove them out from under an agent that has them enabled.
+Note the difference between *stripping* and *disabling*. Output **safety** (`filter`) ships in the
+default-on `SafetyPlugin` — every agent gets it. **Grounding** (`cite` + the citation contract) is
+the separate, **opt-in** `RagPlugin`: a non-RAG agent simply never plugs it in (or
+`reg.disable("rag")`), and the kernel then carries no citation logic at all. An agent enables
+grounding with `plugins=[RagPlugin()]` or `require_citations=True`. What no *third-party* plugin can
+do is strip `cite`/`filter` out from under an agent that has them enabled.
 
 ## Worked example
 

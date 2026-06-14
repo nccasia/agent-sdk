@@ -208,8 +208,8 @@ async def greet(ctx) -> LobeResult: ...  # decorator form for simple lobes
 Lobes.default()                          # the built-in B2–B5 set; compose or extend your own
 ```
 
-`cite` and `filter` are **pinned** (`pinned=True`) — the activation network can never deactivate
-them (ground-or-refuse). See `PINNED_LOBES`.
+`filter` (output safety, default-on `SafetyPlugin`) and `cite` (grounding, opt-in `RagPlugin`) are
+**pinned** *when present* — the activation network can never deactivate them. See `PINNED_LOBES`.
 
 ### Stages (execution units — first-class, reusable, `Activable`)
 
@@ -392,9 +392,12 @@ are registered/resolvable; absent or `enabled = False` ⇒ not. See the deep-div
 
 The **core** network (cognition, tools, skills, task, memory, reply) lives in `agent_sdk/lobes/`
 and is not a plugin. Plugins are the *extension* layer: two default-on but toggleable ones
-(`SafetyPlugin` — `cite`/`filter` grounding; `FormatPlugin` — output styling) plus opt-in
-integrations. Manage them with a `PluginRegistry` (register / override / enable / disable),
-which `PreactAgent(plugins=…)` accepts in place of a list.
+(`SafetyPlugin` — the `filter` output-safety lobe; `FormatPlugin` — output styling) plus opt-in
+integrations — including **`RagPlugin`** (`cite` + the citation contract), which is **opt-in**:
+most agents have no retrieval, so grounding is not default; plug it in or set
+`require_citations=True` (auto-enables it). **Safety ≠ RAG** — a non-RAG agent keeps `filter` but
+has no `cite`. Manage them with a `PluginRegistry` (register / override / enable / disable), which
+`PreactAgent(plugins=…)` accepts in place of a list.
 
 ```python
 @runtime_checkable
@@ -406,11 +409,12 @@ class Plugin(Protocol):
 `AgentSetup` is the builder a plugin fills — the full surface plus removals:
 
 ```python
-setup.add_lobe(lobe)      setup.add_stage(stage)    setup.add_flow(flow)
-setup.add_path(path)      setup.add_skill(skill)    setup.add_tool(tool)
-setup.on_event(hook)      setup.add_pre_check(fn)   setup.add_post_check(fn)
-setup.add_tool_filter(f)  setup.add_prefetch_hook(h) setup.bind_workspace(ws)
-# subtract a builtin this plugin owns/overrides (pinned cite/filter/synthesize always survive):
+setup.add_lobe(lobe)        setup.add_stage(stage)     setup.add_flow(flow)
+setup.add_path(path)        setup.add_skill(skill)     setup.add_tool(tool)
+setup.on_event(hook)        setup.add_pre_check(fn)    setup.add_post_check(fn)
+setup.add_tool_filter(f)    setup.add_prefetch_hook(h) setup.bind_workspace(ws)
+setup.add_finalize_hook(fn) setup.add_tool_result_hook(fn)   # grounding/citation seams (RagPlugin)
+# subtract a builtin this plugin owns/overrides (pinned filter/synthesize, + cite when RagPlugin is on, survive):
 setup.remove_lobe(id)     setup.remove_path(name)   setup.remove_flow(name)   setup.remove_skill(slug)
 ```
 
@@ -418,14 +422,16 @@ Built-in plugins:
 
 ```python
 from agent_sdk.plugins import (
-    SafetyPlugin, FormatPlugin,                 # default-on, toggleable (grounding / styling)
+    SafetyPlugin, FormatPlugin,                 # default-on, toggleable (output safety / styling)
+    RagPlugin,                                  # OPT-IN: cite + citation contract (grounding)
     TaskPlugin, MetacognitionPlugin,            # opt-in capability plugins
     PluginWorkspace, PluginMCP, PluginOTel, PluginGuardrails, PluginSupportTriage,
     PluginRegistry, builtin_registry,
 )
 
-SafetyPlugin()                                 # cite/filter grounding (default-on; disable for non-RAG)
+SafetyPlugin()                                 # `filter` output-safety lobe (default-on; every agent)
 FormatPlugin()                                 # channel/language/tone styling (default-on)
+RagPlugin()                                     # cite + extraction/backfill/strip/ground-or-refuse (opt-in)
 TaskPlugin()                                   # todo-driven task execution (plan→execute→deliver)
 MetacognitionPlugin()                          # think-about-thinking: meta_context + nav_brief lobes +
                                                #   meta_reflect stage + meta_control tool (pick skills /
