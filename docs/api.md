@@ -475,6 +475,32 @@ via `MCPToolRuntime.status` (a `ConnectionStatus`: `connected` · `unauthorized`
 `timeout` · `bad_response` · `unconfigured`), so a host can surface it in a "test connection" UI or
 record it in `trace.degraded`.
 
+### Pre-turn gate — refusal rules + golden known-answers
+
+`PreactAgent(pre_turn_gate=…)` runs a `(query, state) -> AgentResult | None` before any reasoning:
+a non-None result ends the turn (a refusal, or an approved known-answer). The SDK ships a built-in
+gate builder in `agent_sdk.guards`:
+
+```python
+from agent_sdk.guards import make_pre_turn_gate, make_semantic_refusal
+from agent_sdk.memory import GoldenHead, GoldenItem
+
+head = GoldenHead.from_raw(rows, embed_fn=embed_batch, embedding_model_id="bge-small")
+gate = make_pre_turn_gate(
+    refusal_rules=[{"rule_type": "keyword", "pattern": "secret|password", "reason": "blocked"}],
+    golden_head=head,                 # near-duplicate of an approved Q → its answer, cited golden://
+    embed=embed_one,                  # query → vector (injected)
+    semantic_refusal=make_semantic_refusal(rules, embed_one),
+)
+agent = PreactAgent(client=…, pre_turn_gate=gate)
+```
+
+Order: keyword/topic/regex refusal → embed once → golden hit (before semantic refusal, so an
+approved answer beats a fuzzy guess) → semantic refusal. Everything is dependency-injected (rules
+as data, the embedder + `GoldenHead` from the host) — no ACL/tenant type enters the leaf.
+`GoldenHead` is a curated cosine known-answer index (distinct from `SemanticCache`, which keys
+exact query-embedding → cached result).
+
 `PluginWorkspace` gives the agent a persistent, sandboxed file tree for artifacts and working
 documents and wires the `fs.read`/`fs.write`/`fs.list`/`fs.edit` tools + the heavy-document path
 (`react/docworkspace`). Its `driver` selects the backend (`virtual` ephemeral · `local` disk ·
