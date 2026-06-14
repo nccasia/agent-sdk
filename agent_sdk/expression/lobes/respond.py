@@ -25,7 +25,9 @@ from agent_sdk.network.activation import LAYER_EXPRESSION
 SYSTEM_PROMPT = (
     "Write the next reply to the user's latest message, continuing this conversation. Use the "
     "notes gathered this turn and the conversation so far (in the messages). Continue naturally — "
-    "do not restart, re-introduce yourself, or re-greet. Be concrete and direct."
+    "do not restart, re-introduce yourself, or re-greet. Be clear and genuinely helpful: give a "
+    "complete, useful answer (explain what matters, don't just list), and where it fits, end by "
+    "pointing to a specific, relevant next step that moves the conversation forward."
 )
 
 
