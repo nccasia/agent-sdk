@@ -50,10 +50,16 @@ def plugin_surface_checks() -> list[dict]:
     flow_ids = [f.id for f in setup.flows]
     tool_names = [spec["name"] for rt in setup.tool_runtimes for spec in rt.get_tool_specs()]
 
+    # The shipped surface (matches the implementation): the meta_context mirror + the nav_brief
+    # lobe, the meta_reflect stage, the meta flow, and the single meta_control tool. Asserted as
+    # "contains" so the bench is resilient to the surface growing — it gates the contract, not an
+    # exact set. (Metacognition reshapes the CURRENT approach: use_skills / bias_flow / regulate /
+    # navigate. Delegation/fan-out is a SEPARATE concern — the planning plugin — not a meta action.)
+    lset, sset = set(lobe_ids), set(stage_ids)
     checks = [
-        _ck("surface.lobe", lobe_ids == ["meta_context"], f"lobes={lobe_ids}"),
-        _ck("surface.stages", stage_ids == {"meta_reflect", "meta_fanout"}, f"stages={sorted(stage_ids)}"),
-        _ck("surface.flow", flow_ids == ["meta"], f"flows={flow_ids}"),
+        _ck("surface.lobes", {"meta_context", "nav_brief"} <= lset, f"lobes={lobe_ids}"),
+        _ck("surface.stage", "meta_reflect" in sset, f"stages={sorted(sset)}"),
+        _ck("surface.flow", "meta" in flow_ids, f"flows={flow_ids}"),
         _ck("surface.tool", tool_names == ["meta_control"], f"tools={tool_names}"),
     ]
 
@@ -67,14 +73,20 @@ def plugin_surface_checks() -> list[dict]:
     checks.append(_ck("enact.flow_write", t.lobe_outputs.get("meta_flow_bias") == "research",
                       "bias_flow records the next-turn flow bias"))
     t = _fake_turn()
-    _call(t, {"action": "fan_out", "items": [{"input": "a"}, {"input": "b"}]})
-    checks.append(_ck("enact.fanout_write", len(t.scratchpad.get("meta_fanout") or []) == 2,
-                      "fan_out writes the work-list to scratchpad"))
+    _call(t, {"action": "navigate", "to": "redo", "reason": "the step produced nothing"})
+    nav = t.scratchpad.get("nav_request") or {}
+    checks.append(_ck("enact.navigate_write", nav.get("to") == "redo",
+                      "navigate records the phase-cursor request (redo/goto/done)"))
     t = _fake_turn()
     out = _call(t, {"action": "regulate", "request": "skip", "step": "cite"})
     checks.append(_ck("enact.pinned_never_skipped",
                       "Refused" in out and t.scratchpad.get("meta_regulate_request") is None,
                       "a grounding step (cite/filter) is never a meta skip decision"))
+    t = _fake_turn()
+    nav_out = _call(t, {"action": "navigate", "to": "cite"})
+    checks.append(_ck("enact.navigate_never_targets_pinned",
+                      "Refused" in nav_out and not t.scratchpad.get("nav_request"),
+                      "navigate cannot target a pinned grounding step"))
     return checks
 
 
@@ -113,13 +125,28 @@ def _tokens(rec: Any) -> int:
 
 
 def live_metrics(rows: list[dict]) -> dict:
-    """rows: [{correct, meta_tokens}] for the equipped agent (one per scenario)."""
+    """rows: [{correct, meta_fired, category, meta_tokens}] for the EQUIPPED agent on the hard set.
+
+    Headline = ``solve_rate`` (did metacognition + the flow actually solve the hard problem) and
+    ``meta_engagement`` (how often the agent reshaped its thinking via meta_control). Per-category
+    solve-rates surface WHICH kinds of complex problems it handles."""
     n = len(rows) or 1
+    cats: dict[str, list[bool]] = {}
+    for r in rows:
+        cats.setdefault(r.get("category", "?"), []).append(bool(r["correct"]))
+    by_cat = {c: round(sum(v) / len(v), 2) for c, v in cats.items()}
     return {
-        "accuracy": round(sum(1 for r in rows if r["correct"]) / n, 3),
+        "solve_rate": round(sum(1 for r in rows if r["correct"]) / n, 3),
+        "meta_engagement": round(sum(1 for r in rows if r.get("meta_fired")) / n, 3),
         "meta_tokens_avg": round(sum(r["meta_tokens"] for r in rows) / n, 1),
+        "by_category": by_cat,
     }
 
 
-def live_row(rec: Any, expect: dict) -> dict:
-    return {"correct": answered_correctly(rec, expect), "meta_tokens": _tokens(rec)}
+def live_row(rec: Any, expect: dict, category: str = "?") -> dict:
+    return {
+        "correct": answered_correctly(rec, expect),
+        "meta_fired": bool(_meta_calls(rec)),
+        "category": category,
+        "meta_tokens": _tokens(rec),
+    }

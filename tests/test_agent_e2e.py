@@ -102,7 +102,7 @@ async def test_inspect_is_no_llm():
     snap = agent.inspect("compare A and B in detail please now")
     assert isinstance(snap, ActivationSnapshot)
     assert snap.path[0] == "research"
-    assert any("investigate" in s for s in snap.flow)  # production: flow-qualified ids
+    assert any("act" in s for s in snap.flow)  # research (deep) = [act, cite, filter]
     assert fake.calls == []  # inspect never touches the model
 
 

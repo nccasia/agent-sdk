@@ -134,6 +134,12 @@ class FlowStep:
     max_tokens: int | None = None
     hops: int | None = None
     system_prompt: str | None = None
+    # The SUBJECT this state instance works on (a sub-question / aspect / target).
+    # Generalizes the per-map-item subject (``_compose_map_item``) to ANY state, so the
+    # same building block (``act``, ``explore``, …) can be instantiated against a specific
+    # subject — the dynamic state plan (Layer 1) sets it per expanded state. ``None`` ⇒
+    # the state works on the whole turn (today's behavior; byte-identical).
+    subject: str | None = None
 
     def __post_init__(self) -> None:
         if self.loop not in {"none", "single", "agentic", "map"}:

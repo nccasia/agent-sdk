@@ -145,36 +145,37 @@ def _make_agent(model):
     return PreactAgent(client=make_client(model), plugins=[MetacognitionPlugin()], metacognition="apply")
 
 
-async def run_live(model: str, trials: int) -> tuple[dict, list]:
-    """Measure the EQUIPPED agent (the best configuration): it answers every scenario correctly
-    (the gate), and we record how often it reaches for the expected meta lever (decision_hit_rate,
-    transparency — NOT a gate, since forcing a lever on a trivial turn would be overreach)."""
+async def run_live(model: str, trials: int, *, floor: float = 0.5) -> tuple[dict, list]:
+    """Stress-test the EQUIPPED agent (MetacognitionPlugin + apply) on REALLY HARD complex problems
+    — reasoning traps, multi-constraint logic, decomposition, false premises. Each problem has a
+    checkable answer; we pool over trials (a solve in ANY trial counts). The headline is the
+    aggregate ``solve_rate`` (does metacognition + the flow actually crack hard problems); per-problem
+    rows + per-category rates are informative; ``meta_engagement`` records how often it reshaped its
+    thinking. Gated on the aggregate (live LLMs are non-deterministic — one hard miss isn't a gate)."""
     from agent_sdk import probe
 
     agent = _make_agent(model)
-    gate_checks: list[dict] = []  # correctness of the best configuration — the live gate
+    checks: list[dict] = []  # per-problem (informative); the tier gates on aggregate solve_rate
     rows: list[dict] = []
     probes: list = []
-    lever_hits = lever_total = 0
     for sc in _load_scenarios():
-        # pool decision quality across trials (live variance); correctness from the last trial
-        dq_ok, dq_detail, rec = False, "", None
+        ok, rec = False, None
         for t in range(trials):
             rec = await probe(agent, sc["query"], label=f"{sc['id']}·t{t}")
             probes.append(rec)
-            ok, dq_detail = scoring.decision_quality(rec, sc["expect"])
-            dq_ok = dq_ok or ok
-        if not sc["expect"].get("control"):  # lever scenario — record hit-rate (non-gating)
-            lever_total += 1
-            lever_hits += int(dq_ok)
-            print(f"  [{'lever' if dq_ok else ' -- '}] decision.{sc['id']:<22} {dq_detail}")
-        gate_checks.append(_ck(f"answer.{sc['id']}", scoring.answered_correctly(rec, sc["expect"]),
-                               f"answer ok={scoring.answered_correctly(rec, sc['expect'])}"))
-        rows.append(scoring.live_row(rec, sc["expect"]))
+            ok = ok or scoring.answered_correctly(rec, sc["expect"])
+        row = scoring.live_row(rec, sc["expect"], category=sc.get("category", "?"))
+        row["correct"] = ok
+        rows.append(row)
+        print(f"  [{'solved' if ok else ' --- '}] {sc['id']:<22} "
+              f"meta={'y' if row['meta_fired'] else 'n'} ({sc.get('category')})")
+        checks.append(_ck(f"solve.{sc['id']}", ok, f"solved={ok} meta_fired={row['meta_fired']}"))
     metrics = scoring.live_metrics(rows)
-    if lever_total:
-        metrics["decision_hit_rate"] = round(lever_hits / lever_total, 3)
-    return _payload(gate_checks, metrics), probes
+    payload = _payload(checks, metrics)
+    # Gate on the AGGREGATE solve-rate over the hard set, not per-problem (LLM variance). The
+    # per-problem rows + by_category show exactly which complex problems metacognition handles.
+    payload["all_pass"] = metrics["solve_rate"] >= floor
+    return payload, probes
 
 
 def main() -> int:
@@ -210,7 +211,7 @@ def main() -> int:
     verdict = compose_verdict(
         payloads,
         record={"pinned": ["pinned_steps"],
-                "live": ["accuracy", "decision_hit_rate", "meta_tokens_avg"]},
+                "live": ["solve_rate", "meta_engagement", "by_category", "meta_tokens_avg"]},
     )
 
     print("── corgictionbech ─────────────────────────────────────────────")

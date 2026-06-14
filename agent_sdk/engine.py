@@ -74,10 +74,11 @@ _PROMPT_LAYERS = {
     "memory_directive": _LAYER_DIRECTIVES,
     "tools": _LAYER_CAPABILITIES, "skills": _LAYER_CAPABILITIES,
     "skill_select": _LAYER_CAPABILITIES, "skill_active": _LAYER_CAPABILITIES,
-    "stage_prompt": _LAYER_TASK, "synthesize": _LAYER_TASK, "plan": _LAYER_TASK,
-    "research": _LAYER_TASK, "condense": _LAYER_TASK, "classify": _LAYER_TASK,
-    "scope_check": _LAYER_TASK, "respond": _LAYER_TASK, "todo_list": _LAYER_TASK,
-    "plan_supervise": _LAYER_TASK,
+    "stage_prompt": _LAYER_TASK, "subject": _LAYER_TASK, "synthesize": _LAYER_TASK,
+    "plan": _LAYER_TASK, "research": _LAYER_TASK, "condense": _LAYER_TASK,
+    "classify": _LAYER_TASK, "scope_check": _LAYER_TASK, "respond": _LAYER_TASK,
+    "todo_list": _LAYER_TASK, "plan_supervise": _LAYER_TASK,
+    "understand": _LAYER_TASK, "explore": _LAYER_TASK, "act": _LAYER_TASK,
     "grounding": _LAYER_CONTRACT, "cite": _LAYER_CONTRACT, "format": _LAYER_CONTRACT,
     "filter": _LAYER_SAFETY,
     "memory_recall": _LAYER_CONTEXT, "session_recall": _LAYER_CONTEXT,
@@ -129,6 +130,27 @@ def current_turn() -> Any:
 def _xml_tag(source: str) -> str:
     tag = _XML_TAG_MAP.get(source, source).lower()
     return re.sub(r"[^a-z0-9_]", "_", tag) or "section"
+
+
+# Inline grounding markers the model emits — ``[<chunk_id>]``, ``[id1, id2]``
+# (uuid or short-hex), ``[golden:<case>]``. They drive citation EXTRACTION; once
+# citations are on the result they are internal noise in the user-facing text, so
+# they are stripped from the final answer (the citations ride in result.citations /
+# message metadata and are rendered separately by the client).
+_CITE_MARKER_RE = re.compile(
+    r"\s*\[\s*(?:golden:[^\]]+"
+    r"|[0-9a-fA-F][0-9a-fA-F-]{5,}(?:\s*,\s*[0-9a-fA-F][0-9a-fA-F-]{5,})*)\s*\]"
+)
+
+
+def _strip_citation_markers(text: str) -> str:
+    """Remove inline ``[chunk_id]`` / ``[golden:…]`` grounding markers from the
+    user-facing answer (citations are preserved in the result, rendered separately).
+    Leaves ordinary brackets ([1], [2025], markdown links) untouched."""
+    if not text or "[" not in text:
+        return text
+    cleaned = _CITE_MARKER_RE.sub("", text)
+    return re.sub(r"\n{3,}", "\n\n", cleaned).strip()
 
 
 __all__ = ["Engine"]
@@ -651,6 +673,11 @@ class Engine:
         # todo's tailored instruction). Lobe contributions still append below.
         if getattr(stage, "system_prompt", None):
             parts.append(("stage_prompt", stage.system_prompt.strip(), "stable"))
+        # The state's subject — the specific sub-question/aspect this instance works on (set by
+        # the dynamic state plan when a state is expanded over subjects; None ⇒ whole turn).
+        _subj = getattr(stage, "subject", None)
+        if _subj:
+            parts.append(("subject", f"Work on this specifically:\n{str(_subj).strip()}", "stable"))
         # KB prefetch context (host-rendered): the strong-retrieval chunks seeded
         # before reasoning, surfaced so a grounding stage answers from them. Opaque
         # to the engine; rendered by the host plugin (kept domain-free here).
@@ -1238,7 +1265,7 @@ class Engine:
         for fb in ("fallback", "qna"):
             if fb in self.flow_by_id:
                 return self.flow_by_id[fb]
-        return self.flows[0] if self.flows else Flow("qna", stages=["synthesize"])
+        return self.flows[0] if self.flows else Flow("qna", steps=())
 
     @staticmethod
     def _scoped_stage(stage: Stage, *, lobes: list[str]) -> Stage:
@@ -1979,6 +2006,10 @@ class Engine:
         degraded=None,
         scratchpad=None,
     ) -> AgentResult:
+        # Citations are already extracted onto ``citations`` by this point; strip the
+        # inline [chunk_id]/[golden:…] grounding markers from the user-facing text so
+        # the prose is clean (sources render separately from message metadata).
+        answer = _strip_citation_markers(answer)
         after = self._usage_snapshot()
         diff = ProviderUsage(
             input_tokens=after.input_tokens - usage_before.input_tokens,

@@ -1,96 +1,74 @@
-"""Default flows — the 7 named paths' pipelines (Phase 7+).
+"""Default flows — the named paths' pipelines, built from canonical reasoning STATES.
 
-Each path's default flow preserves the original 2-type QnA quality:
+The flow names stay aligned with the path recognizers (``production_flows`` matches a flow to its
+path by name to inherit ``grounds``/``threshold``/recognizer), but every flow is now composed from
+the canonical, reusable **states** rather than ad-hoc per-intent stages. The names group by
+complexity tier (docs/concepts/15-standard-flow.md):
 
-- ``qna`` = ``[synthesize]`` — ONE agentic step over the full
-  composed toolset (legacy simple_answer parity). The simple
-  graph of the legacy dispatch.
-- ``research`` = ``[plan, research, synthesize, cite, filter]`` — the
-  3-stage complex graph with KB fanout. The complex graph of the
-  legacy dispatch.
-- ``task_execute`` = ``[advance, format]`` — agentic todo advance
-  (todo-driving tools + memory) then deliver the prepared payload.
-- ``clarify`` / ``relational`` = ``[synthesize]`` — one LLM call each.
+- **direct tier** — ``relational`` = ``[respond]`` (one cheap social reply, no tools).
+- **standard tier** — ``qna`` = ``[act]`` · ``clarify`` = ``[understand, act]`` (condense resolves
+  the referent, then the workhorse). One agentic ``act`` loop over the full toolset.
+- **deep tier** — ``research`` = ``[act, cite, filter]`` — gather, then ground + ground-or-refuse.
+- ``fallback`` = ``[act]`` (the universal emergent answer); ``onboarding`` = ``[synthesize]`` (steward
+  mode, admin.* tools, reached only via ``config_mode``).
 
-Per-flow customization (Phase 7e) is via ``flow_lobe_weights``:
-- ``flow_disable_<flow>`` — flip a flow off per-bot
-- ``flow_<flow>__step_<step>__disable`` — skip a step
-- ``flow_<flow>__step_<step>__lobe_<lobe_id>__add`` / ``__remove``
-  — mutate the step's lobe slice per-bot
+``act`` is the canonical workhorse state (one agentic ReAct loop); ``cite``/``filter`` are the pinned
+grounding states; ``respond`` is the cheap terminal reply. The dynamic state machine (Layer 1,
+metacognition) may reshape a flow per turn — e.g. expand ``act`` into ``act → act → act`` over a
+plan's subjects — but these seed shapes are the static default. Per-flow customization via
+``flow_lobe_weights`` (``flow_disable_<flow>``, ``flow_<flow>__step_<step>__disable``, ``…__lobe…``).
 """
 
 from __future__ import annotations
 
 from agent_sdk.flows.flow import Flow
 from agent_sdk.flows.stages import (
+    act,
     clarify_synthesize,
-    fallback_synthesize,
     onboarding_synthesize,
-    qna_synthesize,
     relational_synthesize,
     research_cite,
     research_filter,
-    research_investigate,
 )
 
 __all__ = ["default_flows"]
 
 
 def default_flows() -> list[Flow]:
-    """The 7 named paths' default flows (flow axis registry).
-
-    Each Flow is a complete, named pipeline: an ordered sequence of
-    ``FlowStep``s. The interpreter's ``_run_pipeline`` runs them in
-    order, each step composing its system prompt from the lobes in
-    its slice and running its own agentic loop.
-
-    The 7 named paths' default sequences preserve the original
-    2-type QnA quality — qna (simple) is the simple graph; research
-    (complex) is the complex graph. The static degenerate network is
-    the rollback; adaptive mode layers on top.
-    """
+    """The named paths' default flows, composed from the canonical states."""
     return [
-        # qna: one shot, no tools. The simple graph.
+        # standard tier — qna: one agentic act loop over the full toolset.
         Flow(
             name="qna",
-            description="qna answer — one agentic step, full toolset (legacy parity)",
-            steps=(qna_synthesize(),),
+            description="qna (standard) — one agentic act loop over the full toolset",
+            steps=(act(),),
         ),
-        # research: investigate (one ReAct loop over KB tools) → ground + filter.
-        # No decompose + map fan-out — the model plans its own sub-steps with TodoWrite.
+        # deep tier — research: act gathers, then cite-ground + ground-or-refuse filter.
         Flow(
             name="research",
-            description="research — investigate in one ReAct loop, then ground + filter",
-            steps=(
-                research_investigate(),
-                research_cite(),
-                research_filter(),
-            ),
+            description="research (deep) — act, then ground (cite) + filter",
+            steps=(act(), research_cite(), research_filter()),
         ),
-        # clarify: single re-synthesis (condense resolves the anaphora)
+        # standard tier — clarify: re-synthesis after the referent is resolved (condense lobe).
         Flow(
             name="clarify",
-            description="clarify — re-synthesis in the resolve-referent phase",
+            description="clarify (standard) — re-synthesis in the resolve-referent phase",
             steps=(clarify_synthesize(),),
         ),
-        # relational: minimal synthesis
+        # direct tier — relational: minimal social reply (no tools, no grounding).
         Flow(
             name="relational",
-            description="relational — minimal synthesis (greeting / social register)",
+            description="relational (direct) — one cheap reply for the social register",
             steps=(relational_synthesize(),),
         ),
-        # fallback: the standard flow for an UNRECOGNIZED (emergent) turn — a
-        # single agentic answer, same contract as qna. Every turn walks a real
-        # flow; the flow-less emergent case becomes [synthesize] (RFC 0017).
+        # fallback — universal agentic answer for an unrecognized (emergent) turn (≡ qna).
         Flow(
             name="fallback",
-            description="fallback — universal agentic answer when no named path matches",
-            steps=(fallback_synthesize(),),
+            description="fallback — universal agentic act when no named path matches",
+            steps=(act(),),
             promotable=False,
         ),
-        # onboarding: steward mode — admin.* toolset, no KB recall. Only
-        # reachable when the harness flags the conversation (config_mode);
-        # the path recognizer is 0.0 otherwise, so normal turns never run it.
+        # onboarding — steward mode: admin.* toolset, no KB recall (reached only via config_mode).
         Flow(
             name="onboarding",
             description="onboarding — self-configuration steward mode (admin.* tools)",

@@ -122,15 +122,15 @@ async def test_activation_persists_to_session():
 
 
 async def test_no_select_prompt_is_state_aware():
-    # default network (skill_select lobe in the synthesize slice) → the lobe owns
-    # the index, which teaches search→section, and ActivateSkill is exposed.
+    # default network (skill_select lobe in the act slice) → the lobe owns the
+    # index, which teaches search→section, and ActivateSkill is exposed.
     sk = sdk.Skill(
         "code_review",
         when="review code",
         disclosure="on_demand",
         instructions="SKILL: review",
         files={"GUIDE.md": "## A\nbody"},
-        stages=["synthesize"],
+        stages=["act"],  # the canonical workhorse stage (was "synthesize")
     )
     agent = sdk.PreactAgent(
         client=FakeClient(["ok"]), instructions="b", universal_memory=False, skills=[sk]

@@ -20,6 +20,7 @@ cross-links its neighbours; the number is just the suggested path through them. 
 |---|---|---|
 | 02 | [Intent & Paths](./02-intent-and-paths.md) | How a turn's recognized intent biases the lobes and selects the flow. |
 | 03 | [Reply Flow](./03-reply-flow.md) | Collectors → the one terminal response stage that renders the message. |
+| 15 | [Standard Flow](./15-standard-flow.md) | One generic flow graded by complexity — canonical states (act/ground/respond…) + tiers (direct/standard/deep) + the metacognition rail. |
 
 ## 3 · Context & memory (OY) — what's in the window
 

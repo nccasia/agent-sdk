@@ -6,6 +6,7 @@ consult the OY lobe axis for context-window content.
 
 from __future__ import annotations
 
+from agent_sdk.flows.stages.act import act
 from agent_sdk.flows.stages.catalog import (
     catalog_menu,
     get_stage,
@@ -27,6 +28,7 @@ from agent_sdk.flows.stages.synthesize import (
 
 __all__ = [
     "Stage",
+    "act",
     "stage_catalog",
     "catalog_menu",
     "get_stage",

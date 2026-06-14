@@ -8,13 +8,18 @@ Two tiers:
 
 1. **Deterministic floor (free, no provider).** The kernel `monitor→regulate` decision table
    (precedence, thresholds, boundaries), the apply/observe channel, the pinned-step guards
-   (`cite`/`filter` are never skippable), AND the shipped **`MetacognitionPlugin` surface** — it
-   assembles its lobe/stages/flow/tool and its tool enactors write the right turn-state keys
-   (reason → write → enact). This is what makes the bench *match the implementation*.
-2. **Live measurement (`--live`, single-arm).** Run the **equipped** agent (the best configuration:
-   `MetacognitionPlugin` + `metacognition="apply"`) on scenarios that name an expected meta lever,
-   and check it makes that choice (skills / flow-bias / fan-out) and answers correctly. This is a
-   measurement of the best configuration, **not** a with-vs-without A/B.
+   (`cite`/`filter` are never skippable), AND the shipped **`MetacognitionPlugin` surface** — the
+   `meta_context`+`nav_brief` lobes, the `meta_reflect` stage, the `meta` flow, and the single
+   `meta_control` tool whose enactors (`use_skills` / `bias_flow` / `regulate` / `navigate`) write the
+   right turn-state keys (reason → write → enact), with `navigate` refusing to target a pinned step.
+   (Metacognition reshapes the CURRENT approach; delegation/fan-out is a *separate* plugin, not a meta
+   action — so the bench no longer tests `fan_out`.) Surface checks are "contains", resilient to growth.
+2. **Live stress test (`--live`).** Run the **equipped** agent on REALLY HARD complex problems —
+   reasoning traps, multi-constraint logic, decomposition, false premises (`dataset/scenarios.jsonl`).
+   Each has a checkable answer; pool over `--trials`. Headline = the aggregate `solve_rate` (does
+   metacognition + the flow actually crack them); `meta_engagement` records how often the agent
+   reshaped its thinking, and `by_category` shows which problem kinds it handles. Gated on the
+   aggregate solve-rate (LLM variance — a single hard miss isn't a gate).
 
 ## SDK target (the concept it maps to)
 `agent_sdk/metacognition/` (`MetaController`, `monitor.py`, `regulator.py`, `model.py`),

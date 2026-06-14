@@ -70,6 +70,7 @@ class Stage:
     max_tokens: int | None = None
     hops: int | None = None
     system_prompt: str | None = None
+    subject: str | None = None  # the sub-question/aspect this state instance works on
 
     def __init__(
         self,
@@ -92,6 +93,7 @@ class Stage:
         max_tokens: int | None = None,
         hops: int | None = None,
         system_prompt: str | None = None,
+        subject: str | None = None,
     ) -> None:
         # Instance overrides win over class attributes; unset args keep the
         # class-level value (so a Stage subclass with class attributes still
@@ -132,6 +134,8 @@ class Stage:
             self.hops = hops
         if system_prompt is not None:
             self.system_prompt = system_prompt
+        if subject is not None:
+            self.subject = subject
         self._signal_fn = signal
 
     def signal(self, ctx: dict) -> float:
@@ -167,6 +171,7 @@ class Stage:
             max_tokens=self.max_tokens,
             hops=self.hops,
             system_prompt=self.system_prompt,
+            subject=self.subject,
         )
 
     def __repr__(self) -> str:  # pragma: no cover - cosmetic
@@ -193,6 +198,7 @@ def stage(
     max_tokens: int | None = None,
     hops: int | None = None,
     system_prompt: str | None = None,
+    subject: str | None = None,
 ) -> Stage:
     """Concise builder for a simple stage (signal defaults to always-on)."""
     return Stage(
@@ -214,6 +220,7 @@ def stage(
         max_tokens=max_tokens,
         hops=hops,
         system_prompt=system_prompt,
+        subject=subject,
     )
 
 
