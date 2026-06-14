@@ -33,7 +33,7 @@ sys.path.insert(0, str(HERE.parents[1]))
 
 from agent_sdk import PreactAgent, probe  # noqa: E402
 from agent_sdk.clients import FakeClient  # noqa: E402
-from benchmarks._shared import compose_verdict, load_provider  # noqa: E402
+from benchmarks._shared import compose_verdict, emit_report, load_provider  # noqa: E402
 
 RESULTS = HERE / "results"
 
@@ -81,15 +81,27 @@ def _authored_prompts() -> dict[str, str]:
 
     from agent_sdk.cognition.lobes import classify, condense, plan, research, synthesize
     from agent_sdk.expression.lobes import respond
-    from agent_sdk.plugins.format.lobes import format as fmt
-    from agent_sdk.plugins.safety.lobes import cite, filter as filt
+
+    def _attr(module_paths: list[str], attr: str):
+        """Pull an attribute from the first importable module path — resilient to plugin
+        migrations (e.g. the grounding lobes moving safety/ → rag/)."""
+        for mp in module_paths:
+            try:
+                return getattr(__import__(mp, fromlist=[attr]), attr)
+            except Exception:
+                continue
+        raise AttributeError(attr)
 
     add("synthesize.SYSTEM", lambda: synthesize.SYSTEM_PROMPT)
     add("synthesize.SIMPLE", lambda: synthesize.SIMPLE_SYSTEM_PROMPT)
     add("respond.SYSTEM", lambda: respond.SYSTEM_PROMPT)
-    add("cite.SYSTEM", lambda: cite.SYSTEM_PROMPT)
-    add("filter.SYSTEM", lambda: filt.SYSTEM_PROMPT)
-    add("format.SYSTEM", lambda: fmt.SYSTEM_PROMPT)
+    add("cite.SYSTEM", lambda: _attr(
+        ["agent_sdk.plugins.rag.lobes.cite", "agent_sdk.plugins.rag.citation",
+         "agent_sdk.plugins.safety.lobes.cite"], "SYSTEM_PROMPT"))
+    add("filter.SYSTEM", lambda: _attr(
+        ["agent_sdk.plugins.rag.lobes.filter", "agent_sdk.plugins.rag.citation",
+         "agent_sdk.plugins.safety.lobes.filter"], "SYSTEM_PROMPT"))
+    add("format.SYSTEM", lambda: _attr(["agent_sdk.plugins.format.lobes.format"], "SYSTEM_PROMPT"))
     add("classify.SYSTEM", lambda: classify.SYSTEM_PROMPT)
     add("condense.SYSTEM", lambda: condense.SYSTEM_PROMPT)
     add("plan.SYSTEM", lambda: plan.SYSTEM_PROMPT)
@@ -293,7 +305,9 @@ async def main() -> int:
         modes = {m: p for m, p in payloads.items() if p is not None}
         write_viewer(RESULTS / "promptbench.html", records, label="promptbench · prompt quality",
                      verdict=verdict, modes=modes)
-        print(f"report: {RESULTS / 'promptbench.html'}")
+        html, md = emit_report(HERE, "promptbench", label="promptbench · prompt quality",
+                               verdict=verdict, modes=modes, probes=records)
+        print(f"report: {RESULTS / 'promptbench.html'}\ncommitted: {md} · {html}")
     return 0 if verdict["status"] == "READY" else 1
 
 

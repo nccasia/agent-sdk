@@ -30,7 +30,7 @@ from agent_sdk.inspection import (  # noqa: E402
     LobeInspection,
 )
 from agent_sdk.metacognition import MetaController, MetaObservation, monitor, regulate  # noqa: E402
-from benchmarks._shared import compose_verdict, load_provider  # noqa: E402
+from benchmarks._shared import compose_verdict, emit_report, load_provider  # noqa: E402
 from benchmarks.corgictionbech import scoring  # noqa: E402
 
 RESULTS = HERE / "results"
@@ -248,7 +248,9 @@ def main() -> int:
         # One unified two-page report (Overview + Inspect); Inspect is the live probe
         # detail when present, an empty-state on a deterministic floor-only run.
         write_viewer(out, probes, label=label, verdict=verdict, modes=modes)
-        print(f"report: {out}")
+        html, md = emit_report(HERE, "corgictionbech", label=label, verdict=verdict,
+                               modes=modes, probes=probes)
+        print(f"report: {out}\ncommitted: {md} · {html}")
 
     return 0 if verdict["status"] == "READY" else 1
 

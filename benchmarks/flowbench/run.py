@@ -36,7 +36,7 @@ from agent_sdk.clients import FakeClient  # noqa: E402
 from agent_sdk.session import Session, SessionState, Turn  # noqa: E402
 from agent_sdk.stores.session import SessionStoreInMemory  # noqa: E402
 from agent_sdk.viewer import write_viewer  # noqa: E402
-from benchmarks._shared import compose_verdict  # noqa: E402
+from benchmarks._shared import compose_verdict, emit_report  # noqa: E402
 
 RESULTS = HERE / "results"
 
@@ -258,7 +258,9 @@ async def main() -> int:
         RESULTS.mkdir(exist_ok=True)
         write_viewer(RESULTS / "flowbench.html", [], label="flowbench · flow axis (OX)",
                      verdict=verdict, modes=payloads)
-        print(f"report: {RESULTS / 'flowbench.html'}")
+        html, md = emit_report(HERE, "flowbench", label="flowbench · flow axis (OX)",
+                               verdict=verdict, modes=payloads)
+        print(f"report: {RESULTS / 'flowbench.html'}\ncommitted: {md} · {html}")
     return 0 if verdict["status"] == "READY" else 1
 
 
