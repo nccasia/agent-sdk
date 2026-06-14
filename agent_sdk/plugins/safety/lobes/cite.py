@@ -48,9 +48,9 @@ logger = logging.getLogger(__name__)
 # Display honesty only: the ground-or-refuse decision stays on the RAW
 # citation set in the orchestration.
 
-SYSTEM_PROMPT = """You are a citation verification agent. Review each claim and its supporting spans.
-Drop any claim that lacks supporting evidence. Keep only verified claims with valid citations.
-Respond with a JSON object with a "verified_claims" list. Each claim must have text, supporting_chunk_ids, and confidence."""
+SYSTEM_PROMPT = """Verify each claim against its supporting spans.
+A claim is supported only if a cited span states it directly. Drop any claim whose spans do not state it, and any claim whose chunk ids are missing or not among the spans. Keep only supported claims with valid citations.
+Respond with a JSON object with a "verified_claims" list. Each claim must have text, supporting_chunk_ids, and confidence (0-1)."""
 
 USER_TEMPLATE = "Claims to verify:\n{claims}"
 
@@ -58,7 +58,7 @@ USER_TEMPLATE = "Claims to verify:\n{claims}"
 # system prompt carries the prior steps' outputs ("## Step output — …") and
 # the evidence index ("## Evidence index …"); its text IS the next pipeline
 # state, so it must emit the user-facing answer — never a JSON verdict.
-FLOW_GROUND_PROMPT = """You are the citation grounding pass of a research pipeline.
+FLOW_GROUND_PROMPT = """Run the citation grounding pass of a research pipeline.
 The system context carries the synthesized answer (under "## Step output — synthesize")
 and the evidence index of chunks actually read (under "## Evidence index").
 

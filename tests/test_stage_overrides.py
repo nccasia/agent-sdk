@@ -14,7 +14,7 @@ from agent_sdk.stages import Stage
 
 def _stages():
     return [
-        Stage("qna:research", name="research", loop="agentic", temperature=0.4, fanout_parallel=True),
+        Stage("qna:research", name="research", loop="agentic", temperature=0.4, hops=5),
         Stage("qna:synthesize", name="synthesize", temperature=0.0),
         Stage("qna:cite", name="cite", temperature=0.0),
     ]
@@ -27,17 +27,19 @@ def test_no_overrides_is_passthrough():
 
 
 def test_bare_name_override_applies_to_namespaced_stage():
-    out = apply_stage_overrides(_stages(), {"research": {"system_prompt": "be terse", "max_tokens": 99}})
+    out = apply_stage_overrides(
+        _stages(), {"research": {"system_prompt": "be terse", "max_tokens": 99}}
+    )
     research = next(s for s in out if s.id == "qna:research")
     assert research.system_prompt == "be terse"
     assert research.max_tokens == 99
 
 
 def test_override_preserves_unlisted_fields():
-    # the research stage has fanout_parallel=True — an override must NOT drop it
+    # the research stage has hops=5 — an override must NOT drop it
     out = apply_stage_overrides(_stages(), {"research": {"system_prompt": "x"}})
     research = next(s for s in out if s.id == "qna:research")
-    assert research.fanout_parallel is True
+    assert research.hops == 5
     assert research.loop == "agentic"
 
 

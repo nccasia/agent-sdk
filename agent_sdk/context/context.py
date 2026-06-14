@@ -144,9 +144,7 @@ class AgentContext:
         )
 
     # ── scoped state (the unification) ──────────────────────────────────────
-    async def get(
-        self, key: str, *, scope: Scope | str = Scope.TURN, default: Any = None
-    ) -> Any:
+    async def get(self, key: str, *, scope: Scope | str = Scope.TURN, default: Any = None) -> Any:
         """Read one value at ``scope``. ``turn`` → scratchpad; else → durable memory."""
         sc = Scope.coerce(scope)
         if sc is Scope.TURN:

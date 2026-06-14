@@ -15,8 +15,8 @@ def _setup(**kw):
 
 def test_install_contributes_lobe_stages_flow_and_one_tool():
     setup = _setup()
-    assert [lb.id for lb in setup.lobes] == ["meta_context"]
-    assert {s.id for s in setup.stages} == {"meta_reflect", "meta_fanout"}
+    assert [lb.id for lb in setup.lobes] == ["meta_context", "nav_brief"]
+    assert {s.id for s in setup.stages} == {"meta_reflect"}
     assert [f.id for f in setup.flows] == ["meta"]
     # a single stateful tool runtime — the one `meta_control` tool (mounted priority)
     assert setup.tools == []
@@ -27,8 +27,8 @@ def test_install_contributes_lobe_stages_flow_and_one_tool():
 def test_flow_false_omits_the_flow_but_keeps_lobe_stages_tool():
     setup = _setup(flow=False)
     assert setup.flows == []
-    assert [lb.id for lb in setup.lobes] == ["meta_context"]
-    assert {s.id for s in setup.stages} == {"meta_reflect", "meta_fanout"}
+    assert [lb.id for lb in setup.lobes] == ["meta_context", "nav_brief"]
+    assert {s.id for s in setup.stages} == {"meta_reflect"}
 
 
 def test_recognizer_is_conservative_and_reads_next_turn_bias():

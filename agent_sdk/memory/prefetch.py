@@ -61,11 +61,13 @@ def memory_prefetch_hook(
             except Exception:
                 continue
             for it in found:
-                items.append({
-                    "scope": getattr(it, "scope", scope),
-                    "key": getattr(it, "key", ""),
-                    "value": getattr(it, "value", ""),
-                })
+                items.append(
+                    {
+                        "scope": getattr(it, "scope", scope),
+                        "key": getattr(it, "key", ""),
+                        "value": getattr(it, "value", ""),
+                    }
+                )
         # Inline values under the budget; degrade the overflow to hint-only so a
         # long fact is discoverable (Tier 2) without flooding the prompt.
         used = 0

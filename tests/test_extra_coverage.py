@@ -42,10 +42,21 @@ def test_skill_signal_and_validation():
 
 
 async def test_skill_surfaces_in_prompt():
-    skill = Skill(id="reviewer", when="reviewing code", instructions="Be thorough.",
-                  disclosure="eager", stages=["synthesize"])
-    agent = PreactAgent(client=FakeClient(["done"]), instructions="bot", skills=[skill],
-                        lobes=Lobes.minimal(), stages=Stages.minimal(), flows=Flows.minimal())
+    skill = Skill(
+        id="reviewer",
+        when="reviewing code",
+        instructions="Be thorough.",
+        disclosure="eager",
+        stages=["synthesize"],
+    )
+    agent = PreactAgent(
+        client=FakeClient(["done"]),
+        instructions="bot",
+        skills=[skill],
+        lobes=Lobes.minimal(),
+        stages=Stages.minimal(),
+        flows=Flows.minimal(),
+    )
     # the eager skill's instructions are composed into the synthesize stage system
     await agent.query("review this?")
     sys_prompts = [c["system"] for c in agent.client.calls]
@@ -127,7 +138,9 @@ async def test_max_loop_drops_tools_on_final_hop():
         instructions="bot",
         tools=[loop_tool],
         flows=[flow("qna", stages=["synthesize"], signal={"const": 1.0})],
-        stages=[stage("synthesize", lobes=["synthesize"], loop="agentic", tools=["loop_tool"], hops=3)],
+        stages=[
+            stage("synthesize", lobes=["synthesize"], loop="agentic", tools=["loop_tool"], hops=3)
+        ],
     )
     result = await agent.query("go?")
     # terminates without hanging; produces some result

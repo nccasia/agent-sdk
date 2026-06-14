@@ -18,9 +18,11 @@ def test_remember_recall_roundtrip():
 
 
 def test_digest_preserves_needles():
-    body = ("ROOT CAUSE: the csv exporter held the full result set in memory.\n"
-            "fix in src/export/csv.py line 142\n"
-            "thanks everyone, nice work!")
+    body = (
+        "ROOT CAUSE: the csv exporter held the full result set in memory.\n"
+        "fix in src/export/csv.py line 142\n"
+        "thanks everyone, nice work!"
+    )
     dg = deterministic_digest("tool_result", {"tool": "read_file"}, body)
     assert "src/export/csv.py" in dg  # path needle kept
     assert "142" in dg  # number needle kept
@@ -30,8 +32,10 @@ def test_digest_preserves_needles():
 def test_digest_compresses_large_body():
     # The compression payoff is on LARGE bodies — the needles ride near the top, the
     # bulk (chatter/repetition) is dropped by the bounded digest.
-    body = ("DEADLINE: 2026-07-15 owner @lan in src/plan.py\n"
-            + "routine status chatter, nothing decision-relevant here. " * 200)
+    body = (
+        "DEADLINE: 2026-07-15 owner @lan in src/plan.py\n"
+        + "routine status chatter, nothing decision-relevant here. " * 200
+    )
     dg = deterministic_digest("note", {}, body)
     assert "2026-07-15" in dg and "src/plan.py" in dg  # needles survive
     assert compression_ratio(dg, body) < 0.2  # the bulk is dropped

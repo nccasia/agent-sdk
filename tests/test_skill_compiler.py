@@ -19,7 +19,9 @@ from agent_sdk.skills.parser import est_tokens
 def _big_skill(slug="advisor"):
     # LARGE BODY (> budget) → the LLM core kicks in; the big file gives chunk refs.
     return sdk.Skill(
-        slug, when="advise", disclosure="on_demand",
+        slug,
+        when="advise",
+        disclosure="on_demand",
         instructions="SKILL: Advisor\n" + ("Follow the detailed procedure carefully. " * 120),
         files={"reference/catalog.md": "## ML\n" + ("course prerequisites " * 400)},
         stages=["synthesize"],
@@ -27,8 +29,13 @@ def _big_skill(slug="advisor"):
 
 
 def _small_skill(slug="cr"):
-    return sdk.Skill(slug, when="review", disclosure="on_demand",
-                     instructions="SKILL: review\nquote the bug", stages=["synthesize"]).to_pack()
+    return sdk.Skill(
+        slug,
+        when="review",
+        disclosure="on_demand",
+        instructions="SKILL: review\nquote the bug",
+        stages=["synthesize"],
+    ).to_pack()
 
 
 async def test_small_skill_is_deterministic_no_llm():
@@ -72,15 +79,25 @@ def test_chunk_ids_match_sections_and_are_readable():
 
 def test_content_hash_changes_on_edit():
     a = _small_skill()
-    b = sdk.Skill("cr", when="review", disclosure="on_demand",
-                  instructions="SKILL: review\nDIFFERENT", stages=["synthesize"]).to_pack()
+    b = sdk.Skill(
+        "cr",
+        when="review",
+        disclosure="on_demand",
+        instructions="SKILL: review\nDIFFERENT",
+        stages=["synthesize"],
+    ).to_pack()
     assert content_hash(a) != content_hash(b)
 
 
 def test_sidecar_roundtrip_and_stale(tmp_path):
-    pack = sdk.Skill("cr", when="review", disclosure="on_demand",
-                     instructions="SKILL: review", stages=["synthesize"],
-                     source_dir=str(tmp_path)).to_pack()
+    pack = sdk.Skill(
+        "cr",
+        when="review",
+        disclosure="on_demand",
+        instructions="SKILL: review",
+        stages=["synthesize"],
+        source_dir=str(tmp_path),
+    ).to_pack()
     cache = SurfaceCache()
     compiled = CompiledSkill(pack.id, content_hash(pack), 600, "the surface", (), "deterministic")
     cache.put(pack, compiled)

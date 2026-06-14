@@ -53,15 +53,29 @@ class SkillActiveLobe(Lobe):
 
     def state_machine(self) -> list[LobeNode]:
         return [
-            self.state_node("skill:in_use", when="skills_in_use", order=0,
-                            produce=self._produce_in_use,
-                            desc="ACTIVATED: the 'N skills in use' marker"),
-            self.state_node("skill:guide", when="skills_in_use", order=1,
-                            stability="volatile", produce=self._produce_guide,
-                            desc="DRIVING: a skill is loaded — execute remaining steps until done"),
-            self.state_node("skill:context_vars", when="skills_in_use", order=2,
-                            stability="volatile", produce=self._produce_context_vars,
-                            desc="DRIVING: the active skill's context vars (checklist/todos/notes)"),
+            self.state_node(
+                "skill:in_use",
+                when="skills_in_use",
+                order=0,
+                produce=self._produce_in_use,
+                desc="ACTIVATED: the 'N skills in use' marker",
+            ),
+            self.state_node(
+                "skill:guide",
+                when="skills_in_use",
+                order=1,
+                stability="volatile",
+                produce=self._produce_guide,
+                desc="DRIVING: a skill is loaded — execute remaining steps until done",
+            ),
+            self.state_node(
+                "skill:context_vars",
+                when="skills_in_use",
+                order=2,
+                stability="volatile",
+                produce=self._produce_context_vars,
+                desc="DRIVING: the active skill's context vars (checklist/todos/notes)",
+            ),
         ]
 
     def _in_use_packs(self, ctx: TurnContext) -> list:
@@ -83,27 +97,38 @@ class SkillActiveLobe(Lobe):
 
     def _produce_context_vars(self, ctx: TurnContext) -> list[ContextNode]:
         from agent_sdk.skills import render_context_var
+
         out: list[ContextNode] = []
         for pack in self._in_use_packs(ctx):
             sid = str(getattr(pack, "id", "skill"))
             getvars = getattr(pack, "all_context_vars", None)
-            for var in (getvars() if callable(getvars) else []):
+            for var in getvars() if callable(getvars) else []:
                 if not isinstance(var, dict):
                     continue
                 key = str(var.get("key") or "var")
-                out.append(ContextNode(
-                    id=f"skill:context:{sid}:{key}", kind="skill_context",
-                    text=render_context_var(sid, var), pinned=True,
-                    menu_hint=f"{sid} {key}"))
+                out.append(
+                    ContextNode(
+                        id=f"skill:context:{sid}:{key}",
+                        kind="skill_context",
+                        text=render_context_var(sid, var),
+                        pinned=True,
+                        menu_hint=f"{sid} {key}",
+                    )
+                )
         return out
 
     def _produce_in_use(self, ctx: TurnContext) -> list[ContextNode]:
         if not ctx.lobe_outputs.get("skills_in_use"):
             return []
         n = len(active_skill_packs(ctx))
-        return [ContextNode(id="skill:in_use:marker", kind="skill_marker",
-                            text=f"You have {n} skill{'s' if n != 1 else ''} in use.",
-                            menu_hint=f"{n} skills in use")]
+        return [
+            ContextNode(
+                id="skill:in_use:marker",
+                kind="skill_marker",
+                text=f"You have {n} skill{'s' if n != 1 else ''} in use.",
+                menu_hint=f"{n} skills in use",
+            )
+        ]
 
     def _produce_guide(self, ctx: TurnContext) -> list[ContextNode]:
         in_use = ctx.lobe_outputs.get("skills_in_use")
@@ -113,11 +138,19 @@ class SkillActiveLobe(Lobe):
         label = f" ({names})" if names else ""
         # Pinned: when a skill is driving, this is the turn's primary instruction —
         # it must not be tiered out. Tight: only what the model needs to keep going.
-        return [ContextNode(id="skill:guide", kind="skill_guide", pinned=True, text=(
-            f"Skill in use{label}: follow its steps in order to completion. Read a "
-            "reference section (skill.read file+section, or skill.search) only when a "
-            "step needs it — not whole files. Finish all steps before answering."),
-            menu_hint="skill workflow in progress")]
+        return [
+            ContextNode(
+                id="skill:guide",
+                kind="skill_guide",
+                pinned=True,
+                text=(
+                    f"Skill in use{label}: follow its steps in order to completion. Read a "
+                    "reference section (skill.read file+section, or skill.search) only when a "
+                    "step needs it — not whole files. Finish all steps before answering."
+                ),
+                menu_hint="skill workflow in progress",
+            )
+        ]
 
 
 LOBE = SkillActiveLobe()

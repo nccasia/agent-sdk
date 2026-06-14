@@ -71,12 +71,6 @@ def test_to_flow_step_bridges_runtime():
     assert fs.min_activation == 0.5
 
 
-def test_map_loop_requires_fanout_key():
-    s = stage("fanout", lobes=["plan"], loop="map", fanout_key="sub_questions")
-    fs = s.to_flow_step()
-    assert fs.fanout_key == "sub_questions"
-
-
 def test_registry_resolve_by_reference():
     reg = StageRegistry([stage("plan", lobes=["plan"]), stage("synth", lobes=["synthesize"])])
     resolved = reg.resolve(["plan", "synth", "missing"])

@@ -17,6 +17,10 @@ MetaAction = Literal[
     "skip_step",
     "ask_clarification",
     "meta_review",
+    # Navigator layer — pipeline-level (phase) moves, applied by the engine's
+    # movable phase cursor (apply-capable, opt-in; never default → parity).
+    "redo_phase",
+    "goto_phase",
 ]
 
 

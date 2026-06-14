@@ -41,9 +41,16 @@ class SkillToolRuntime:
     """A ``ToolRuntime`` exposing ActivateSkill / skill.read / skill.search over
     the on-demand skills in a registry."""
 
-    def __init__(self, registry: SkillRegistry, slugs: list[str], *,
-                 llm: Any = None, cache: Any = None, budget_tokens: int = 600,
-                 surface_mode: str = "deterministic"):
+    def __init__(
+        self,
+        registry: SkillRegistry,
+        slugs: list[str],
+        *,
+        llm: Any = None,
+        cache: Any = None,
+        budget_tokens: int = 600,
+        surface_mode: str = "deterministic",
+    ):
         self.registry = registry
         self.slugs = list(slugs)  # the on-demand skills this runtime serves
         self.activated: list[str] = []  # slugs activated this turn (for inspection)
@@ -57,6 +64,7 @@ class SkillToolRuntime:
         self.surface_mode = surface_mode
         if cache is None:
             from agent_sdk.skills.cache import SurfaceCache
+
             cache = SurfaceCache()
         self.cache = cache
 
@@ -141,7 +149,9 @@ class SkillToolRuntime:
             return await self._activate(str(inp.get("slug") or ""))
         if name == READ:
             return self._read(
-                str(inp.get("slug") or ""), inp.get("file"), inp.get("section"),
+                str(inp.get("slug") or ""),
+                inp.get("file"),
+                inp.get("section"),
                 inp.get("chunk"),
             )
         if name == SEARCH:
@@ -162,6 +172,7 @@ class SkillToolRuntime:
             compiled = self.cache.get(pack)
             if compiled is None:
                 from agent_sdk.skills.compiler import compile_skill
+
                 llm = self.llm if self.surface_mode == "llm" else None
                 compiled = await compile_skill(pack, llm=llm, budget_tokens=self.budget_tokens)
                 self.cache.put(pack, compiled)
@@ -176,8 +187,11 @@ class SkillToolRuntime:
         """The pre-surface activation result: the whole body (or its ToC if large) +
         a reference-file list. The A/B baseline that the compiled surface improves on."""
         body = pack.instructions or f"SKILL: {pack.name or pack.id}"
-        lead = (f"Skill '{pack.id}' (large — read sections as needed):\n" + file_toc(body)
-                if est_tokens(body) > FULL_FILE_TOKENS else body)
+        lead = (
+            f"Skill '{pack.id}' (large — read sections as needed):\n" + file_toc(body)
+            if est_tokens(body) > FULL_FILE_TOKENS
+            else body
+        )
         if pack.files:
             lead += "\n\nReference files: " + ", ".join(sorted(pack.files))
         return lead
@@ -209,10 +223,15 @@ class SkillToolRuntime:
             # Tolerant match: an LLM-written ref may carry accents/casing the slugified
             # chunk id dropped (e.g. "bảo-lưu" vs "bao-luu") — normalize both sides.
             from agent_sdk.skills.parser import _slugify_heading
+
             norm = _slugify_heading(sec)
             for s in sections:
-                if (s.id == sec or s.heading.strip().lower() == sec.lower()
-                        or s.id == norm or _slugify_heading(s.heading) == norm):
+                if (
+                    s.id == sec
+                    or s.heading.strip().lower() == sec.lower()
+                    or s.id == norm
+                    or _slugify_heading(s.heading) == norm
+                ):
                     return s.content
             toc = file_toc(content)
             return f"Error: no section {sec!r} in {label}. {toc}"

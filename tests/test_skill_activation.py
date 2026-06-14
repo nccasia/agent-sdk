@@ -26,7 +26,9 @@ def _rt(*skills: sdk.Skill) -> SkillToolRuntime:
 
 async def test_activate_returns_body_and_files():
     sk = sdk.Skill(
-        "code_review", when="review code", disclosure="on_demand",
+        "code_review",
+        when="review code",
+        disclosure="on_demand",
         instructions="SKILL: Code review\nQuote the bug and fix it.",
         files={"GUIDE.md": "## Deep checklist\nCheck the edges."},
         stages=["synthesize"],
@@ -47,7 +49,9 @@ async def test_activate_unknown_slug_errors():
 async def test_read_section_and_toc():
     big = "## One\n" + ("alpha " * 50) + "\n## Two\n" + ("beta " * 50)
     sk = sdk.Skill(
-        "doc", when="docs", disclosure="on_demand",
+        "doc",
+        when="docs",
+        disclosure="on_demand",
         files={"BIG.md": "x " * 4000},  # > FULL_FILE_TOKENS ⇒ ToC, not dump
         instructions=big,
     )
@@ -65,7 +69,9 @@ async def test_read_section_and_toc():
 
 async def test_search_locates_section():
     sk = sdk.Skill(
-        "advisor", when="advise", disclosure="on_demand",
+        "advisor",
+        when="advise",
+        disclosure="on_demand",
         instructions="SKILL: Advisor",
         files={"rules.md": "## Reservation\nReserve up to two semesters."},
     )
@@ -85,16 +91,22 @@ def test_eager_skill_exposes_no_activation_tool():
 
 async def test_activation_persists_to_session():
     sk = sdk.Skill(
-        "code_review", when="review code", disclosure="on_demand",
+        "code_review",
+        when="review code",
+        disclosure="on_demand",
         instructions="SKILL: Code review\nEnd with: — reviewed by FUNiX bot",
         stages=["synthesize"],
     )
     agent = sdk.PreactAgent(
-        client=FakeClient([
-            {"tools": [{"name": ACTIVATE, "input": {"slug": "code_review"}}]},
-            "ok — reviewed by FUNiX bot",
-        ]),
-        instructions="bot", universal_memory=False, skills=[sk],
+        client=FakeClient(
+            [
+                {"tools": [{"name": ACTIVATE, "input": {"slug": "code_review"}}]},
+                "ok — reviewed by FUNiX bot",
+            ]
+        ),
+        instructions="bot",
+        universal_memory=False,
+        skills=[sk],
         flows=[sdk.flow("qna", stages=["synthesize"], signal={"const": 1.0})],
         stages=[sdk.stage("synthesize", lobes=["synthesize"], loop="agentic", hops=4)],
     )
@@ -102,7 +114,8 @@ async def test_activation_persists_to_session():
     res = await agent.query("review this code")
     assert any(
         b.get("type") == "tool_use" and b.get("name") == ACTIVATE
-        for ll in res.trace.llm_calls for b in ll.get("response", [])
+        for ll in res.trace.llm_calls
+        for b in ll.get("response", [])
     )
     state = await agent.session.load()
     assert state.skills_in_use == ["code_review"]
@@ -111,31 +124,43 @@ async def test_activation_persists_to_session():
 async def test_no_select_prompt_is_state_aware():
     # default network (skill_select lobe in the synthesize slice) → the lobe owns
     # the index, which teaches search→section, and ActivateSkill is exposed.
-    sk = sdk.Skill("code_review", when="review code", disclosure="on_demand",
-                   instructions="SKILL: review", files={"GUIDE.md": "## A\nbody"},
-                   stages=["synthesize"])
-    agent = sdk.PreactAgent(client=FakeClient(["ok"]), instructions="b",
-                            universal_memory=False, skills=[sk])
+    sk = sdk.Skill(
+        "code_review",
+        when="review code",
+        disclosure="on_demand",
+        instructions="SKILL: review",
+        files={"GUIDE.md": "## A\nbody"},
+        stages=["synthesize"],
+    )
+    agent = sdk.PreactAgent(
+        client=FakeClient(["ok"]), instructions="b", universal_memory=False, skills=[sk]
+    )
     res = await agent.query("review my code")
     sysp = res.trace.llm_calls[0].get("system") or ""
-    assert "code_review" in sysp                       # index present
+    assert "code_review" in sysp  # index present
     assert "skill.search" in sysp and "section" in sysp  # teaches the efficient path
     assert any(t.get("name") == ACTIVATE for t in (res.trace.llm_calls[0].get("tools") or []))
 
 
 async def test_driving_suppresses_index_and_pins_workspace():
-    sk = sdk.Skill("code_review", when="review code", disclosure="on_demand",
-                   instructions="SKILL: review", stages=["synthesize"],
-                   context_vars=[{"key": "findings", "type": "notes", "title": "Findings"}])
-    agent = sdk.PreactAgent(client=FakeClient(["done"]), instructions="b",
-                            universal_memory=False, skills=[sk])
+    sk = sdk.Skill(
+        "code_review",
+        when="review code",
+        disclosure="on_demand",
+        instructions="SKILL: review",
+        stages=["synthesize"],
+        context_vars=[{"key": "findings", "type": "notes", "title": "Findings"}],
+    )
+    agent = sdk.PreactAgent(
+        client=FakeClient(["done"]), instructions="b", universal_memory=False, skills=[sk]
+    )
     agent.session = Session(id="drv")
     st = await agent.session.load()
     st.skills_in_use = ["code_review"]  # in-memory store returns the live state
     res = await agent.query("continue the review")
     sysp = res.trace.llm_calls[0].get("system") or ""
-    assert "Available skills" not in sysp          # select directive suppressed when driving
-    assert "Findings" in sysp                       # context_vars pinned by skill_active
+    assert "Available skills" not in sysp  # select directive suppressed when driving
+    assert "Findings" in sysp  # context_vars pinned by skill_active
     assert "follow its steps" in sysp or "Skill in use" in sysp  # drive-guide surfaced
 
 
@@ -143,27 +168,43 @@ async def test_activate_compiles_lazily_then_caches():
     # two big on-demand skills; only ONE is activated → only ONE compile call, and
     # re-activating it is a cache hit (no extra call).
     # large BODIES → the LLM core compiles (the body-size gate triggers)
-    big_a = sdk.Skill("adv_a", when="advise A", disclosure="on_demand",
-                      instructions="SKILL A\n" + ("step detail " * 120), stages=["synthesize"])
-    big_b = sdk.Skill("adv_b", when="advise B", disclosure="on_demand",
-                      instructions="SKILL B\n" + ("step detail " * 120), stages=["synthesize"])
+    big_a = sdk.Skill(
+        "adv_a",
+        when="advise A",
+        disclosure="on_demand",
+        instructions="SKILL A\n" + ("step detail " * 120),
+        stages=["synthesize"],
+    )
+    big_b = sdk.Skill(
+        "adv_b",
+        when="advise B",
+        disclosure="on_demand",
+        instructions="SKILL B\n" + ("step detail " * 120),
+        stages=["synthesize"],
+    )
     fake = FakeClient(default="CORE surface. read [SKILL.md#intro] for detail.")
-    rt = SkillToolRuntime(_registry(big_a, big_b), ["adv_a", "adv_b"],
-                          llm=fake, budget_tokens=150, surface_mode="llm")
+    rt = SkillToolRuntime(
+        _registry(big_a, big_b), ["adv_a", "adv_b"], llm=fake, budget_tokens=150, surface_mode="llm"
+    )
     out1 = await rt.call_tool(ACTIVATE, {"slug": "adv_a"})
     assert "CORE surface" in out1
-    assert len(fake.calls) == 1            # compiled adv_a only
+    assert len(fake.calls) == 1  # compiled adv_a only
     await rt.call_tool(ACTIVATE, {"slug": "adv_a"})
-    assert len(fake.calls) == 1            # cache hit — no recompile
+    assert len(fake.calls) == 1  # cache hit — no recompile
     # adv_b was never activated → never compiled
     assert all(c.get("stage") == "skill.compile" for c in fake.calls)
     assert len(fake.calls) == 1
 
 
 async def test_read_resolves_chunk_id():
-    sk = sdk.Skill("adv", when="advise", disclosure="on_demand", instructions="SKILL",
-                   files={"ref.md": "## Reservation\nReserve up to two semesters."},
-                   stages=["synthesize"])
+    sk = sdk.Skill(
+        "adv",
+        when="advise",
+        disclosure="on_demand",
+        instructions="SKILL",
+        files={"ref.md": "## Reservation\nReserve up to two semesters."},
+        stages=["synthesize"],
+    )
     rt = SkillToolRuntime(_registry(sk), ["adv"])
     out = await rt.call_tool(READ, {"slug": "adv", "chunk": "ref.md#reservation"})
     assert "two semesters" in out
@@ -172,10 +213,16 @@ async def test_read_resolves_chunk_id():
 async def test_skill_tools_not_exposed_when_no_skill_for_stage():
     # a skill declared only for 'research' must NOT put ActivateSkill on a turn that
     # routes to qna/synthesize (no on-demand skill active there).
-    sk = sdk.Skill("research_helper", when="deep research", disclosure="on_demand",
-                   instructions="SKILL: research", stages=["research"])
-    agent = sdk.PreactAgent(client=FakeClient(["hi"]), instructions="b",
-                            universal_memory=False, skills=[sk])
+    sk = sdk.Skill(
+        "research_helper",
+        when="deep research",
+        disclosure="on_demand",
+        instructions="SKILL: research",
+        stages=["research"],
+    )
+    agent = sdk.PreactAgent(
+        client=FakeClient(["hi"]), instructions="b", universal_memory=False, skills=[sk]
+    )
     res = await agent.query("hello there")  # → qna/synthesize, not research
     tools0 = {t.get("name") for t in (res.trace.llm_calls[0].get("tools") or [])}
     assert ACTIVATE not in tools0

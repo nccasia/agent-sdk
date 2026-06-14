@@ -49,8 +49,18 @@ async def load(
     The ``session_factory`` / ``redis`` params are accepted for signature parity
     and ignored.
     """
-    _ = (session_factory, redis, tenant_id, bot_id, channel_id, clan_id,
-         user_id, lang, timezone, bot_name)
+    _ = (
+        session_factory,
+        redis,
+        tenant_id,
+        bot_id,
+        channel_id,
+        clan_id,
+        user_id,
+        lang,
+        timezone,
+        bot_name,
+    )
     lines = [f"- {key}: {value}" for key, value in (resolved or []) if value]
     fragments = [(line.split(":", 1)[0].lstrip("- ").strip(), line) for line in lines]
     if not lines:

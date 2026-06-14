@@ -23,10 +23,9 @@ from agent_sdk.lobes.runtime import Lobe, PromptContribution, TurnContext
 from agent_sdk.network.activation import LAYER_EXPRESSION
 
 SYSTEM_PROMPT = (
-    "You are the assistant continuing this conversation. Using the information gathered this "
-    "turn (the notes above) and the conversation so far, write the next reply to the user's "
-    "latest message. Continue naturally — do not restart, re-introduce yourself, or re-greet. "
-    "Be concrete and direct."
+    "Write the next reply to the user's latest message, continuing this conversation. Use the "
+    "notes gathered this turn and the conversation so far (in the messages). Continue naturally — "
+    "do not restart, re-introduce yourself, or re-greet. Be concrete and direct."
 )
 
 
@@ -38,7 +37,9 @@ class RespondLobe(Lobe):
     name = "Respond"
     description = "Render the next reply, continuing the conversation from the gathered notes."
     use_when = "the terminal response stage — composing the reply to the user's latest message"
-    how = "a single pass that frames the reply as a continuation using the turn's notes + transcript"
+    how = (
+        "a single pass that frames the reply as a continuation using the turn's notes + transcript"
+    )
     system_prompt = SYSTEM_PROMPT
     behavior = "compose"
     layer = LAYER_EXPRESSION
@@ -49,21 +50,11 @@ class RespondLobe(Lobe):
         return 1.0
 
     def prompt(self, ctx: TurnContext) -> list[PromptContribution]:
-        """Two chunks → two master-prompt sections: the conversation dialog (when this lobe
-        runs as a real stage and a transcript is available) then the continuation framing that
-        refers to it. ``ctx.session_memory`` is the live ``SessionState``."""
-        out: list[PromptContribution] = []
-        state = getattr(ctx, "session_memory", None)
-        render = getattr(state, "transcript", None)
-        if callable(render):
-            dialog = render()
-            if dialog:
-                out.append(PromptContribution(
-                    "The conversation so far:\n" + dialog,
-                    stability="volatile", source="conversation",
-                ))
-        out.append(PromptContribution(SYSTEM_PROMPT, stability="stable", source=self.id))
-        return out
+        """The continuation framing only. The conversation lives once — in the ``messages``
+        array the engine sends alongside the system prompt (Claude-Code style) — so this lobe no
+        longer re-injects the transcript into the system prompt (which duplicated it and churned
+        the cache prefix). ``cite``/``filter`` keep the ground-or-refuse contract."""
+        return [PromptContribution(SYSTEM_PROMPT, stability="stable", source=self.id)]
 
 
 LOBE = RespondLobe()

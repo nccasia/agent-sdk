@@ -22,3 +22,6 @@ benchmarks/*/results/*.html
 
 # OS
 .DS_Store
+
+# generated example report
+examples/subagents-analytics/report.html

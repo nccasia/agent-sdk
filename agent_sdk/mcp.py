@@ -54,6 +54,7 @@ def _classify_error(exc: Exception) -> ConnectionStatus:
         return "bad_response"
     return "unreachable"
 
+
 _JSONRPC = "2.0"
 _PROTOCOL_VERSION = "2025-06-18"  # MCP protocol revision the client advertises
 _CLIENT_INFO = {"name": "agent-sdk", "version": "0.1.0"}
@@ -176,7 +177,11 @@ class MCPToolRuntime:
         try:
             result = await self._rpc(
                 "initialize",
-                {"protocolVersion": _PROTOCOL_VERSION, "capabilities": {}, "clientInfo": _CLIENT_INFO},
+                {
+                    "protocolVersion": _PROTOCOL_VERSION,
+                    "capabilities": {},
+                    "clientInfo": _CLIENT_INFO,
+                },
             )
             self.server_info = (result or {}).get("serverInfo", {})
             await self._rpc("notifications/initialized", notify=True)

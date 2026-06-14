@@ -39,6 +39,8 @@ run () { local name="$1"; shift; echo "── $name ─────────�
 # free / deterministic benches (no provider needed — they read the engine's pure functions)
 run flowbench          --report
 run attentionbench     --report
+# promptbench: free structure+quality tiers (READY with no creds) + an opt-in LLM-judge tier.
+run promptbench        --live --report "${MODEL_ARGS[@]}"
 # live benches (real provider). corgictionbech keeps a deterministic floor (READY with no creds)
 # and adds a single-arm live measurement of the equipped agent when a provider is present.
 run corgictionbech     --live --report "${MODEL_ARGS[@]}"

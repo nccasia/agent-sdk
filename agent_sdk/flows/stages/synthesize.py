@@ -28,7 +28,8 @@ class QnaSynthesize(Stage):
     loop = "agentic"
     lobes = (
         "synthesize",
-        "skill_select", "skill_active",
+        "skill_select",
+        "skill_active",
         "memory_recall",
         "session_recall",
         "ctxvar_resolve",
@@ -54,7 +55,8 @@ class FallbackSynthesize(Stage):
     loop = "agentic"
     lobes = (
         "synthesize",
-        "skill_select", "skill_active",
+        "skill_select",
+        "skill_active",
         "memory_recall",
         "session_recall",
         "ctxvar_resolve",
@@ -74,7 +76,8 @@ class ResearchSynthesize(Stage):
     lobes = (
         "synthesize",
         "research",
-        "skill_select", "skill_active",
+        "skill_select",
+        "skill_active",
         "memory_recall",
         "session_recall",
     )
@@ -133,8 +136,14 @@ class OnboardingSynthesize(Stage):
     use_when = "the conversation is flagged config_mode (the steward/onboarding path)"
     how = "agentic loop with admin.* + tasks.* + memory tools; KB read for relearn drafting"
     loop = "agentic"
-    lobes = ("synthesize", "skill_select", "skill_active", "session_recall", "task_state",
-             "memory_recall")
+    lobes = (
+        "synthesize",
+        "skill_select",
+        "skill_active",
+        "session_recall",
+        "task_state",
+        "memory_recall",
+    )
     tools = (
         "admin.overview",
         "admin.configure_channel",

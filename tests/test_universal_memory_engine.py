@@ -38,7 +38,14 @@ class _Driver:
         if self.n == 13:
             return {"tools": [{"name": "recall", "input": {"query": "needle_2"}}]}
         if self.n == 14:
-            return {"tools": [{"name": "note", "input": {"content": "needle_2 is the root cause", "kind": "decision"}}]}
+            return {
+                "tools": [
+                    {
+                        "name": "note",
+                        "input": {"content": "needle_2 is the root cause", "kind": "decision"},
+                    }
+                ]
+            }
         return "Done: found needle_2 and recorded the decision."
 
 

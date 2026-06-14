@@ -3,9 +3,11 @@
 > A subagent explores in its own space and hands back a **memo** — never its raw working set.
 > Fan-out runs N of them; fan-in keeps the conclusions, not the dumps.
 
-> **Status: shipped (opt-in).** The generic `map` fan-out + research path are live; named
-> reusable subagents, parallel + bounded-failure map, and true per-worker context isolation are
-> now shipped as opt-in surfaces (the default path is unchanged). See *Implementation status*.
+> **Status: shipped (opt-in).** The generic `map` fan-out + research path are live; **plan-driven**
+> subagents (the `TodoWrite` plan + a `plan → supervise → execute → fanin` flow), parallel +
+> bounded-failure map, and true per-worker context isolation are shipped as opt-in surfaces (the
+> default path is unchanged). **The plan is the spawn list** — there is no separate `Subagent` tool
+> and no named registry. See *Implementation status*.
 
 ## Why subagents
 
@@ -52,10 +54,10 @@ orchestrator-worker shape — through the `research` flow and the generic `map` 
 | Orchestrator-worker shape | `research` flow = `plan → research → synthesize → cite → filter` (`agent_sdk/flows/defaults.py`) | live |
 | Return = summary, not dump | the **`Memo`** (`agent_sdk/contracts/memo.py`) for research; the generic map's enriched result (`{label, result, status, tokens_used, error}`) for any worker | live (generalized) |
 | Context isolation (boundary) | `Blackboard` rejects `RAW_CHUNK_KINDS` (`network/activation.py:113,494`) + `Stage.fanout_isolated` gives each worker a fresh evidence pool | live — output **and** execution boundary hold |
-| A composable subagent definition | **`Subagent`** + **`SubagentRegistry`** (`agent_sdk/subagents/`), in-code or `.claude/agents/*.md`; `to_item()` projects to the map-item dict | live (named + reusable) |
-| Tool restriction per worker | `item["tools"]` filters the worker's specs; a first-class `Subagent.tools` field | live |
+| A composable subagent definition | the **`TodoWrite` plan** (`plugins/planning/`) — each todo `{content, prompt, tools, deps}` *is* a subagent definition → a map work-item | live (plan-driven; no named registry) |
+| Tool restriction per worker | a todo's `tools` filters the worker's specs; `PlanningPlugin(worker_tools=…)` sets the worker belt | live |
 | Parallel without shared state | the research lobe's `asyncio.gather`; `Stage.fanout_parallel` for the *generic* map (semaphore-bounded, bounded-failure) | live (generalized) |
-| Reusable, model-tiered, restricted | per-item `model` override + `Subagent` registry rows / markdown defs | live |
+| Reusable, model-tiered, restricted | per-item `model`/`hops`/`tools` overrides on the map work-item | live |
 
 ```txt
         ORCHESTRATOR                 WORKERS (fan-out)                FAN-IN
@@ -87,10 +89,14 @@ item (`Engine._map_stage`, `engine.py:1324`). **Each work-item dict *is* an ad-h
   "model": "...", "max_tokens": 1024, "hops": 12 }   # its own model + budget
 ```
 
-The decomposer (`cognition/lobes/plan.py::run`) turns a query into 2–5 aspects; the worker
-(`research.py::run_aspect`) runs a bounded retrieval ReAct loop and returns a `Memo`
-(`aspect_id` + `claims[]` each with `supporting_chunk_ids` + `unresolved` + `tokens_used`). The `Memo` *is*
-the "summary, not dump" contract: claims and citations cross the boundary; the chunks they stand on do not.
+A **`TodoWrite` plan** produces exactly these work-items: each todo `{content, prompt, tools, deps}`
+maps onto a subagent definition (`content`→input/label, `prompt`→system_prompt, `tools`→the worker's
+belt) — so the plan *is* the spawn list and `loop="map"` over `scratchpad["todos"]` runs one subagent
+per todo. The research flow's decomposer (`cognition/lobes/plan.py::run`) is the other producer: it
+turns a query into 2–5 aspects; the worker (`research.py::run_aspect`) runs a bounded retrieval ReAct
+loop and returns a `Memo` (`aspect_id` + `claims[]` each with `supporting_chunk_ids` + `unresolved` +
+`tokens_used`). The `Memo` *is* the "summary, not dump" contract: claims and citations cross the
+boundary; the chunks they stand on do not.
 
 ## Two fan-out shapes
 
@@ -124,7 +130,9 @@ The worker's *execution* is isolated on demand: by default every `map` sub-execu
 evidence channel (`retrieved_chunks` / `already_read`), but `Stage.fanout_isolated` gives each worker a
 **fresh** pool (`Engine._map_item_pool`) — worker A's chunks never enter worker B's window, and only its
 result crosses back. With both the output boundary (memos only) and the input boundary (fresh window)
-clean, an isolated parallel worker *is* a Claude-Code subagent. The `meta_fanout` stage turns both on.
+clean, an isolated parallel worker *is* a Claude-Code subagent. The `plan` flow's supervisor turns
+both on (it writes `plan_structure="fanout"` for an independent plan, which the engine enacts as
+parallel + isolated).
 
 ## The escalation ladder (mapped to Claude Code)
 
@@ -137,8 +145,8 @@ clean, an isolated parallel worker *is* a Claude-Code subagent. The `meta_fanout
 ```
 
 The SDK now reaches "isolated subagents" (fresh evidence pool + summary-only return, via
-`fanout_isolated`), with named delegation by `meta_control`. Beyond that, nested maps and recursive
-`PreactAgent` sub-agents map onto Claude Code's teams/workflows tier (still deferred).
+`fanout_isolated`), driven by the `TodoWrite` plan (one subagent per todo). Beyond that, nested maps
+and recursive `PreactAgent` sub-agents map onto Claude Code's teams/workflows tier (still deferred).
 
 ## Implementation status
 
@@ -159,33 +167,36 @@ This builds on machinery that already exists; the default path is unchanged.
 - The work-list accessor — `Scratchpad.as_list` (`memory/scratchpad.py`).
 
 **Live today (opt-in; default path unchanged).**
-- A named, reusable **`Subagent`** definition + **`SubagentRegistry`** (`agent_sdk/subagents/`):
-  `name`/`description`/`instructions`/`tools`/`lobes`/`model`/`max_tokens`/`hops`. Declare once in
-  code (`SubagentRegistry.add_row` / `register`) or as `.claude/agents/*.md` files
-  (`load_agents_dir`, reusing the skills frontmatter parser) — Claude Code's `AgentDefinition`.
-  `Subagent.to_item()` projects to the map-item dict the engine already runs (no kernel change).
+- **Plan-driven subagents** — `PlanningPlugin` (`plugins/planning/`) exposes the `TodoWrite` tool;
+  the model writes a plan (one designed todo per part), and the `execute` stage (`loop="map"`,
+  `fanout_key="todos"`) runs one subagent per todo. **The plan is the spawn list** — no separate
+  `Subagent` tool, no named registry. Each todo `{content, prompt, tools, deps}` scopes its worker.
+- **The `plan → supervise → execute → fanin` flow** (`plugins/planning/stages.py`): `supervise` is a
+  deterministic `loop="none"` step whose `plan_supervise` lobe reads the plan's deps and writes
+  `scratchpad["plan_structure"]` (`"fanout"` for independent steps, `"sequential"` when any todo has
+  `deps`); the engine's `_fanout_with_structure` enacts it. `fanin` is agentic with the
+  `plan_results` lobe rendering every worker's `{label, status, result}` for the model to aggregate.
 - **Parallel + bounded-failure** for the *generic* map — `Stage.fanout_parallel` runs items via
   `asyncio.gather` bounded by `Stage.fanout_max` (≤ 40), events buffered + flushed in item order
   (deterministic); a worker that raises or exceeds a per-item `timeout` is recorded
   `status="failed"`, never dropped, never sinks the turn (`Engine._map_parallel`, `engine.py`).
 - **True per-worker context isolation** — `Stage.fanout_isolated` gives each worker a fresh
   `retrieved_chunks`/`already_read`; worker A's chunks never enter worker B's window, only its
-  result returns (`Engine._map_item_pool`). Closes the shared-pool gap above.
-- **Named delegation** — `meta_control(action=fan_out, items=[{agent, input}])` resolves names via
-  the registry (`plugins/metacognition/tool.py`); the `meta_fanout` stage runs them parallel +
-  isolated. The `subagents` plugin (`plugins/subagents/`) wires the registry + a `subagent_catalog`
-  lobe that surfaces the available subagents to the reflect step. Routing stays deterministic.
+  result returns (`Engine._map_item_pool`).
+- **Deterministic routing** — `complexity_score` (`plugins/planning/path.py`) selects the
+  `plan` flow on multi-faceted queries; no LLM judges the pipeline.
 
 **Deferred.**
-- Nested maps (a worker that itself fans out).
+- Nested maps (a worker that itself fans out — `TodoWrite` is kept out of workers).
 - Recursive `PreactAgent`/`Engine` subagents (a real child run, not a scoped stage).
-- Automatic delegation by `description` (the model choosing to spawn a named subagent mid-turn).
+- A predefined/named subagent registry + automatic delegation by `description` (a prior iteration
+  shipped this; removed in favor of the plan-driven model — re-add if a use case needs it).
 - Inter-worker messaging (the "teams" tier).
 
 ## Boundaries (keep it the same engine, not a fork)
 
 - **No second interpreter.** Subagents reuse `Engine._agentic` with a scoped `Stage` — not a parallel
-  runtime. New capability is a registry row / item field, never a kernel branch.
+  runtime. New capability is a stage flag / item field, never a kernel branch.
 - **Citations carve-out.** `cite`/`filter` are pinned stages that run on the *aggregated* memos — never
   inside a worker's discretion. A subagent cannot decide to skip grounding; ground-or-refuse is the
   flow's, not the worker's.
@@ -197,17 +208,19 @@ This builds on machinery that already exists; the default path is unchanged.
 ## Benchmarking
 
 `agentbench` and `taskbench` already exercise the `map` path (plan-builds-rail-then-map-runs-each-item).
-**`benchmarks/delegationbench/`** is the dedicated slice: a *free* tier gates the delegation
-**decision** (the complexity recognizer's precision/recall over a labeled dataset) plus the fan-out
-engine invariants under the `FakeClient`; a *live* tier gates the **execution** (real delegation
-precision/recall + fan-in fidelity). The properties, with the same verdict contract:
+**`benchmarks/delegationbench/`** is the dedicated, **live-only** slice: it gates the **execution**
+(real planning precision/recall + fan-out coverage + fan-in fidelity) on the real provider, and its
+report shows each subagent's own timeline. The deterministic fan-out engine invariants (isolation /
+bounded failure / ordering) are unit-tested in `agent_sdk/plugins/tasks/tests/` + `tests/test_planning.py`.
+The properties:
 
 ```txt
-Delegation decision  delegate iff multi-facet (recognizer precision/recall)  → free, ≥ floor
-Fan-in fidelity      facets surviving decompose → fan-out → synthesize       → ≥ floor (no facet dropped)
-Isolation            no cross-worker leakage (worker A's chunks in B)        → 0 (free)
-Bounded failure      one slow/failing worker doesn't sink the turn           → degrade, never lose (free)
-Ordering             parallel results flush in submission order              → deterministic (free)
+Planning precision    plan (TodoWrite) only when it pays off                 → live, ≥ floor
+Planning recall       plan on the should-plan cases                          → live, ≥ floor
+Fan-out coverage      one subagent per todo on the plan cases                → live, ≥ floor
+Fan-in fidelity       facets surviving plan → fan-out → synthesize           → ≥ floor (no facet dropped)
+Isolation             no cross-worker leakage (worker A's chunks in B)       → 0  (unit-tested)
+Bounded failure       one slow/failing worker doesn't sink the turn          → degrade (unit-tested)
 ```
 
 ## Related

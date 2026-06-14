@@ -87,6 +87,7 @@ async def test_tool_selection_recorded_in_trace():
 async def test_payload_stable_across_hops():
     """Selection is computed once per stage → the tool payload (and thus the
     cached prefix) is identical on every hop of the stage."""
+
     @tool
     async def search_kb(q: str) -> str:
         "search the knowledge base"
@@ -105,6 +106,9 @@ async def test_payload_stable_across_hops():
     )
     rec = await probe(agent, "search the knowledge base repeatedly", label="t")
     # the per-hop tool payloads (recorded on each llm_call) are identical
-    payloads = [tuple(sorted(t["name"] for t in c.get("tools", [])))
-                for c in rec.llm_calls if c["stage"] == "work" and c.get("tools")]
+    payloads = [
+        tuple(sorted(t["name"] for t in c.get("tools", [])))
+        for c in rec.llm_calls
+        if c["stage"] == "work" and c.get("tools")
+    ]
     assert payloads and len(set(payloads)) == 1  # stable across hops

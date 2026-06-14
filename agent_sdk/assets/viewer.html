@@ -400,7 +400,7 @@ const LAYERS = {2:"B2 memory",3:"B3 skill",4:"B4 cognition",5:"B5 expression"};
 const PANELS = [
   ["timeline","Timeline"],
   ["flow","Flow"],["lobes","Lobes"],["context","Context"],
-  ["metacog","Metacognition"],["skills","Skills"],["tasks","Tasks"],
+  ["metacog","Metacognition"],["skills","Skills"],["tasks","Tasks"],["subagents","Subagents"],
   ["prompt","Prompt"],["efficiency","Efficiency"],
   ["hotspots","Optimize"],["raw","Raw JSON"],
 ];
@@ -591,7 +591,8 @@ function renderPanel(){
     (r.query ? `<div class="q"><strong>query:</strong> ${esc(r.query)}</div>` : "")+
     axisChips(t, r);
   const body = ({ flow:panelFlow, lobes:panelLobes,
-                  metacog:panelMeta, skills:panelSkills, tasks:panelTasks, prompt:panelPrompt,
+                  metacog:panelMeta, skills:panelSkills, tasks:panelTasks, subagents:panelSubagents,
+                  prompt:panelPrompt,
                   efficiency:panelEfficiency, hotspots:panelHotspots, raw:panelRaw }[panel])(t, r);
   document.getElementById("panel").innerHTML = head + body;
   if(panel==="lobes"){ requestAnimationFrame(drawEdges); wireLobes(t, r); }
@@ -2030,6 +2031,48 @@ function panelTasks(t, r){
   h += `<h3>Execution scratchpad <span class="dim">— rail: recall_state → advance → checkpoint → report → continue?</span></h3>`;
   h += Object.keys(sp).length ? `<pre>${esc(JSON.stringify(sp,null,2))}</pre>`
      : '<p class="none">No task scratchpad on this turn (not a task-execution fire).</p>';
+  return h;
+}
+
+/* ── Subagents (plan-driven fan-out: one worker per todo) ──────────────────── */
+// Each map stage records per-worker sub-traces on flow_steps[].subagents:
+// {label, status, system_prompt, steps:[{kind,...}], llm_calls, tokens_used}. Every
+// worker has its OWN isolated context + timeline — this panel shows each one.
+function _subStep(s){
+  const k = s.kind || "?";
+  if(k==="tool_use")    return `<li class="sa-tu">→ <b>${esc(s.name||"tool")}</b>(${esc(JSON.stringify(s.input||{}).slice(0,120))})</li>`;
+  if(k==="tool_result") return `<li class="sa-tr">← ${esc(String(s.output||"").split("\n")[0].slice(0,140))}</li>`;
+  if(k==="thinking")    return `<li class="sa-th dim">· ${esc(String(s.text||"").slice(0,140))}</li>`;
+  if(k==="answer")      return `<li class="sa-an">✓ ${esc(String(s.text||"").slice(0,200))}</li>`;
+  return `<li class="dim">${esc(k)}</li>`;
+}
+function panelSubagents(t, r){
+  const steps = t.flow_steps || [];
+  const groups = steps.filter(s => (s.subagents||[]).length);
+  let h = `<h3>Subagents <span class="dim">— plan-driven fan-out: one isolated worker per todo</span></h3>`;
+  if(!groups.length)
+    return h + '<p class="none">No fan-out on this turn (no stage ran loop="map" with a plan to fan out).</p>';
+  const sp = (r.trace||t||{}).blackboard || {};
+  const structure = sp.plan_structure;
+  if(structure) h += `<p class="dim">execution structure: <span class="badge ${structure==='fanout'?'agentic':'single'}">${esc(structure)}</span> `+
+                     `(${structure==='fanout'?'workers ran in parallel, each isolated':'workers ran in order, carrying prior results'})</p>`;
+  groups.forEach(st=>{
+    const subs = st.subagents||[];
+    h += `<h4 class="dim">stage <code>${esc(st.step)}</code> · ${subs.length} subagent(s)</h4>`;
+    h += subs.map((sa,i)=>{
+      const ok = sa.status!=="failed";
+      const badge = ok ? "ok" : "bad";
+      const tl = (sa.steps||[]).map(_subStep).join("");
+      const promptId = `sa-${st.step}-${i}`;
+      return `<div class="turnblk">
+        <b>${esc(sa.label||("worker "+(i+1)))}</b>
+        <span class="badge ${badge}">${esc(sa.status||"ok")}</span>
+        <span class="dim">· ${(sa.steps||[]).length} step(s) · ${(sa.llm_calls||[]).length} hop(s) · ${num(sa.tokens_used||0)} tok</span>
+        ${sa.system_prompt?`<details class="optsec"><summary>its system prompt (own isolated context)</summary><pre id="${promptId}">${esc(sa.system_prompt)}</pre></details>`:""}
+        <ol class="sa-tl" style="list-style:none;margin:6px 0 0;padding-left:6px;font-size:12.5px;border-left:2px solid #e9e6dd">${tl||'<li class="none">no steps captured</li>'}</ol>
+      </div>`;
+    }).join("");
+  });
   return h;
 }
 

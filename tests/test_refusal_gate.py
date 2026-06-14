@@ -46,7 +46,9 @@ def test_golden_hit_above_and_below_threshold():
 
 
 def test_golden_hit_empty_head_is_none():
-    empty = GoldenHead(items=[], embeddings=np.zeros((0, 2), dtype="float32"), embedding_model_id="m")
+    empty = GoldenHead(
+        items=[], embeddings=np.zeros((0, 2), dtype="float32"), embedding_model_id="m"
+    )
     assert golden_hit(np.array([1.0, 0.0], dtype="float32"), empty, threshold=0.5) is None
 
 
@@ -63,7 +65,9 @@ async def test_gate_golden_beats_semantic_refusal():
     head = _head([GoldenItem("g1", "hi", "Hello there.")], [[1.0, 0.0]])
     # a semantic-refusal that would fire on the same vector
     rules = [{"rule_type": "semantic", "reason": "blocked", "query_examples": ["hi"]}]
-    sem = make_semantic_refusal(rules, lambda t: np.array([1.0, 0.0], dtype="float32"), threshold=0.5)
+    sem = make_semantic_refusal(
+        rules, lambda t: np.array([1.0, 0.0], dtype="float32"), threshold=0.5
+    )
     gate = make_pre_turn_gate(
         golden_head=head,
         embed=lambda q: np.array([1.0, 0.0], dtype="float32"),
@@ -76,7 +80,9 @@ async def test_gate_golden_beats_semantic_refusal():
 
 async def test_gate_semantic_refusal_fires_when_no_golden():
     rules = [{"rule_type": "semantic", "reason": "out of scope", "query_examples": ["politics"]}]
-    sem = make_semantic_refusal(rules, lambda t: np.array([1.0, 0.0], dtype="float32"), threshold=0.5)
+    sem = make_semantic_refusal(
+        rules, lambda t: np.array([1.0, 0.0], dtype="float32"), threshold=0.5
+    )
     gate = make_pre_turn_gate(
         embed=lambda q: np.array([1.0, 0.0], dtype="float32"),
         semantic_refusal=sem,
@@ -94,7 +100,9 @@ async def test_gate_disabled_is_noop():
 
 
 def test_semantic_refusal_excludes_not_in_docs_tag():
-    rules = [{"rule_type": "semantic", "reason": "x", "query_examples": ["q"], "tags": ["not-in-docs"]}]
+    rules = [
+        {"rule_type": "semantic", "reason": "x", "query_examples": ["q"], "tags": ["not-in-docs"]}
+    ]
     assert make_semantic_refusal(rules, lambda t: np.array([1.0, 0.0], dtype="float32")) is None
 
 

@@ -31,10 +31,10 @@ from agent_sdk.tools import lobes as tools_lobes
 # ``lobes`` subpackage (``agent_sdk.<domain>.lobes``); this network is their
 # concatenation (then ``(layer, order)``-sorted in ``default_lobe_objects``).
 _CORE_LOBE_DOMAINS = (
-    memory_lobes,      # B2 Memory — recall (agent_sdk.memory.lobes)
-    skill_lobes,       # B3 Skill — progressive-disclosure skills (agent_sdk.skills.lobes)
-    tools_lobes,       # B3 Tools — adaptive tool-exposure selection (agent_sdk.tools.lobes)
-    cognition_lobes,   # B4 Cognition — the reasoning spine (agent_sdk.cognition.lobes)
+    memory_lobes,  # B2 Memory — recall (agent_sdk.memory.lobes)
+    skill_lobes,  # B3 Skill — progressive-disclosure skills (agent_sdk.skills.lobes)
+    tools_lobes,  # B3 Tools — adaptive tool-exposure selection (agent_sdk.tools.lobes)
+    cognition_lobes,  # B4 Cognition — the reasoning spine (agent_sdk.cognition.lobes)
     expression_lobes,  # B5 Expression — the reply flow (agent_sdk.expression.lobes)
 )
 

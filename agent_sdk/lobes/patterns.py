@@ -70,6 +70,18 @@ GREETING_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Self-reference: the user asks ABOUT the assistant itself (identity / capability /
+# introduction). These are social/relational, not an information need against the
+# knowledge base — so they belong on the relational path (answer from persona, no
+# KB retrieval, no citations) even though "bạn là ai" is syntactically interrogative.
+SELF_REF_RE = re.compile(
+    r"\bbạn (là (ai|gì|người (gì|nào))|tên (là )?gì|giúp (được )?(gì|được gì)"
+    r"|làm (được )?gì|hỗ trợ (được )?gì|có thể (làm|giúp))"
+    r"|giới thiệu (về )?(bạn|bản thân)"
+    r"|who are you|what can you (do|help)|introduce yourself",
+    re.IGNORECASE,
+)
+
 # Soft cancellation/abandonment cues — too weak to mean "mutate a task" on
 # their own, but inside a conversation whose PREVIOUS turn was task-shaped
 # ("nhắc mình ôn bài mỗi tối 21h" → "thôi bỏ cái đó đi") they are exactly a

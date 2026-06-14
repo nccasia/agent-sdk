@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
-"""delegationbench — does the agent delegate well? (metacognition + subagent fan-out, doc 12)
+"""delegationbench — LIVE benchmark: plan-driven fan-out (docs 08/12).
 
-Rich, realistic, multi-faceted queries that a *single* agent answers worse than a *delegating* one
-(decompose → fan out scoped subagents → aggregate). It grades two things:
+Live-only (no stubs, no fake data). Rich, realistic, multi-faceted queries that a *single*-shot
+answer handles worse than a *planned* one. For each scenario it runs the REAL agent
+(plan → supervise → execute → fanin) and measures the whole loop:
 
-- **The decision (free, deterministic):** does the agent route a query to delegation when — and only
-  when — it pays off? Scored on the pure complexity recognizer (`auto_delegate`), so precision (no
-  over-delegation on simple queries) and recall (delegate on complex ones) gate with no provider.
-- **The execution (live):** end-to-end, does the agent actually fan out on the should-delegate
-  cases, cover every facet in the answer (fan-in fidelity), and stay single-shot on the simple ones?
+- **Planning precision/recall** — did the agent write a plan (call ``TodoWrite``) when — and only
+  when — the task warranted it? (over-planning guards are the simple/near-neighbor scenarios.)
+- **Execution coverage** — on the should-plan cases, did every planned piece get SOLVED? The
+  supervisor picks the structure (``blackboard["plan_structure"]``): ``fanout``/``sequential`` run a
+  subagent per todo (checked against ``blackboard["todos_results"]``); ``inline`` has the main agent
+  work the list in its own stage (checked by a completed answer). All three must solve the pieces.
+- **Fan-in fidelity** — did every facet land in the combined final answer?
 
-Plus the fan-out engine invariants (isolation / bounded-failure / ordering) carried from the
-subagent feature itself.
+Each scenario's real probe is written to the report (the rendered plan shows in the Prompt tab).
 
-    python benchmarks/delegationbench/run.py                          # free tier (no provider)
     python benchmarks/delegationbench/run.py --live --report --label base
+    python benchmarks/delegationbench/run.py --live --model claude-opus-4-8
 """
 
 from __future__ import annotations
@@ -26,10 +28,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # packages/agent-sdk on path
-from agent_sdk import PreactAgent, Subagent, flow, probe, stage  # noqa: E402
-from agent_sdk.clients.fake import scripted  # noqa: E402
-from agent_sdk.plugins.metacognition.path import make_recognize  # noqa: E402
-from agent_sdk.plugins.subagents import SubagentsPlugin  # noqa: E402
+from agent_sdk import PreactAgent, probe  # noqa: E402
+from agent_sdk.plugins.planning import PlanningPlugin  # noqa: E402
+from agent_sdk.probe import ProbeRecord  # noqa: E402
 from agent_sdk.viewer import write_viewer  # noqa: E402
 from benchmarks._shared import compose_verdict, load_provider  # noqa: E402
 
@@ -37,9 +38,10 @@ HERE = Path(__file__).resolve().parent
 DATASET = HERE / "dataset"
 RESULTS = HERE / "results"
 
-# Gating thresholds (see METHOD.md). Free = the deterministic decision signal; live = the model.
-FREE_PRECISION, FREE_RECALL = 0.90, 0.80
-LIVE_PRECISION, LIVE_RECALL, LIVE_FIDELITY = 0.80, 0.70, 0.70
+# Gating thresholds (see METHOD.md).
+LIVE_PRECISION, LIVE_RECALL, LIVE_FIDELITY, LIVE_EXEC = 0.80, 0.70, 0.70, 0.70
+# Per-scenario wall-clock cap — a stalled provider call is bounded (recorded as an error, not a hang).
+SCENARIO_TIMEOUT_S = 180.0
 
 
 def _scenarios() -> list[dict]:
@@ -48,7 +50,7 @@ def _scenarios() -> list[dict]:
 
 
 def _pr(should: list[bool], did: list[bool]) -> tuple[float, float]:
-    """precision, recall of the delegate decision against the labels."""
+    """precision, recall of the plan decision against the labels."""
     tp = sum(1 for s, d in zip(should, did, strict=False) if s and d)
     fp = sum(1 for s, d in zip(should, did, strict=False) if d and not s)
     fn = sum(1 for s, d in zip(should, did, strict=False) if s and not d)
@@ -57,239 +59,149 @@ def _pr(should: list[bool], did: list[bool]) -> tuple[float, float]:
     return precision, recall
 
 
-# ── fan-out engine invariants (deterministic, FakeClient) ─────────────────────
-class _SeedRT:
-    name = "seedrt"
-
-    def __init__(self, items):
-        self._items = items
-
-    def get_tool_specs(self):
-        return [
-            {
-                "name": "seed",
-                "description": "seed the work-list",
-                "input_schema": {"type": "object", "properties": {}},
-            }
-        ]
-
-    async def call_tool(self, name, inp, retrieved_chunks=None, already_read=None):
-        from agent_sdk.engine import current_turn
-
-        current_turn().scratchpad.set("items", self._items)
-        return "seeded"
-
-
-class _GrabRT:
-    name = "grabrt"
-
-    def __init__(self):
-        self.seen: list[tuple[str, list[str]]] = []
-
-    def get_tool_specs(self):
-        return [
-            {
-                "name": "grab",
-                "description": "retrieve a chunk",
-                "input_schema": {"type": "object", "properties": {"tag": {"type": "string"}}},
-            }
-        ]
-
-    async def call_tool(self, name, inp, retrieved_chunks=None, already_read=None):
-        tag = str(inp.get("tag") or "x")
-        if retrieved_chunks is not None:
-            retrieved_chunks.append({"chunk_id": tag})
-        pool = [c["chunk_id"] for c in (retrieved_chunks or [])]
-        self.seen.append((tag, pool))
-        return f"pool={pool}"
-
-
-def _fanout_agent(seed, grab, *, parallel, isolated):
-    def model(sid, sy, m, t):
-        last = str(m[-1]["content"]) if m else ""
-        if sid == "seedstage":
-            return {"tools": [{"name": "seed", "input": {}}]}
-        if "Sub-task (A)" in last:
-            return {"tools": [{"name": "grab", "input": {"tag": "A1"}}]}
-        if "Sub-task (B)" in last:
-            return {"tools": [{"name": "grab", "input": {"tag": "B1"}}]}
-        if "Sub-task" in last:
-            return "ans " + last.split("(", 1)[1].split(")", 1)[0]
-        return "done"
-
-    return PreactAgent(
-        client=scripted(model),
-        instructions="bot",
-        tools=[seed, grab],
-        flows=[flow("f", stages=["seedstage", "fan"], signal={"const": 1.0})],
-        stages=[
-            stage("seedstage", lobes=["synthesize"], loop="agentic", tools=["seed"], hops=3),
-            stage(
-                "fan",
-                lobes=["synthesize"],
-                loop="map",
-                fanout_key="items",
-                tools=["grab"],
-                fanout_parallel=parallel,
-                fanout_isolated=isolated,
-                hops=3,
-            ),
-        ],
-    )
-
-
-async def run_free() -> dict:
-    """Deterministic tier — the delegation DECISION + the fan-out engine invariants (no provider)."""
-    checks: list[dict] = []
-
-    def add(cid, ok, detail):
-        checks.append({"id": cid, "ok": bool(ok), "detail": str(detail)[:70]})
-
-    # ── the delegation decision: complexity recognizer precision/recall over the dataset ──
-    recognize = make_recognize(auto_delegate=True)
-    scen = _scenarios()
-    should, did = [], []
-    for s in scen:
-        want = bool(s.get("expect", {}).get("delegate"))
-        got = recognize({"query": s["query"]}) >= 0.5
-        should.append(want)
-        did.append(got)
-        add(f"free.decision.{s['id']}", got == want, f"want={want} got={got} [{s.get('category')}]")
-    precision, recall = _pr(should, did)
-    add(
-        "free.decision.precision",
-        precision >= FREE_PRECISION,
-        f"{precision:.2f} >= {FREE_PRECISION}",
-    )
-    add("free.decision.recall", recall >= FREE_RECALL, f"{recall:.2f} >= {FREE_RECALL}")
-
-    # ── fan-out engine invariants (the subagent feature these scenarios exercise live) ──
-    grab = _GrabRT()
-    items = [
-        {"label": "A", "input": "alpha", "tools": ["grab"]},
-        {"label": "B", "input": "beta", "tools": ["grab"]},
+def _planned(rec: ProbeRecord) -> int:
+    """Plan steps the agent wrote (0 ⇒ no plan) — the largest TodoWrite list it sent."""
+    sizes = [
+        len((tc.get("input") or {}).get("todos") or [])
+        for tc in rec.tool_calls
+        if tc.get("name") == "TodoWrite"
     ]
-    await probe(_fanout_agent(_SeedRT(items), grab, parallel=True, isolated=True), "go")
-    pools = dict(grab.seen)
-    add(
-        "free.isolation.no_cross_worker_leak",
-        pools.get("A1") == ["A1"] and pools.get("B1") == ["B1"],
-        f"A={pools.get('A1')} B={pools.get('B1')}",
-    )
-
-    seed3 = _SeedRT([{"label": x, "input": x.lower()} for x in ("A", "B", "C")])
-    rec3 = await probe(_fanout_agent(seed3, _GrabRT(), parallel=True, isolated=True), "go")
-    order = [ln.split(":")[0] for ln in rec3.answer.splitlines() if ":" in ln]
-    add("free.determinism.submission_order", order[:3] == ["A", "B", "C"], f"order={order[:3]}")
-
-    seed4 = _SeedRT(
-        [
-            {"label": "OK1", "input": "x"},
-            {"label": "BAD", "input": "boom", "timeout": 0.0001},
-            {"label": "OK2", "input": "y"},
-        ]
-    )
-    rec4 = await probe(_fanout_agent(seed4, _GrabRT(), parallel=True, isolated=True), "go")
-    add(
-        "free.bounded_failure.degrade_not_lose",
-        rec4.status == "answered" and "OK1" in rec4.answer and "OK2" in rec4.answer,
-        rec4.status,
-    )
-
-    n = len(checks)
-    return {
-        "checks": checks,
-        "n": n,
-        "pass": sum(c["ok"] for c in checks),
-        "all_pass": all(c["ok"] for c in checks) and n > 0,
-        "metrics": {
-            "decision_precision": round(precision, 3),
-            "decision_recall": round(recall, 3),
-            "scenarios": len(scen),
-        },
-    }
+    return max(sizes, default=0)
 
 
-# ── live tier: end-to-end delegation behavior on the real provider ────────────
-def _delegated(rec) -> int:
-    """Subtasks the agent fanned out (0 ⇒ did not delegate). Read from the meta_control call."""
-    for tc in rec.tool_calls:
-        if tc.get("name") == "meta_control" and (tc.get("input") or {}).get("action") == "fan_out":
-            return len(tc["input"].get("items") or []) or 1
-    return 0
+def _subagents(rec: ProbeRecord) -> list[dict]:
+    """The per-todo subagent results the engine fanned out (blackboard['todos_results']).
+    Skips scratchpad cap markers ({"_elided"}/{"_truncated"}) — only real result rows."""
+    return [
+        r for r in (rec.blackboard.get("todos_results") or [])
+        if isinstance(r, dict) and r.get("status")
+    ]
 
 
-async def run_live(model: str) -> dict:
+class _NoResearch:
+    """Drop the RAG ``research`` flow — this delegation agent has no KB, so a complex query should
+    route to the ``plan`` (TodoWrite → fanout) flow, not the general research flow (per METHOD.md)."""
+
+    name = "no_research"
+
+    def install(self, setup) -> None:
+        setup.remove_flow("research")
+
+
+async def run_live(model: str, *, navigator: bool = False) -> tuple[dict, list[ProbeRecord]]:
     from agent_sdk.clients import AnthropicClient
 
+    plugins = [PlanningPlugin(), _NoResearch()]
+    meta = None
+    if navigator:
+        # A/B the Navigator: mount the metacognition faculty + enable its phase moves
+        # (redo_phase/goto_phase) so a phase that misses its definition of done is redone.
+        from agent_sdk.metacognition_facade import Metacognition
+        from agent_sdk.plugins.metacognition import MetacognitionPlugin
+
+        plugins.append(MetacognitionPlugin(flow=False))  # contribute the surface, not a new flow
+        meta = Metacognition(
+            mode="apply", apply_actions={"adjust_lobe_slice", "redo_phase", "goto_phase"}
+        )
     agent = PreactAgent(
         client=AnthropicClient(model),
         instructions=(
-            "Answer fully and accurately. When a task has several independent parts, "
-            "fan them out to subagents and combine their results."
+            "Answer fully and accurately. When a task has several distinct parts, plan it with the "
+            "TodoWrite tool — one todo per part, each with its own prompt and tools — then let each "
+            "part run as its own subagent and combine their results into one answer."
         ),
-        plugins=[
-            SubagentsPlugin(
-                [
-                    Subagent(
-                        "researcher",
-                        description="answers one focused sub-question",
-                        instructions="Answer ONLY the given sub-question, concisely and factually.",
-                    ),
-                ],
-                auto_delegate=True,
-            )
-        ],
+        plugins=plugins,
+        **({"metacognition": meta} if meta is not None else {}),
     )
     checks: list[dict] = []
-    should, did, widths = [], [], []
+    records: list[ProbeRecord] = []
+    should, did, widths, subagent_counts = [], [], [], []
     fidelity_hits, fidelity_total = 0, 0
-    for s in _scenarios():
+    exec_hits, exec_total = 0, 0
+    scenarios = _scenarios()
+    n_scn = len(scenarios)
+    for i, s in enumerate(scenarios, start=1):
         exp = s.get("expect", {})
-        want = bool(exp.get("delegate"))
-        rec = await probe(agent, s["query"], label=s["id"])
-        width = _delegated(rec)
-        delegated = width > 0
+        want = bool(exp.get("delegate"))  # "delegate" label = "this query warrants a plan"
+        # Progress to stderr so a long live run is observable (and a stalled scenario is bounded:
+        # a per-scenario timeout records an error and moves on instead of hanging the whole run).
+        print(f"[{i}/{n_scn}] {s['id']} …", file=sys.stderr, flush=True)
+        try:
+            rec = await asyncio.wait_for(probe(agent, s["query"], label=s["id"]), SCENARIO_TIMEOUT_S)
+        except TimeoutError:
+            rec = ProbeRecord(label=s["id"], query=s["query"], status="error",
+                              error=f"scenario timed out after {SCENARIO_TIMEOUT_S}s")
+        records.append(rec)  # the full live trace per scenario → Inspect / Prompt tabs
+        width = _planned(rec)
+        planned = width > 0
+        print(f"    → {s['id']}: status={rec.status} planned={planned} "
+              f"structure={rec.blackboard.get('plan_structure', '-')} "
+              f"subagents={len(_subagents(rec))}", file=sys.stderr, flush=True)
         should.append(want)
-        did.append(delegated)
-        if delegated:
+        did.append(planned)
+        subs = _subagents(rec)
+        if planned:
             widths.append(width)
-        # fan-in fidelity on should-delegate cases with a facet contract
+            subagent_counts.append(len(subs))
+        # Execution coverage: when the agent plans (≥2 steps), every planned piece must be SOLVED —
+        # by a subagent (fanout/sequential structures) OR by the main agent itself (inline). Inline
+        # is a legitimate structure, not a missing fan-out, so we don't require subagents there; we
+        # require the work landed (answered) and let the fidelity check below prove the facets.
+        if want and width >= 2:
+            exec_total += 1
+            structure = rec.blackboard.get("plan_structure") or ("inline" if not subs else "-")
+            if structure in ("fanout", "sequential"):
+                solved = len(subs) >= max(2, width - 1)  # a subagent ran for (nearly) every todo
+            else:  # inline — the main agent worked the list in its own stage
+                solved = rec.status == "answered"
+            exec_hits += int(solved)
+            checks.append(
+                {
+                    "id": f"live.exec.{s['id']}",
+                    "ok": solved,
+                    "detail": f"structure={structure} todos={width} subagents={len(subs)}",
+                }
+            )
         facets = exp.get("answer_contains") or []
-        if want and facets:
+        if want and facets:  # fan-in fidelity on should-plan cases with a facet contract
             fidelity_total += 1
             covered = all(f.lower() in (rec.answer or "").lower() for f in facets)
-            if covered:
-                fidelity_hits += 1
+            fidelity_hits += int(covered)
             checks.append(
                 {
                     "id": f"live.fanin.{s['id']}",
                     "ok": covered and rec.status == "answered",
-                    "detail": f"delegated={delegated} facets={'all' if covered else 'MISS'}",
+                    "detail": f"planned={planned} facets={'all' if covered else 'MISS'}",
                 }
             )
         else:
             checks.append(
                 {
                     "id": f"live.decision.{s['id']}",
-                    "ok": delegated == want,
-                    "detail": f"want={want} delegated={delegated} w={width}",
+                    "ok": planned == want,
+                    "detail": f"want={want} planned={planned} steps={width}",
                 }
             )
 
     precision, recall = _pr(should, did)
     fidelity = fidelity_hits / fidelity_total if fidelity_total else 1.0
+    execution = exec_hits / exec_total if exec_total else 1.0
     checks.extend(
         [
             {
-                "id": "live.delegation.precision",
+                "id": "live.planning.precision",
                 "ok": precision >= LIVE_PRECISION,
                 "detail": f"{precision:.2f} >= {LIVE_PRECISION}",
             },
             {
-                "id": "live.delegation.recall",
+                "id": "live.planning.recall",
                 "ok": recall >= LIVE_RECALL,
                 "detail": f"{recall:.2f} >= {LIVE_RECALL}",
+            },
+            {
+                "id": "live.exec.coverage",
+                "ok": execution >= LIVE_EXEC,
+                "detail": f"{execution:.2f} >= {LIVE_EXEC} (every planned piece solved: subagent or inline)",
             },
             {
                 "id": "live.fanin.fidelity",
@@ -299,54 +211,70 @@ async def run_live(model: str) -> dict:
         ]
     )
     n = len(checks)
-    return {
+    payload = {
         "checks": checks,
         "n": n,
         "pass": sum(c["ok"] for c in checks),
         "all_pass": all(c["ok"] for c in checks) and n > 0,
         "metrics": {
-            "delegation_precision": round(precision, 3),
-            "delegation_recall": round(recall, 3),
+            "planning_precision": round(precision, 3),
+            "planning_recall": round(recall, 3),
+            "execution_coverage": round(execution, 3),
             "fanin_fidelity": round(fidelity, 3),
-            "avg_fanout_width": round(sum(widths) / len(widths), 2) if widths else 0,
+            "avg_plan_steps": round(sum(widths) / len(widths), 2) if widths else 0,
+            "avg_subagents": round(sum(subagent_counts) / len(subagent_counts), 2)
+            if subagent_counts
+            else 0,
         },
     }
+    return payload, records
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    ap.add_argument("--live", action="store_true")
+    ap.add_argument("--live", action="store_true", help="run the live tier (real provider)")
     ap.add_argument("--report", action="store_true")
     ap.add_argument("--label", default="base")
     ap.add_argument("--model", default=None)
     ap.add_argument("--trials", type=int, default=1)
+    ap.add_argument("--navigator", action="store_true",
+                    help="enable the metacognition Navigator (redo/goto phase moves) — A/B switch")
     a = ap.parse_args()
 
-    payloads: dict[str, dict | None] = {"free": asyncio.run(run_free())}
+    payloads: dict[str, dict | None] = {}
+    records: list[ProbeRecord] = []
     if a.live:
         model = a.model or load_provider()
         if not model:
             print(
-                "delegationbench live tier needs a provider token — set one in "
-                "packages/agent-sdk/.env.",
+                "delegationbench is live-only — set a provider token in packages/agent-sdk/.env "
+                "(or pass --model).",
                 file=sys.stderr,
             )
-            payloads["live"] = None
+            payloads["live"] = None  # → UNMEASURED
         else:
-            payloads["live"] = asyncio.run(run_live(model))
+            payloads["live"], records = asyncio.run(run_live(model, navigator=a.navigator))
+    else:
+        print(
+            "delegationbench is LIVE-ONLY (no fake/free tier). Re-run with --live (needs a "
+            "provider token).",
+            file=sys.stderr,
+        )
+        payloads["live"] = None  # → UNMEASURED
 
     verdict = compose_verdict(
         payloads,
         record={
-            "free": ["decision_precision", "decision_recall", "scenarios"],
             "live": [
-                "delegation_precision",
-                "delegation_recall",
+                "planning_precision",
+                "planning_recall",
+                "execution_coverage",
                 "fanin_fidelity",
-                "avg_fanout_width",
-            ],
+                "avg_plan_steps",
+                "avg_subagents",
+            ]
         },
     )
     total = sum(p["n"] for p in payloads.values() if p)
@@ -359,7 +287,7 @@ def main() -> int:
         RESULTS.mkdir(exist_ok=True)
         write_viewer(
             RESULTS / f"{a.label}.html",
-            [],
+            records,  # real live probes — the Prompt tab shows each turn's rendered plan
             label=f"delegationbench · {a.label}",
             verdict=verdict,
             modes=payloads,

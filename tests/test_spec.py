@@ -13,8 +13,11 @@ def _agent():
     # The minimal network has declarative-signal flows that round-trip through
     # the spec; the production default's Python recognizers do not serialize.
     return PreactAgent(
-        client=FakeClient(["x"]), instructions="You are helpful.",
-        lobes=Lobes.minimal(), stages=Stages.minimal(), flows=Flows.minimal(),
+        client=FakeClient(["x"]),
+        instructions="You are helpful.",
+        lobes=Lobes.minimal(),
+        stages=Stages.minimal(),
+        flows=Flows.minimal(),
     )
 
 

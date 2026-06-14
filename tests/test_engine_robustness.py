@@ -91,7 +91,11 @@ async def test_repeated_error_results_count_as_no_progress():
         return "Error: not a file: " + path
 
     agent = _agent(
-        scripted(lambda s, sy, m, t: ("done" if not t else {"tools": [{"name": "look", "input": {"path": "x"}}]})),
+        scripted(
+            lambda s, sy, m, t: (
+                "done" if not t else {"tools": [{"name": "look", "input": {"path": "x"}}]}
+            )
+        ),
         tools=[look],
         stages=[stage("work", lobes=["synthesize"], loop="agentic", tools=["look"], hops=40)],
         budgets={"stall_patience": 2},
@@ -107,7 +111,9 @@ async def test_novel_results_keep_progressing():
     async def look(path: str) -> str:
         return f"contents of {path}"
 
-    script = [{"tools": [{"name": "look", "input": {"path": f"f{i}.py"}}]} for i in range(8)] + ["done"]
+    script = [{"tools": [{"name": "look", "input": {"path": f"f{i}.py"}}]} for i in range(8)] + [
+        "done"
+    ]
     agent = _agent(
         FakeClient(script),
         tools=[look],
@@ -172,7 +178,7 @@ async def test_agentic_forces_final_answer_when_loop_ends_on_tool_call():
     script = [
         {"tools": [{"name": "look", "input": {"x": 1}}]},  # hop 0
         {"tools": [{"name": "look", "input": {"x": 2}}]},  # hop 1 (last, tool-free) — still 'calls'
-        "I cannot confirm that from the references.",       # forced tool-free answer hop
+        "I cannot confirm that from the references.",  # forced tool-free answer hop
     ]
     agent = _agent(
         FakeClient(script),

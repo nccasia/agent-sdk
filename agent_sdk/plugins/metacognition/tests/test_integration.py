@@ -1,13 +1,13 @@
 """Integration — MetacognitionPlugin end-to-end through a real agent + the engine.
 
-Pins the opt-in/parity contract, the subagent-scoping fan-out (a sub-execution gets the
-meta faculty from a per-item lobe override), and the next-turn flow-bias seam (a mid-turn
-bias is persisted and routes the following turn).
+Pins the opt-in/parity contract and the next-turn flow-bias seam (a mid-turn bias is
+persisted and routes the following turn). Delegation/fan-out is the planning plugin's
+concern (see tests/test_planning.py), not metacognition's.
 """
 
 from __future__ import annotations
 
-from agent_sdk import PreactAgent, probe
+from agent_sdk import PreactAgent
 from agent_sdk.clients.fake import scripted
 from agent_sdk.lobes.network import default_lobes, default_paths
 from agent_sdk.plugins.metacognition import MetacognitionPlugin
@@ -23,54 +23,12 @@ def test_metacognition_lives_only_in_the_plugin():
     assert bare.inspect("rethink your approach to this").path[0] != "meta"
 
 
-def test_plugin_adds_exactly_the_meta_context_lobe():
+def test_plugin_adds_the_meta_lobes():
     agent = PreactAgent(client=scripted(lambda *a: "x"), plugins=[MetacognitionPlugin()])
     lobe_ids = {lb.id for lb in agent.engine.lobe_specs}
     bare_ids = {lb.id for lb in default_lobes()}
-    assert lobe_ids - bare_ids == {"meta_context"}  # adds exactly one lobe, shifts nothing else
-
-
-# ── subagent scoping via fan-out ─────────────────────────────────────────────────
-class _FanModel:
-    """meta_reflect: fan out 2 sub-tasks (one carrying its own meta faculty), then stop."""
-
-    def __init__(self) -> None:
-        self.fanned = False
-
-    def __call__(self, stage, system, messages, tools):
-        if stage == "meta_reflect" and not self.fanned:
-            self.fanned = True
-            return {
-                "tools": [
-                    {
-                        "name": "meta_control",
-                        "input": {
-                            "action": "fan_out",
-                            "items": [
-                                {
-                                    "label": "scoped",
-                                    "input": "do scoped work",
-                                    "lobes": ["meta_context"],
-                                },
-                                {"label": "plain", "input": "do plain work"},
-                            ],
-                        },
-                    }
-                ]
-            }
-        return "done"
-
-
-async def test_fan_out_runs_one_scoped_subexecution_per_item():
-    agent = PreactAgent(client=scripted(_FanModel()), plugins=[MetacognitionPlugin()])
-    assert agent.inspect("rethink the approach here").path[0] == "meta"
-    await probe(agent, "rethink the approach here", label="fan")
-
-    fanout_calls = [c for c in agent.client.calls if c["stage"] == "meta_fanout"]
-    assert len(fanout_calls) >= 2  # one scoped sub-execution per fanned item
-    # the scoped item (lobes=["meta_context"]) borrows the meta faculty: its sub-prompt
-    # carries the meta-context mirror block
-    assert any("How you are thinking" in str(c["system"]) for c in fanout_calls)
+    # adds the meta mirror + the Navigator brief lobe, shifts nothing else
+    assert lobe_ids - bare_ids == {"meta_context", "nav_brief"}
 
 
 # ── next-turn flow bias ──────────────────────────────────────────────────────────

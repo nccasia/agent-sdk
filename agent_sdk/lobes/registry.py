@@ -29,6 +29,7 @@ from agent_sdk.network.context_builder import ContextNode
 # ``flows.compat`` glue.
 Stage = Any
 
+
 # Default-member providers — the PROJECT (``agent_core.lobes.network``)
 # registers these at import time so the SDK registry carries no concrete
 # lobe / path / stage instances (framework, not instances). They default to

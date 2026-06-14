@@ -47,7 +47,7 @@ MEMORY_DIRECTIVE = (
     "preferences, postmortems, agreements — call `note` for EACH distinct fact, one note per fact, "
     "the moment you read it (scope=conversation for things that outlive this turn). Do not skip facts.\n"
     "- RECALL: before answering any question about earlier information, check the `## Memory` list and "
-    "use `recall` to pull the detail. Never answer that you don't have something without recalling first.\n"
+    "use `recall` to pull the detail. Always recall first, then answer.\n"
     "- When a fact changes, note the new value; recall returns the latest."
 )
 
@@ -152,7 +152,9 @@ class PreactAgent:
         # at ANY hop count) instead of only every 24 hops. Overridable via budgets.
         engine_budgets = dict(budgets or {})
         if funnel and "working_set_budget" not in engine_budgets:
-            engine_budgets["working_set_budget"] = 2000   # ~8k chars: compaction triggers on a real loop
+            engine_budgets["working_set_budget"] = (
+                2000  # ~8k chars: compaction triggers on a real loop
+            )
             engine_budgets.setdefault("working_set_keep", 3)
         self.instructions = instructions
         self.session = session
@@ -280,7 +282,8 @@ class PreactAgent:
         self._memory_runtime = memory_runtime
         extra_runtimes = list(mcp_runtimes) + [r for r in (recall_runtime,) if r is not None]
         tool_runtime = self._compose_tools(
-            list(tools or []) + list(setup.tools) + extra_runtimes, memory_runtime,
+            list(tools or []) + list(setup.tools) + extra_runtimes,
+            memory_runtime,
             priority_runtimes=list(setup.tool_runtimes),
         )
         # Any tool runtime that needs an async connect/discover phase (MCP) — resolved
@@ -384,8 +387,10 @@ class PreactAgent:
         """Eagerly run the MCP resolve phase (otherwise it runs lazily on the first turn).
         Returns ``{server_name: connected}`` for inspection."""
         await self._resolve_mcp()
-        return {getattr(r, "name", type(r).__name__): bool(getattr(r, "connected", False))
-                for r in self._mcp_runtimes}
+        return {
+            getattr(r, "name", type(r).__name__): bool(getattr(r, "connected", False))
+            for r in self._mcp_runtimes
+        }
 
     # ── core turn plumbing ───────────────────────────────────────────────────
     async def _run_stream(self, input: str, session: Session | None) -> AsyncIterator[Any]:
@@ -412,8 +417,9 @@ class PreactAgent:
 
                 for fact in salient_facts(input):
                     # Topic-keyed: a newer version of the same fact consolidates over the old one.
-                    self._memory_store.remember("fact", fact, scope="conversation", key=fact_key(fact),
-                                                source="establish")
+                    self._memory_store.remember(
+                        "fact", fact, scope="conversation", key=fact_key(fact), source="establish"
+                    )
             if sess is not None:
                 await sess.append(Turn("user", input))
                 await sess.append(Turn("assistant", last_result.text))

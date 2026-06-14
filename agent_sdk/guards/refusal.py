@@ -136,7 +136,11 @@ def match_refusal(query: str, rules: Sequence[dict]) -> str | None:
 def golden_hit(q_vec: Any, head: Any, threshold: float) -> AgentResult | None:
     """A near-duplicate of an approved golden question returns its answer directly,
     cited ``golden://<case_id>`` (cosine over the L2-normalized golden head)."""
-    if head is None or getattr(head, "embeddings", None) is None or not getattr(head, "items", None):
+    if (
+        head is None
+        or getattr(head, "embeddings", None) is None
+        or not getattr(head, "items", None)
+    ):
         return None
     try:
         sims = head.embeddings @ q_vec

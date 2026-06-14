@@ -97,7 +97,6 @@ from agent_sdk.session import Session, SessionState, Turn
 from agent_sdk.signals import compile_signal, eval_signal
 from agent_sdk.skill_def import Skill
 from agent_sdk.stages import Stage, StageRegistry, stage
-from agent_sdk.subagents import Subagent, SubagentRegistry, load_agents_dir
 from agent_sdk.tools import FunctionToolRuntime, Tool, tool
 from agent_sdk.viewer import render_viewer_html, to_viewer_record, write_viewer
 
@@ -116,9 +115,6 @@ __all__ = [
     "Lobes",
     "Stages",
     "Skill",
-    "Subagent",
-    "SubagentRegistry",
-    "load_agents_dir",
     "Session",
     "SessionState",
     "Turn",

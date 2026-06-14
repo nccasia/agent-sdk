@@ -108,8 +108,7 @@ def _scorecard(report: Any, probes: list) -> str:
         pills.append(("probes", str(len(probes)), ""))
         pills.append(("out tokens", str(toks), ""))
     cells = "".join(
-        f'<div class="pill"><div class="k">{_e(k)}</div>'
-        f'<div class="v {cls}">{_e(v)}</div></div>'
+        f'<div class="pill"><div class="k">{_e(k)}</div><div class="v {cls}">{_e(v)}</div></div>'
         for k, v, cls in pills
     )
     return f'<div class="cards">{cells}</div>'
@@ -149,12 +148,12 @@ def _lobe_table(lobes: list[dict]) -> str:
     for lb in lobes:
         on = lb.get("activated")
         rows.append(
-            f'<tr><td class=mono>{_e(lb.get("id"))}</td><td>{_e(lb.get("layer"))}</td>'
+            f"<tr><td class=mono>{_e(lb.get('id'))}</td><td>{_e(lb.get('layer'))}</td>"
             f'<td><span class="badge {"on" if on else "off"}">{"yes" if on else "no"}</span></td>'
-            f'<td class=mono>{lb.get("activation", 0):.2f}</td>'
-            f'<td class=mono>{_e(lb.get("reason"))}</td>'
-            f'<td class=mono>{_e(_kv(lb.get("signals")))}</td>'
-            f'<td class=mono>{_e(_edges(lb.get("in_edges")))}</td></tr>'
+            f"<td class=mono>{lb.get('activation', 0):.2f}</td>"
+            f"<td class=mono>{_e(lb.get('reason'))}</td>"
+            f"<td class=mono>{_e(_kv(lb.get('signals')))}</td>"
+            f"<td class=mono>{_e(_edges(lb.get('in_edges')))}</td></tr>"
         )
     return (
         "<table><tr><th>lobe</th><th>layer</th><th>activated</th><th>activation</th>"
@@ -169,11 +168,11 @@ def _hotspots(hints: list[dict]) -> str:
     for h in hints:
         patch = ", ".join(f"{k}={v}" for k, v in (h.get("weight_patch") or {}).items())
         rows.append(
-            f'<tr><td>{_e(h.get("axis"))}</td><td class=mono>{_e(h.get("target"))}</td>'
-            f'<td>{_e(h.get("reason"))}</td><td class=mono>{_e(patch)}</td></tr>'
+            f"<tr><td>{_e(h.get('axis'))}</td><td class=mono>{_e(h.get('target'))}</td>"
+            f"<td>{_e(h.get('reason'))}</td><td class=mono>{_e(patch)}</td></tr>"
         )
     return (
-        '<details><summary>optimization hotspots '
+        "<details><summary>optimization hotspots "
         f'<span class="meta">({len(hints)})</span></summary>'
         "<table><tr><th>axis</th><th>target</th><th>reason</th><th>weight patch</th></tr>"
         f"{''.join(rows)}</table></details>"
@@ -190,17 +189,25 @@ def _stage_block(stage: dict) -> str:
     for st in stage.get("steps", []):
         kind = st.get("kind")
         if kind == "thinking":
-            steps_html.append(f'<div class="step think"><span class=lbl>think</span>'
-                              f'<span class="t">{_e(_trunc(st.get("text"), 240))}</span></div>')
+            steps_html.append(
+                f'<div class="step think"><span class=lbl>think</span>'
+                f'<span class="t">{_e(_trunc(st.get("text"), 240))}</span></div>'
+            )
         elif kind == "tool_use":
-            steps_html.append(f'<div class="step tool"><span class=lbl>→ tool</span>'
-                              f'<span class="t mono">{_e(st.get("name"))}({_e(_trunc(st.get("input"), 110))})</span></div>')
+            steps_html.append(
+                f'<div class="step tool"><span class=lbl>→ tool</span>'
+                f'<span class="t mono">{_e(st.get("name"))}({_e(_trunc(st.get("input"), 110))})</span></div>'
+            )
         elif kind == "tool_result":
-            steps_html.append(f'<div class="step result"><span class=lbl>← result</span>'
-                              f'<span class="t mono">{_e(_trunc(st.get("output"), 160))}</span></div>')
+            steps_html.append(
+                f'<div class="step result"><span class=lbl>← result</span>'
+                f'<span class="t mono">{_e(_trunc(st.get("output"), 160))}</span></div>'
+            )
         elif kind == "answer" and st.get("text"):
-            steps_html.append(f'<div class="step answer"><span class=lbl>answer</span>'
-                              f'<span class="t">{_e(_trunc(st.get("text"), 300))}</span></div>')
+            steps_html.append(
+                f'<div class="step answer"><span class=lbl>answer</span>'
+                f'<span class="t">{_e(_trunc(st.get("text"), 300))}</span></div>'
+            )
     body = "".join(steps_html) or '<div class="step"><span class=empty>(no LLM step)</span></div>'
     return (
         f'<div class="stage"><div class="h">{name} '
@@ -225,11 +232,11 @@ def _probe(p: Any) -> str:
     toks = (p.usage or {}).get("output_tokens", 0)
     seq = " → ".join(_e(s.get("stage")) for s in p.stages) or "—"
     head = (
-        f'<summary>{_e(p.label)}'
+        f"<summary>{_e(p.label)}"
         f'<span class="meta"><span class="badge flow">{_e(p.flow)} {p.flow_score:.2f}</span>'
-        f'{_runner_up(p.path)} '
+        f"{_runner_up(p.path)} "
         f'<span class="{status_cls}">{_e(p.status)}</span> · {toks} out-tok · '
-        f'{len(p.tool_calls)} tool calls</span></summary>'
+        f"{len(p.tool_calls)} tool calls</span></summary>"
     )
     if p.error:
         body = f'<div class="fail">{_e(p.error)}</div>'
@@ -268,10 +275,10 @@ def _overview(verdict: dict, modes: dict | None) -> str:
         npass, n = payload.get("pass", 0), payload.get("n", len(checks))
         ok = payload.get("all_pass")
         rows = "".join(
-            f'<tr><td>{"✓" if c["ok"] else "✗"}</td>'
-            f'<td class=mono>{_e(c["id"])}</td>'
-            f'<td>{_e(_trunc(c.get("detail", ""), 110))}</td>'
-            f'<td class=diag>{"diag" if c.get("diag") else ""}</td></tr>'
+            f"<tr><td>{'✓' if c['ok'] else '✗'}</td>"
+            f"<td class=mono>{_e(c['id'])}</td>"
+            f"<td>{_e(_trunc(c.get('detail', ''), 110))}</td>"
+            f"<td class=diag>{'diag' if c.get('diag') else ''}</td></tr>"
             for c in checks
         )
         cls = "ok" if ok else "bad"
@@ -295,13 +302,17 @@ def _tabbed(tabs: list[tuple[str, str]]) -> str:
         for i in range(len(tabs))
     )
     inputs = "".join(
-        f'<input class=tabradio type=radio name=rtabs id=tab{i}{" checked" if i == 0 else ""}>'
+        f"<input class=tabradio type=radio name=rtabs id=tab{i}{' checked' if i == 0 else ''}>"
         for i in range(len(tabs))
     )
-    nav = "<nav class=tabnav>" + "".join(
-        f'<label class=tablabel for=tab{i}>{_e(lbl)}</label>' for i, (lbl, _) in enumerate(tabs)
-    ) + "</nav>"
-    panels = "".join(f'<div class=tabpanel id=panel{i}>{h}</div>' for i, (_, h) in enumerate(tabs))
+    nav = (
+        "<nav class=tabnav>"
+        + "".join(
+            f"<label class=tablabel for=tab{i}>{_e(lbl)}</label>" for i, (lbl, _) in enumerate(tabs)
+        )
+        + "</nav>"
+    )
+    panels = "".join(f"<div class=tabpanel id=panel{i}>{h}</div>" for i, (_, h) in enumerate(tabs))
     return f"<style>{rules}</style><div class=tabs>{inputs}{nav}{panels}</div>"
 
 
@@ -323,7 +334,10 @@ def render_html(
     probes = list(probes)
     ts = generated_at or datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
 
-    overview = [_overview(verdict, modes) if verdict is not None else "", _scorecard(report, probes)]
+    overview = [
+        _overview(verdict, modes) if verdict is not None else "",
+        _scorecard(report, probes),
+    ]
     if report is not None:
         overview.append("<h2>Scenarios (routing &amp; behavior)</h2>")
         overview.append(_scenarios(report))
@@ -336,7 +350,9 @@ def render_html(
     ]
     if probes:
         traces_html = "<h2>Probes (real turn internals)</h2>" + "".join(_probe(p) for p in probes)
-        parts.append(_tabbed([("Overview", overview_html), (f"Traces ({len(probes)})", traces_html)]))
+        parts.append(
+            _tabbed([("Overview", overview_html), (f"Traces ({len(probes)})", traces_html)])
+        )
     else:
         parts.append(overview_html)
     parts.append("</div></body></html>")
@@ -357,8 +373,14 @@ def write_html(
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
-        render_html(title, report=report, probes=probes, verdict=verdict, modes=modes,
-                    generated_at=generated_at),
+        render_html(
+            title,
+            report=report,
+            probes=probes,
+            verdict=verdict,
+            modes=modes,
+            generated_at=generated_at,
+        ),
         encoding="utf-8",
     )
     return out

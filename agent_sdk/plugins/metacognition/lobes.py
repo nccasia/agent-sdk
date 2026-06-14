@@ -17,8 +17,9 @@ from __future__ import annotations
 from agent_sdk.contracts.turn import PromptContribution, TurnContext
 from agent_sdk.lobes.runtime import Lobe
 from agent_sdk.network.activation import LAYER_COGNITION
+from agent_sdk.plugins.metacognition.tool import PHASE_BRIEF_KEY
 
-__all__ = ["MetaContextLobe", "LOBE"]
+__all__ = ["MetaContextLobe", "NavBriefLobe", "LOBE", "LOBES"]
 
 
 def _as_list(value: object) -> list[str]:
@@ -85,10 +86,58 @@ class MetaContextLobe(Lobe):
         block = (
             "## How you are thinking\n"
             "This is your own reasoning state for this turn. If the default approach is wrong, "
-            "reshape it with the meta_control tool (pick skills / bias the flow / fan out / "
-            "request regulation).\n" + "\n".join(lines)
+            "reshape it with the meta_control tool (pick skills / bias the flow / "
+            "request regulation / navigate phases).\n" + "\n".join(lines)
+        )
+        return [PromptContribution(block, stability="volatile", source=self.id)]
+
+
+class NavBriefLobe(Lobe):
+    """Render the Navigator's brief for the active phase (goal / instruction / DoD).
+
+    The ``meta_control(action="navigate", goal=…, instruction=…, dod=[…])`` enactor writes a
+    brief to ``scratchpad["phase_brief"]`` keyed by the target phase id (or ``"next"`` for the
+    immediately-following phase). This lobe reads the brief for the current phase and renders it
+    so the phase runs against the navigator-authored brief — the *enact* half of the Navigator's
+    "prepare the next phase" step. Contributes nothing when no brief targets this phase."""
+
+    id = "nav_brief"
+    name = "Navigator Brief"
+    description = "Renders the Navigator's goal/instruction/DoD brief for the current phase."
+    use_when = "the Navigator authored a goal/instruction/DoD for this phase"
+    how = "reads scratchpad['phase_brief'][<phase>] and renders it into the phase prompt"
+    layer = LAYER_COGNITION
+    behavior = "select"
+    prior = 1.0
+
+    def prompt(self, ctx: TurnContext) -> list[PromptContribution]:
+        sp = getattr(ctx, "scratchpad", None)
+        if sp is None:
+            return []
+        briefs = sp.get(PHASE_BRIEF_KEY)
+        if not isinstance(briefs, dict) or not briefs:
+            return []
+        stage = str(getattr(ctx, "stage_id", "") or "")
+        brief = briefs.get(stage) or briefs.get("next")
+        if not isinstance(brief, dict):
+            return []
+        parts: list[str] = []
+        if brief.get("goal"):
+            parts.append(f"### Goal\n{brief['goal']}")
+        if brief.get("instruction"):
+            parts.append(f"### Instruction\n{brief['instruction']}")
+        dod = _as_list(brief.get("dod"))
+        if dod:
+            parts.append("### Definition of done\n" + "\n".join(f"- {d}" for d in dod))
+        if not parts:
+            return []
+        block = (
+            "## Navigator brief\n"
+            "The navigator set this phase's brief. Work to it and satisfy the definition of done.\n"
+            + "\n\n".join(parts)
         )
         return [PromptContribution(block, stability="volatile", source=self.id)]
 
 
 LOBE = MetaContextLobe()
+LOBES = [LOBE, NavBriefLobe()]

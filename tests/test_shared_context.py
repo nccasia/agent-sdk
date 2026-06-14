@@ -45,9 +45,7 @@ async def test_turn_scope_is_the_default():
     assert ctx.scratchpad.get("lang") == "vi"
 
 
-@pytest.mark.parametrize(
-    "scope", [Scope.CONVERSATION, Scope.CHANNEL, Scope.USER, Scope.BOT]
-)
+@pytest.mark.parametrize("scope", [Scope.CONVERSATION, Scope.CHANNEL, Scope.USER, Scope.BOT])
 async def test_durable_scopes_roundtrip_through_memory(scope):
     ctx = _ctx_with_memory()
     await ctx.set("ui_pref", "dark", scope=scope)

@@ -27,17 +27,24 @@ def fake_mcp(tools, *, record=None):
         method = req.get("method")
         rid = req.get("id")
         if method == "initialize":
-            return {"jsonrpc": "2.0", "id": rid,
-                    "result": {"protocolVersion": "2025-06-18", "serverInfo": {"name": "fake"}}}
+            return {
+                "jsonrpc": "2.0",
+                "id": rid,
+                "result": {"protocolVersion": "2025-06-18", "serverInfo": {"name": "fake"}},
+            }
         if method == "notifications/initialized":
             return {}
         if method == "tools/list":
             return {"jsonrpc": "2.0", "id": rid, "result": {"tools": tools}}
         if method == "tools/call":
             p = req.get("params", {})
-            return {"jsonrpc": "2.0", "id": rid,
-                    "result": {"content": [{"type": "text",
-                                            "text": f"{p.get('name')}({p.get('arguments')})"}]}}
+            return {
+                "jsonrpc": "2.0",
+                "id": rid,
+                "result": {
+                    "content": [{"type": "text", "text": f"{p.get('name')}({p.get('arguments')})"}]
+                },
+            }
         return {"jsonrpc": "2.0", "id": rid, "error": {"code": -32601, "message": "no method"}}
 
     return transport
@@ -131,10 +138,12 @@ async def test_status_bad_response_when_tools_list_errors():
     def half_up(req):
         # initialize succeeds, tools/list returns a JSON-RPC error → bad_response
         if req.get("method") in ("initialize", "notifications/initialized"):
-            return {"jsonrpc": "2.0", "id": req.get("id"),
-                    "result": {"protocolVersion": "2025-06-18", "serverInfo": {}}}
-        return {"jsonrpc": "2.0", "id": req.get("id"),
-                "error": {"code": -32000, "message": "boom"}}
+            return {
+                "jsonrpc": "2.0",
+                "id": req.get("id"),
+                "result": {"protocolVersion": "2025-06-18", "serverInfo": {}},
+            }
+        return {"jsonrpc": "2.0", "id": req.get("id"), "error": {"code": -32000, "message": "boom"}}
 
     rt = MCPToolRuntime({"name": "wx"}, transport=half_up)
     await rt.resolve()
@@ -145,8 +154,11 @@ async def test_status_bad_response_when_tools_list_errors():
 async def test_agent_connect_registers_mcp_tools():
     agent = PreactAgent(
         client=FakeClient(),
-        plugins=[PluginMCP(spec={"name": "wx", "transport": "embedded"},
-                           transport=fake_mcp([WEATHER_TOOL]))],
+        plugins=[
+            PluginMCP(
+                spec={"name": "wx", "transport": "embedded"}, transport=fake_mcp([WEATHER_TOOL])
+            )
+        ],
     )
     status = await agent.connect()
     assert status == {"wx": True}

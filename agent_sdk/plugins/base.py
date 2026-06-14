@@ -119,7 +119,11 @@ class AgentSetup:
         transport for a spec."""
         from agent_sdk.mcp import MCPToolRuntime
 
-        rt = server if isinstance(server, MCPToolRuntime) else MCPToolRuntime(server, transport=transport)
+        rt = (
+            server
+            if isinstance(server, MCPToolRuntime)
+            else MCPToolRuntime(server, transport=transport)
+        )
         self.mcp_servers.append(rt)
 
     def remove_lobe(self, lobe_id: str) -> None:

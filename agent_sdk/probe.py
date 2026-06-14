@@ -41,6 +41,7 @@ class ProbeRecord:
     meta_actions: list[dict] = field(default_factory=list)
     hints: list[dict] = field(default_factory=list)  # optimization hotspots (axis/target/reason)
     attention: dict = field(default_factory=dict)  # context tiers + per-stage funnel telemetry
+    blackboard: dict = field(default_factory=dict)  # turn scratchpad snapshot (plan/results/etc.)
     # First-class selection/health signals from the trace — which skills the
     # skill_select lobe surfaced + their ranking ({stage, ranking:[{label,l1,l2,
     # activation,kept}]}), the adaptive tool routing, and any degraded-dependency
@@ -95,6 +96,7 @@ async def probe(agent: Any, query: str, *, label: str = "") -> ProbeRecord:
         rec.llm_calls = t.llm_calls
         rec.meta_actions = t.meta_actions
         rec.attention = getattr(t, "attention", {}) or {}
+        rec.blackboard = getattr(t, "blackboard", {}) or {}
         rec.skill_selection = getattr(t, "skill_selection", []) or []
         rec.tool_selection = getattr(t, "tool_selection", []) or []
         rec.degraded = getattr(t, "degraded", []) or []

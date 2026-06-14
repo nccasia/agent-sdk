@@ -511,5 +511,6 @@ stay bounded — see [`agentbench`](../../benchmarks/agentbench/)).
 - [`universal-memory.md`](./06-universal-memory.md) — the store skill bodies offload to.
 - [`task-execution-mode.md`](./13-task-execution-mode.md) — the rail that runs multi-stage SOPs.
 - [`intent-and-paths.md`](./02-intent-and-paths.md) — how a turn's intent biases which skills surface.
+- [`prompt-engineering.md`](./14-prompt-engineering.md) — writing the procedure text a skill discloses.
 - [`agentbench`](../../benchmarks/agentbench/) — the live bench gating bounded context.
 - [`skillbench`](../../../../benchmarks/skillbench/) — skill activation-recall gate.

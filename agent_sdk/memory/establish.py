@@ -15,16 +15,25 @@ import re
 # A line that is explicitly a fact: a bullet item.
 _BULLET = re.compile(r"^\s*[-*•]\s+(.{6,240}?)\s*$", re.M)
 # A concrete value that marks a sentence as worth remembering.
-_VALUE = re.compile(r"\d{4}-\d{2}-\d{2}|\b\d{1,2}:\d{2}\b|@\w+|\b\d+(?:\.\d+)?\s?(?:ms|%)\b|"
-                    r"\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*\b", re.I)
+_VALUE = re.compile(
+    r"\d{4}-\d{2}-\d{2}|\b\d{1,2}:\d{2}\b|@\w+|\b\d+(?:\.\d+)?\s?(?:ms|%)\b|"
+    r"\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*\b",
+    re.I,
+)
 # Decision/commitment cues — remember these even without a numeric value.
-_CUE = re.compile(r"\b(decided|agreed|owner|deadline|scheduled|rollout|cutover|sla|must|policy|"
-                  r"rule|hotline|requirement|trigger|window)\b", re.I)
+_CUE = re.compile(
+    r"\b(decided|agreed|owner|deadline|scheduled|rollout|cutover|sla|must|policy|"
+    r"rule|hotline|requirement|trigger|window)\b",
+    re.I,
+)
 _SPLIT = re.compile(r"(?<=[.!?])\s+|\n")
 # Tokens that are VALUES (what changes when a fact is updated) — stripped to derive the topic, so a
 # later version of the same fact CONSOLIDATES over the older one instead of piling up.
-_VALUE_TOKENS = re.compile(r"\d{4}-\d{2}-\d{2}|\b\d{1,2}:\d{2}\b|@\w+|\b\d+(?:\.\d+)?\s?(?:ms|%)?\b|"
-                           r"\b(?:mon|tue|wed|thu|fri|sat|sun)\w*\b", re.I)
+_VALUE_TOKENS = re.compile(
+    r"\d{4}-\d{2}-\d{2}|\b\d{1,2}:\d{2}\b|@\w+|\b\d+(?:\.\d+)?\s?(?:ms|%)?\b|"
+    r"\b(?:mon|tue|wed|thu|fri|sat|sun)\w*\b",
+    re.I,
+)
 
 __all__ = ["salient_facts", "fact_key"]
 

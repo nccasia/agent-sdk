@@ -39,7 +39,11 @@ async def test_probe_records_tool_calls():
         instructions="bot",
         tools=[search],
         flows=[__import__("agent_sdk").flow("qna", stages=["synthesize"], signal={"const": 1.0})],
-        stages=[__import__("agent_sdk").stage("synthesize", lobes=["synthesize"], loop="agentic", tools=["search"])],
+        stages=[
+            __import__("agent_sdk").stage(
+                "synthesize", lobes=["synthesize"], loop="agentic", tools=["search"]
+            )
+        ],
     )
     rec = await probe(agent, "go", label="tool turn")
     assert rec.tool_calls[0]["name"] == "search"
@@ -48,10 +52,12 @@ async def test_probe_records_tool_calls():
 
 async def test_render_html_combines_report_and_probes():
     agent = _agent(["answer"])
-    report = await Harness(agent).run([
-        Scenario(input="compare a and b in extensive detail right now", expect_path="research"),
-        Scenario(input="hi?", expect_path="qna"),
-    ])
+    report = await Harness(agent).run(
+        [
+            Scenario(input="compare a and b in extensive detail right now", expect_path="research"),
+            Scenario(input="hi?", expect_path="qna"),
+        ]
+    )
     rec = await probe(agent, "compare a and b in extensive detail", label="probe1")
     html = render_html("coding-agent-bench", report=report, probes=[rec], generated_at="FIXED")
 
@@ -83,9 +89,7 @@ async def test_probe_carries_skill_selection():
     rec = await probe(agent, "go", label="skill turn")
     assert isinstance(rec.skill_selection, list)
     assert any(
-        r.get("label") == "kbk"
-        for sel in rec.skill_selection
-        for r in sel.get("ranking", [])
+        r.get("label") == "kbk" for sel in rec.skill_selection for r in sel.get("ranking", [])
     )
     assert isinstance(rec.tool_selection, list)
     assert isinstance(rec.degraded, list)
@@ -110,11 +114,17 @@ async def test_render_html_combines_overview_and_probes():
     agent = _agent(["answer"])
     rec = await probe(agent, "compare a and b", label="probe1")
     verdict = {"status": "READY", "reasons": [], "metrics": {"activation.recall": 1.0}}
-    modes = {"activation": {"checks": [{"id": "activation.code_review", "ok": True,
-                                        "detail": "P=1.0 R=1.0"}], "n": 1, "pass": 1,
-                            "all_pass": True}}
-    html = render_html("skillbench", verdict=verdict, modes=modes, probes=[rec],
-                       generated_at="FIXED")
+    modes = {
+        "activation": {
+            "checks": [{"id": "activation.code_review", "ok": True, "detail": "P=1.0 R=1.0"}],
+            "n": 1,
+            "pass": 1,
+            "all_pass": True,
+        }
+    }
+    html = render_html(
+        "skillbench", verdict=verdict, modes=modes, probes=[rec], generated_at="FIXED"
+    )
     # overview half
     assert "Overview" in html and 'class="verdict READY"' in html
     assert "activation.code_review" in html and "activation.recall" in html

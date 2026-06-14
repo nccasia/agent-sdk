@@ -58,7 +58,9 @@ def test_multiple_conditions_all_must_match():
 
 def test_activation_of_extractor_for_dict_items():
     items = [{"name": "a", "activation": {"channel_ids": ["c1"]}}]
-    out = select_active(items, {"channel_id": "c1"}, activation_of=lambda d: d.get("activation") or {})
+    out = select_active(
+        items, {"channel_id": "c1"}, activation_of=lambda d: d.get("activation") or {}
+    )
     assert out == items
 
 

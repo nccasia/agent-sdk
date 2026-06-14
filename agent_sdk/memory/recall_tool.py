@@ -45,8 +45,14 @@ class RecallToolRuntime:
                         "query": {"type": "string", "description": "free-text search over digests"},
                         "handle": {"type": "string", "description": "mem://… handle to expand"},
                         "full": {"type": "boolean", "description": "return the full body"},
-                        "grep": {"type": "string", "description": "regex; matching lines of a large body"},
-                        "section": {"type": "string", "description": "section id; one slice of a large body"},
+                        "grep": {
+                            "type": "string",
+                            "description": "regex; matching lines of a large body",
+                        },
+                        "section": {
+                            "type": "string",
+                            "description": "section id; one slice of a large body",
+                        },
                         "kind": {"type": "string", "description": "filter the search by kind"},
                     },
                 },
@@ -64,7 +70,10 @@ class RecallToolRuntime:
                     "properties": {
                         "content": {"type": "string"},
                         "kind": {"type": "string", "enum": list(_WRITE_KINDS)},
-                        "scope": {"type": "string", "enum": [FLASH_SCOPE, "conversation", "user", "bot"]},
+                        "scope": {
+                            "type": "string",
+                            "enum": [FLASH_SCOPE, "conversation", "user", "bot"],
+                        },
                         "key": {"type": "string"},
                     },
                     "required": ["content"],
@@ -111,8 +120,12 @@ class RecallToolRuntime:
         # silently lost facts the model noted without an explicit scope.)
         scope = inp.get("scope") or "conversation"
         handle = self.store.remember(
-            kind, inp.get("content", ""), scope=scope, key=inp.get("key"),
-            pinned=(kind in ("decision", "plan", "obligation")), source="note",
+            kind,
+            inp.get("content", ""),
+            scope=scope,
+            key=inp.get("key"),
+            pinned=(kind in ("decision", "plan", "obligation")),
+            source="note",
         )
         self.writes.append({"kind": kind, "scope": scope, "handle": handle})
         durable = "" if scope == FLASH_SCOPE else " (durable)"

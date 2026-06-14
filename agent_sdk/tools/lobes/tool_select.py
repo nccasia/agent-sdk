@@ -73,8 +73,13 @@ class ToolSelectLobe(Lobe):
             name = str(s.get("name") or "")
             if essential(name):
                 continue
-            sc = score_relevance(query, q_vec, f"{name} {s.get('description') or ''}",
-                                 embed_one=embed_one, weights=weights)
+            sc = score_relevance(
+                query,
+                q_vec,
+                f"{name} {s.get('description') or ''}",
+                embed_one=embed_one,
+                weights=weights,
+            )
             scored.append((sc["activation"], sc, s, name))
         scored.sort(key=lambda x: -x[0])
 
@@ -82,8 +87,12 @@ class ToolSelectLobe(Lobe):
         kept_meta = [{"name": str(s.get("name") or ""), "essential": True} for s in essentials]
         dropped, non_ess_kept, budget = [], 0, max(0, max_tools - len(essentials))
         for act, sc, s, name in scored:
-            meta = {"name": name, "l1": round(sc["l1"], 3), "l2": round(sc["l2"], 3),
-                    "activation": round(act, 3)}
+            meta = {
+                "name": name,
+                "l1": round(sc["l1"], 3),
+                "l2": round(sc["l2"], 3),
+                "activation": round(act, 3),
+            }
             if act < min_activation:
                 dropped.append({**meta, "reason": "below_floor"})
             elif non_ess_kept >= budget:

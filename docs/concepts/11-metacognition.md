@@ -86,9 +86,40 @@ The same three-part surface every capacity module uses (`AgentSetup.add_lobe/add
 | **Flow / path** | signal recognizers (`recognize_paths`) | the tool writes a path/flow preference | the path resolver (reads it as a signal) |
 | **Subagent control** | the flow decides fan-out; `_map_stage` runs it | the tool writes the work-list / per-item specs | `_map_stage` ([Subagent Fan-out](./12-subagent-fanout.md)) |
 | **Trim / retry / skip** | deterministic `regulate` (today) | the tool requests the action | the engine's regulation seam (`engine.py:836`) |
+| **Phase navigation** (the **Navigator**) | the flow's stages run once, in order | the tool writes a nav request + the next phase's brief | the engine's movable phase cursor (`_next_phase`) |
 
 Every lever follows the same shape: the **meta tool decides**, a **deterministic enactor applies** —
 the object level never asks an LLM to judge it inline.
+
+## The Navigator — pipeline-level metacognition (phases)
+
+The first four levers reshape thinking *within* a phase. The **Navigator** is metacognition over the
+**phases themselves**: a hook that runs at each phase boundary and turns a turn into a
+*do → check → navigate* loop.
+
+```
+run phase i ─▶ NAVIGATOR ─▶ 1. "are we good to go?"  (phase output vs its definition of done)
+   ▲                        2. "what runs next?"      advance · redo · goto <phase> · done
+   └─ redo/goto rewinds     3. prepare the next phase  {goal, instruction, dod}
+      msgs+notes to the         (written to scratchpad["phase_brief"]; the nav_brief lobe renders it)
+      target's checkpoint
+```
+
+- **Both producers** (decision = `Both`): the deterministic regulator redoes a phase that clearly
+  missed its DoD (e.g. produced no output), and the model can navigate explicitly with
+  `meta_control(action="navigate", to="redo"|"done"|"<phase id>", goal=…, instruction=…, dod=[…])`.
+- **The engine enacts** it with a **movable phase cursor** (`_next_phase`, pure): the old linear
+  `for stage in stages` became an index that can advance, rewind (redo / backward-goto, rewinding the
+  conversational state to the phase's checkpoint), or jump.
+- **Bounded & safe**: a per-phase **redo budget** + a total-execution cap guarantee termination;
+  pinned `cite`/`filter` always run before a turn can finish (a `done`/jump that would leave them
+  un-run is redirected to them); apply-gated and **off by default** (parity) — opt in by adding
+  `redo_phase`/`goto_phase` to `Metacognition(apply_actions=…)` (the `MetacognitionPlugin` surfaces the
+  `navigate` action + the `nav_brief` lobe).
+
+Why this is still invariant #4: the Navigator does **not** resolve the flow — it moves the cursor
+within the already-resolved stage list and writes the next phase's brief into turn state; pure
+functions enact both. The model writes a decision; the deterministic core applies it.
 
 ## Composable onto any agent — or any subagent
 
@@ -141,26 +172,30 @@ This landed on machinery that already existed; the default (no-plugin) agent is 
   precedence, pinned `cite`/`filter` (`metacognition_facade.py` `PINNED_UNSKIPPABLE`,
   `metacognition/controller.py` `_DEFAULT_APPLY_ACTIONS={adjust_lobe_slice}`).
 - Metacognition **as a plugin** — `MetacognitionPlugin` (`agent_sdk/plugins/metacognition/`):
-  the `meta_context` lobe, the `meta_reflect` + `meta_fanout` stages, the `meta` flow, and the
-  `meta_control` tool.
-- The meta-control tool's **enactors** — **skills** (writes `lobe_outputs["skills_in_use"]`,
-  driven by the existing `skill_active` lobe), **flow** (`bias_flow` → persisted `meta_flow_bias`,
-  read next turn by the plugin's path recognizer), **subagent** (`fan_out` → `scratchpad["meta_fanout"]`,
-  run by the generic `loop="map"` `_map_stage`), and **regulate** (`trim`/`skip` honored at the
-  engine seam, apply-gated + pin-guarded).
+  the `meta_context` lobe, the `meta_reflect` stage, the `meta` flow, and the `meta_control` tool.
+  Delegation/fan-out is the **planning** plugin's concern (`plugins/planning/`, doc 12), not
+  metacognition's — they compose.
+- The meta-control tool's **enactors** — **skills** (`use_skills` writes
+  `lobe_outputs["skills_in_use"]`, driven by the existing `skill_active` lobe), **flow**
+  (`bias_flow` → persisted `meta_flow_bias`, read next turn by the plugin's path recognizer), and
+  **regulate** (`trim`/`skip` honored at the engine seam, apply-gated + pin-guarded). Because
+  enactors are just turn-state writes the engine reads, metacognition can also reshape a **plan's
+  execution structure** — overwriting `scratchpad["plan_structure"]` (the same key the planning
+  `plan_supervise` lobe writes) forces fanout vs sequential before the `execute` map runs.
 - **The controller now sees what it regulates** — the engine builds real `LobeAxisSnapshot` /
   `FlowAxisSnapshot` / `EngineSnapshot` at the stage seam and passes them (+ `current_lobes`) to
   `plan_next`; the observations are surfaced to the meta-context lobe (the mirror finally enters the
   prompt). `adjust_lobe_slice` is **applied** (was infra-ready, unapplied).
-- **Per-subagent capacity (by borrow)** — a `fan_out` item may carry `lobes=["meta_context", …]` /
+- **Per-subagent capacity (by borrow)** — a plan todo may carry `lobes=["meta_context", …]` /
   `tools=["meta_control", …]`; `_map_stage` scopes the sub-execution to them, so the subagent gains
   its own meta faculty from the globally-installed module.
 
 **Deferred (honest gaps).**
 - **True per-subagent *install*** — a subagent borrows the global lobe/tool; it cannot `install` a
   private plugin only it sees.
-- **Tool-driven `retry_step`** — the meta tool enacts `trim`/`skip`; `retry_step` stays the
-  deterministic regulator's domain (no low-risk inline re-run seam in the hot stage loop).
+- **Tool-driven `retry_step`** (within a single stage's hop loop) — stays the deterministic
+  regulator's domain. Note: **phase-level re-run shipped** as the Navigator's `redo_phase` (re-runs a
+  whole phase with a checkpoint rewind); intra-stage hop retry is the remaining deferred piece.
 - **Deterministic `adjust_lobe_slice` auto-trigger** — the apply seam is wired, but the engine emits
   no `context:tight` signal by default (no portable context-window probe), so the deterministic trim
   fires only when a host supplies one; the tool's `trim` is the live manual lever meanwhile.

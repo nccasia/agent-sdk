@@ -41,6 +41,12 @@ cross-links its neighbours; the number is just the suggested path through them. 
 | 12 | [Subagent Fan-out](./12-subagent-fanout.md) **(direction)** | Delegating a slice of a turn to scoped sub-thinkers that return memos, not dumps. |
 | 13 | [Task Execution Mode](./13-task-execution-mode.md) **(direction)** | Long-rail work — a checklist/rail driven over many steps via the `map` loop. |
 
+## 5 · Prompt craft
+
+| # | Doc | What it covers |
+|---|---|---|
+| 14 | [Prompt Engineering](./14-prompt-engineering.md) | Writing the words inside each prompt contribution — techniques mapped to the compose-and-tag seam, with worked before/afters. |
+
 ## Assets & notes
 
 - `*.svg` (`overview`, `the-model`, `turn-pipeline`, `core-and-extensions`) are rendered diagrams, not

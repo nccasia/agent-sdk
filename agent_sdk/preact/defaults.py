@@ -36,14 +36,31 @@ class Stages:
     @staticmethod
     def minimal() -> list[Stage]:
         return [
-            stage("plan", lobes=["plan"], loop="single",
-                  description="Decompose the question into sub-questions."),
-            stage("research", lobes=["research"], loop="agentic",
-                  description="Gather evidence with tools."),
-            stage("synthesize", lobes=["classify", "synthesize", "cite", "filter"],
-                  loop="single", description="Compose the grounded answer."),
-            stage("clarify", lobes=["clarify"], loop="single",
-                  use_when="an ambiguous follow-up", description="Ask one clarifying question."),
+            stage(
+                "plan",
+                lobes=["plan"],
+                loop="single",
+                description="Decompose the question into sub-questions.",
+            ),
+            stage(
+                "research",
+                lobes=["research"],
+                loop="agentic",
+                description="Gather evidence with tools.",
+            ),
+            stage(
+                "synthesize",
+                lobes=["classify", "synthesize", "cite", "filter"],
+                loop="single",
+                description="Compose the grounded answer.",
+            ),
+            stage(
+                "clarify",
+                lobes=["clarify"],
+                loop="single",
+                use_when="an ambiguous follow-up",
+                description="Ask one clarifying question.",
+            ),
         ]
 
 
@@ -55,12 +72,31 @@ class Flows:
     @staticmethod
     def minimal() -> list[Flow]:
         return [
-            flow("research", use_when="multi-step questions needing sources",
-                 stages=["plan", "research", "synthesize"], threshold=0.5,
-                 signal={"any": [{"lexical": ["compare", "vs", "versus", "research", "analyze"]},
-                                 {"min_words": 12}]}),
-            flow("clarify", use_when="an ambiguous follow-up", stages=["clarify"],
-                 threshold=0.5, grounds=False, signal={"flag": "ambiguous"}),
-            flow("qna", use_when="a direct question", stages=["synthesize"],
-                 threshold=0.4, signal={"const": 0.5}),
+            flow(
+                "research",
+                use_when="multi-step questions needing sources",
+                stages=["plan", "research", "synthesize"],
+                threshold=0.5,
+                signal={
+                    "any": [
+                        {"lexical": ["compare", "vs", "versus", "research", "analyze"]},
+                        {"min_words": 12},
+                    ]
+                },
+            ),
+            flow(
+                "clarify",
+                use_when="an ambiguous follow-up",
+                stages=["clarify"],
+                threshold=0.5,
+                grounds=False,
+                signal={"flag": "ambiguous"},
+            ),
+            flow(
+                "qna",
+                use_when="a direct question",
+                stages=["synthesize"],
+                threshold=0.4,
+                signal={"const": 0.5},
+            ),
         ]

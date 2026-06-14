@@ -25,14 +25,12 @@ from agent_sdk.flows.flow import Flow
 from agent_sdk.flows.stages import (
     clarify_synthesize,
     fallback_synthesize,
-    kb_research,
     onboarding_synthesize,
     qna_synthesize,
     relational_synthesize,
     research_cite,
     research_filter,
-    research_plan,
-    research_synthesize,
+    research_investigate,
 )
 
 __all__ = ["default_flows"]
@@ -58,14 +56,13 @@ def default_flows() -> list[Flow]:
             description="qna answer — one agentic step, full toolset (legacy parity)",
             steps=(qna_synthesize(),),
         ),
-        # research: plan → research → synthesize → cite → filter
+        # research: investigate (one ReAct loop over KB tools) → ground + filter.
+        # No decompose + map fan-out — the model plans its own sub-steps with TodoWrite.
         Flow(
             name="research",
-            description="research — decompose + fanout KB + compose + ground + filter",
+            description="research — investigate in one ReAct loop, then ground + filter",
             steps=(
-                research_plan(),
-                kb_research(),
-                research_synthesize(),
+                research_investigate(),
                 research_cite(),
                 research_filter(),
             ),

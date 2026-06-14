@@ -31,8 +31,9 @@ def test_default_agent_is_natively_efficient():
 
 
 def test_opt_out_restores_bare_behavior():
-    agent = PreactAgent(client=FakeClient(["ok"]), instructions="bare",
-                        funnel=False, universal_memory=False)
+    agent = PreactAgent(
+        client=FakeClient(["ok"]), instructions="bare", funnel=False, universal_memory=False
+    )
     assert agent._memory_store is None
     assert not ({"recall", "note"} & _tool_names(agent))
     assert agent.engine.funnel is False
@@ -42,11 +43,13 @@ def test_opt_out_restores_bare_behavior():
 def test_establish_extracts_fact_shaped_statements():
     from agent_sdk.memory.establish import salient_facts
 
-    text = ("New messages in #ops:\n"
-            "- The zephyr deadline is 2026-07-15.\n"
-            "- @lan owns the orion project.\n"
-            "lol nice\n"
-            "The rollout is scheduled for Friday 14:00.")
+    text = (
+        "New messages in #ops:\n"
+        "- The zephyr deadline is 2026-07-15.\n"
+        "- @lan owns the orion project.\n"
+        "lol nice\n"
+        "The rollout is scheduled for Friday 14:00."
+    )
     facts = salient_facts(text)
     assert any("2026-07-15" in f for f in facts)
     assert any("@lan" in f for f in facts)
@@ -73,10 +76,16 @@ async def test_default_funnel_bounds_a_long_tool_loop():
     async def fetch(record_id: int) -> str:
         return "lorem ipsum dolor sit amet detail " * 30  # ~1020 chars, like the bench
 
-    script = [{"tools": [{"name": "fetch", "input": {"record_id": i}}]} for i in range(18)] + ["done"]
-    agent = PreactAgent(client=FakeClient(script), instructions="loop",
-                        tools=[fetch], flows=[flow("qna", stages=["work"], signal={"const": 1.0})],
-                        stages=[stage("work", lobes=["synthesize"], loop="agentic", tools=["fetch"], hops=24)])
+    script = [{"tools": [{"name": "fetch", "input": {"record_id": i}}]} for i in range(18)] + [
+        "done"
+    ]
+    agent = PreactAgent(
+        client=FakeClient(script),
+        instructions="loop",
+        tools=[fetch],
+        flows=[flow("qna", stages=["work"], signal={"const": 1.0})],
+        stages=[stage("work", lobes=["synthesize"], loop="agentic", tools=["fetch"], hops=24)],
+    )
     rec = await probe(agent, "fetch records 1..18")
     series = [c for s in rec.stages for c in (s.get("metadata") or {}).get("funnel_obs_chars", [])]
     peak = max(series or [0])
@@ -90,11 +99,24 @@ async def test_default_agent_can_offload_and_recall():
     from agent_sdk import probe
 
     agent = PreactAgent(
-        client=FakeClient([
-            {"tools": [{"name": "note", "input": {"content": "the launch is Friday", "kind": "fact",
-                                                  "scope": "conversation", "key": "launch"}}]},
-            "Noted.",
-        ]),
+        client=FakeClient(
+            [
+                {
+                    "tools": [
+                        {
+                            "name": "note",
+                            "input": {
+                                "content": "the launch is Friday",
+                                "kind": "fact",
+                                "scope": "conversation",
+                                "key": "launch",
+                            },
+                        }
+                    ]
+                },
+                "Noted.",
+            ]
+        ),
         instructions="assistant",
     )
     await probe(agent, "remember the launch is Friday")

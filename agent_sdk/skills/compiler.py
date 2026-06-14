@@ -43,8 +43,13 @@ class SkillChunk:
     gist: str
 
     def to_json(self) -> dict:
-        return {"id": self.id, "source_file": self.source_file, "heading": self.heading,
-                "tokens": self.tokens, "gist": self.gist}
+        return {
+            "id": self.id,
+            "source_file": self.source_file,
+            "heading": self.heading,
+            "tokens": self.tokens,
+            "gist": self.gist,
+        }
 
 
 @dataclass(frozen=True)
@@ -59,19 +64,28 @@ class CompiledSkill:
     built_by: str  # "llm" | "deterministic"
 
     def to_json(self) -> dict:
-        return {"slug": self.slug, "content_hash": self.content_hash,
-                "budget_tokens": self.budget_tokens, "surface": self.surface,
-                "chunks": [c.to_json() for c in self.chunks], "built_by": self.built_by}
+        return {
+            "slug": self.slug,
+            "content_hash": self.content_hash,
+            "budget_tokens": self.budget_tokens,
+            "surface": self.surface,
+            "chunks": [c.to_json() for c in self.chunks],
+            "built_by": self.built_by,
+        }
 
     @classmethod
     def from_json(cls, d: dict) -> CompiledSkill:
         return cls(
-            slug=str(d.get("slug", "")), content_hash=str(d.get("content_hash", "")),
+            slug=str(d.get("slug", "")),
+            content_hash=str(d.get("content_hash", "")),
             budget_tokens=int(d.get("budget_tokens", DEFAULT_BUDGET)),
             surface=str(d.get("surface", "")),
-            chunks=tuple(SkillChunk(**{k: c.get(k) for k in
-                                       ("id", "source_file", "heading", "tokens", "gist")})
-                         for c in (d.get("chunks") or [])),
+            chunks=tuple(
+                SkillChunk(
+                    **{k: c.get(k) for k in ("id", "source_file", "heading", "tokens", "gist")}
+                )
+                for c in (d.get("chunks") or [])
+            ),
             built_by=str(d.get("built_by", "deterministic")),
         )
 
@@ -92,13 +106,23 @@ def content_hash(pack: Any) -> str:
 def chunk_skill(pack: Any) -> list[SkillChunk]:
     """Split the whole bundle (SKILL.md body + every file) into addressable chunks."""
     out: list[SkillChunk] = []
-    sources = {"SKILL.md": getattr(pack, "instructions", "") or "", **(getattr(pack, "files", {}) or {})}
+    sources = {
+        "SKILL.md": getattr(pack, "instructions", "") or "",
+        **(getattr(pack, "files", {}) or {}),
+    }
     for fname, content in sources.items():
         for sec in split_sections(content or ""):
             body = sec.content.strip()
-            gist = (body.splitlines()[0][:120] if body else sec.heading)
-            out.append(SkillChunk(id=f"{fname}#{sec.id}", source_file=fname,
-                                  heading=sec.heading, tokens=est_tokens(sec.content), gist=gist))
+            gist = body.splitlines()[0][:120] if body else sec.heading
+            out.append(
+                SkillChunk(
+                    id=f"{fname}#{sec.id}",
+                    source_file=fname,
+                    heading=sec.heading,
+                    tokens=est_tokens(sec.content),
+                    gist=gist,
+                )
+            )
     return out
 
 
@@ -109,8 +133,11 @@ def _message_text(msg: Any) -> str:
     t = getattr(msg, "text", None)
     if isinstance(t, str):
         return t
-    out = [getattr(b, "text", "") or "" for b in (getattr(msg, "content", None) or [])
-           if getattr(b, "type", None) == "text"]
+    out = [
+        getattr(b, "text", "") or ""
+        for b in (getattr(msg, "content", None) or [])
+        if getattr(b, "type", None) == "text"
+    ]
     return "\n".join(out)
 
 
@@ -120,14 +147,21 @@ def _chunk_index(chunks: list[SkillChunk]) -> str:
 
 def deterministic_surface(pack: Any, chunks: list[SkillChunk], budget_tokens: int) -> str:
     """The no-LLM surface (the fallback): description + the chunk index to skill.read."""
-    head = (getattr(pack, "description", "") or getattr(pack, "name", "")
-            or getattr(pack, "id", "skill")).strip()
+    head = (
+        getattr(pack, "description", "")
+        or getattr(pack, "name", "")
+        or getattr(pack, "id", "skill")
+    ).strip()
     idx = _chunk_index(chunks)
-    return (f"{head}\n\nThis skill's content — read a chunk with "
-            f"skill.read(chunk='<id>') when a step needs it:\n{idx}")
+    return (
+        f"{head}\n\nThis skill's content — read a chunk with "
+        f"skill.read(chunk='<id>') when a step needs it:\n{idx}"
+    )
 
 
-async def compile_skill(pack: Any, *, llm: Any = None, budget_tokens: int = DEFAULT_BUDGET) -> CompiledSkill:
+async def compile_skill(
+    pack: Any, *, llm: Any = None, budget_tokens: int = DEFAULT_BUDGET
+) -> CompiledSkill:
     """Compile ``pack`` into a :class:`CompiledSkill`. A bundle within ``budget_tokens``
     is its own surface (no LLM). A larger one gets an LLM-written core that references
     chunk ids; on no ``llm`` or any failure it falls back to ``deterministic_surface``."""
@@ -144,30 +178,44 @@ async def compile_skill(pack: Any, *, llm: Any = None, budget_tokens: int = DEFA
         surface = body.strip()
         files = getattr(pack, "files", {}) or {}
         if files:
-            surface += ("\n\nReference files (skill.read a section when a step needs it): "
-                        + ", ".join(sorted(files)))
+            surface += (
+                "\n\nReference files (skill.read a section when a step needs it): "
+                + ", ".join(sorted(files))
+            )
         return CompiledSkill(pack.id, chash, budget_tokens, surface, tuple(chunks), "deterministic")
 
     surface = ""
     if llm is not None:
         idx = _chunk_index(chunks)
-        user = (f"SKILL: {getattr(pack, 'name', '') or pack.id}\n{getattr(pack, 'description', '')}\n\n"
-                f"BODY:\n{body}\n\nCHUNKS (reference by id):\n{idx}")
+        user = (
+            f"SKILL: {getattr(pack, 'name', '') or pack.id}\n{getattr(pack, 'description', '')}\n\n"
+            f"BODY:\n{body}\n\nCHUNKS (reference by id):\n{idx}"
+        )
         try:
             # Headroom over the budget: a reasoning model spends output tokens on a
             # thinking block before the surface — cap at the budget and the surface
             # comes back empty (truncated mid-thought). The SURFACE is bounded to the
             # budget below; max_tokens just needs room for reasoning + the surface.
-            msg = await llm(stage="skill.compile", system=_COMPILE_PROMPT.format(budget=budget_tokens),
-                            messages=[{"role": "user", "content": user}],
-                            max_tokens=max(2048, budget_tokens * 3), temperature=0.0)
+            msg = await llm(
+                stage="skill.compile",
+                system=_COMPILE_PROMPT.format(budget=budget_tokens),
+                messages=[{"role": "user", "content": user}],
+                max_tokens=max(2048, budget_tokens * 3),
+                temperature=0.0,
+            )
             surface = _message_text(msg).strip()
         except Exception:
             surface = ""
 
     if not surface:
-        return CompiledSkill(pack.id, chash, budget_tokens,
-                             deterministic_surface(pack, chunks, budget_tokens), tuple(chunks), "deterministic")
+        return CompiledSkill(
+            pack.id,
+            chash,
+            budget_tokens,
+            deterministic_surface(pack, chunks, budget_tokens),
+            tuple(chunks),
+            "deterministic",
+        )
 
     if est_tokens(surface) > budget_tokens:  # safety net — keep the surface within budget
         surface = surface[: budget_tokens * 4].rstrip() + "\n…(truncated — skill.read for detail)"

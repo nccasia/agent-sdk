@@ -112,8 +112,9 @@ def test_anthropic_is_faithful_passthrough():
     from agent_sdk.clients import AnthropicClient
 
     markup = '<minimax:tool_call>\n<invoke name="x"><parameter name="a">1</parameter></invoke>'
-    resp = SimpleNamespace(stop_reason="end_turn",
-                           content=[SimpleNamespace(type="text", text=markup)], usage=None)
+    resp = SimpleNamespace(
+        stop_reason="end_turn", content=[SimpleNamespace(type="text", text=markup)], usage=None
+    )
     assert AnthropicClient("m")._postprocess(resp) is resp  # passthrough, markup untouched
 
 
@@ -123,11 +124,11 @@ def test_minimax_recovers_markup_tool_calls():
     from agent_sdk.clients import MiniMaxClient
 
     markup = (
-        'Sure, writing the doc.\n'
+        "Sure, writing the doc.\n"
         '<minimax:tool_call>\n<invoke name="write_file">\n'
         '<parameter name="path">ARCHITECTURE.md</parameter>\n'
         '<parameter name="content"># Title\n\nBody line.</parameter>\n'
-        '</invoke>\n</minimax:tool_call>'
+        "</invoke>\n</minimax:tool_call>"
     )
     resp = SimpleNamespace(
         stop_reason="end_turn",
@@ -153,8 +154,12 @@ def test_minimax_recovered_ids_are_unique_across_hops():
     def _markup(name):
         return SimpleNamespace(
             stop_reason="end_turn",
-            content=[SimpleNamespace(type="text",
-                                     text=f'<invoke name="{name}"><parameter name="x">1</parameter></invoke>')],
+            content=[
+                SimpleNamespace(
+                    type="text",
+                    text=f'<invoke name="{name}"><parameter name="x">1</parameter></invoke>',
+                )
+            ],
             usage=SimpleNamespace(input_tokens=1, output_tokens=1),
         )
 
@@ -189,10 +194,13 @@ def test_minimax_recovers_truncated_markup():
     from agent_sdk.clients import MiniMaxClient
 
     # max_tokens cut the call off mid-content → no closing tags
-    markup = ('writing… <minimax:tool_call>\n<invoke name="bash">\n'
-              '<parameter name="command">cat > F.md << EOF\n# Title\nlots of content that got cut')
-    resp = SimpleNamespace(stop_reason="max_tokens",
-                           content=[SimpleNamespace(type="text", text=markup)], usage=None)
+    markup = (
+        'writing… <minimax:tool_call>\n<invoke name="bash">\n'
+        '<parameter name="command">cat > F.md << EOF\n# Title\nlots of content that got cut'
+    )
+    resp = SimpleNamespace(
+        stop_reason="max_tokens", content=[SimpleNamespace(type="text", text=markup)], usage=None
+    )
     out = MiniMaxClient()._postprocess(resp)
     assert out.stop_reason == "tool_use"
     assert out.tool_uses[0].name == "bash"

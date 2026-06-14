@@ -78,7 +78,9 @@ agent = PreactAgent(
 (`<instructions>`, `<conversation>`, `<memory>`, `<tools>`, `<skills>`, `<notes>`, `<env>`, …) —
 Claude (and Claude Code) parse XML-delimited context far more reliably than flat markdown, so this
 lifts comprehension and accuracy at a negligible token cost. Provenance is preserved (the viewer
-still colours by source). Pass `prompt_format="markdown"` for the older flat layout.
+still colours by source). Pass `prompt_format="markdown"` for the older flat layout. See
+[concepts/14-prompt-engineering.md](./concepts/14-prompt-engineering.md) for how to write the text
+*inside* each tag.
 
 ### Methods
 
@@ -239,18 +241,14 @@ stages = [
 ]
 ```
 
-`loop` ∈ `none` (pure prompt) · `single` (one LLM call) · `agentic` (a ReAct `tool_loop`) ·
-`map` (fan-out over a scratchpad key). Per-stage overrides: `model`, `temperature`, `max_tokens`,
-`hops`, `system_prompt`. Because the Stage's `signal` is part of the `Activable` contract, a flow
-can list a stage that only fires under its own condition — same gating rule as lobes and skills.
+`loop` ∈ `none` (pure prompt) · `single` (one LLM call) · `agentic` (a ReAct `tool_loop`). Per-stage
+overrides: `model`, `temperature`, `max_tokens`, `hops`, `system_prompt`. Because the Stage's
+`signal` is part of the `Activable` contract, a flow can list a stage that only fires under its own
+condition — same gating rule as lobes and skills.
 
-A `loop="map"` stage fans out one scoped sub-execution per work-item in `scratchpad[fanout_key]`.
-Three fan-out knobs (all default to today's behavior): `fanout_parallel` (run workers concurrently
-via `asyncio.gather`, semaphore-bounded; default sequential with state-carry), `fanout_max` (the
-concurrency / item cap, ≤ 40), and `fanout_isolated` (each worker gets a fresh evidence pool — no
-cross-worker leakage; default shares the turn pool). Either shape is bounded-failure: a worker that
-raises or exceeds a per-item `timeout` is recorded `status="failed"`, never dropped. See
-**Subagents** below and `docs/concepts/12-subagent-fanout.md`.
+Multi-step work is done by an `agentic` stage looping with a plan tool (`TodoWrite`), not an engine
+fan-out — there is no `map` loop. See **Planning** below and
+[`concepts/08-reasoning-as-a-tool.md`](concepts/08-reasoning-as-a-tool.md).
 
 #### How an `agentic` loop ends
 
@@ -335,29 +333,28 @@ The loader records `SkillPack.source_dir` (so the compiled-surface cache can per
 parses nested `checklist` / `context_vars` from YAML, and raises `SkillLoadError` on a malformed
 bundle (no frontmatter, missing `name`/`description`, no `SKILL.md`).
 
-### Subagents (general-purpose fan-out — the `Subagent()` tool)
+### Planning (multi-step work — the `TodoWrite` tool)
 
-A **subagent** is a fresh, general-purpose worker the model spawns on demand to handle one
-independent sub-problem in its own isolated context, returning a concise result (no predefined
-registry — what it does is the `task` it's handed). `SubagentsPlugin` exposes the **`Subagent(task=…)`**
-tool plus a two-stage **fanout → fanin** flow:
+Multi-step work is handled by **plan-driven fan-out**: the agent writes a todo list with
+**`TodoWrite`** (Claude Code's shape — `content` / `status` / `activeForm`, extended with per-todo
+`prompt` / `tools` / `deps`), a supervisor picks the execution structure, and the engine runs **one
+subagent per todo** before a fan-in aggregates. `PlanningPlugin` exposes the tool + the planning lobes
+(reason → write → enact) and registers a `plan` flow that complex, multi-part queries route to:
 
 ```python
 from agent_sdk import PreactAgent
-from agent_sdk.plugins.subagents import SubagentsPlugin
+from agent_sdk.plugins.planning import PlanningPlugin
 
 agent = PreactAgent(client=…, instructions="…",
-                    plugins=[SubagentsPlugin()])              # pure-reasoning workers
-# plugins=[SubagentsPlugin(worker_tools=["search"])]         # give workers tools
+                    plugins=[PlanningPlugin()])                 # adds TodoWrite + lobes + plan flow
+# plugins=[PlanningPlugin(worker_tools=["search"])]            # tools each per-todo subagent may use
 ```
 
-A deterministic complexity signal routes a multi-faceted query to the `subagents` flow; in `fanout`
-the model calls `Subagent(task=…)` once per part (the engine runs the spawned workers **parallel +
-context-isolated**); in `fanin` the model calls `subagent_results()` to review every worker's
-`{label, status, result}` — all finished — and composes one answer. `cite`/`filter` ground the
-**aggregate**, never a worker. Routing is deterministic (no LLM judges the pipeline); a simple query
-stays single-shot. Full model + the `fanout_spawn`/`fanout_isolated` mechanics:
-[`sdk/subagents.md`](sdk/subagents.md) · [`concepts/12-subagent-fanout.md`](concepts/12-subagent-fanout.md).
+A deterministic complexity signal routes a multi-faceted query to the `plan` flow (`plan` →
+`supervise` → `execute` (map, one subagent per todo) → `fanin`, grounded by the pinned
+`cite`/`filter`); a simple query stays single-shot. Full model:
+[`sdk/planning.md`](sdk/planning.md) · [`concepts/08-reasoning-as-a-tool.md`](concepts/08-reasoning-as-a-tool.md)
+· [`concepts/12-subagent-fanout.md`](concepts/12-subagent-fanout.md).
 
 ### Tools — the `@tool` decorator
 
@@ -430,9 +427,11 @@ from agent_sdk.plugins import (
 SafetyPlugin()                                 # cite/filter grounding (default-on; disable for non-RAG)
 FormatPlugin()                                 # channel/language/tone styling (default-on)
 TaskPlugin()                                   # todo-driven task execution (plan→execute→deliver)
-MetacognitionPlugin()                          # think-about-thinking: meta_context lobe + meta_reflect
-                                               #   stage + meta_control tool (pick skills / bias flow /
-                                               #   fan out / trim-skip); opt-in, traced, cite/filter pinned
+MetacognitionPlugin()                          # think-about-thinking: meta_context + nav_brief lobes +
+                                               #   meta_reflect stage + meta_control tool (pick skills /
+                                               #   bias flow / trim-skip / navigate phases); the Navigator
+                                               #   (advance/redo/goto + brief next) needs apply_actions
+                                               #   ⊇ {redo_phase, goto_phase}; opt-in, cite/filter pinned
 PluginWorkspace(driver="virtual")              # a virtual FS + fs.* tools (read/write/list/edit)
 PluginWorkspace(driver="local", root="/data/agent-fs")    # persisted to disk
 PluginWorkspace(driver="s3", bucket="…")
@@ -635,7 +634,9 @@ from agent_sdk import Metacognition
 
 agent = PreactAgent(..., metacognition=Metacognition(
     mode="apply",                        # "observe" (monitor+trace only) | "apply"
-    apply_actions={"adjust_lobe_slice"}, # allow-list (also: skip_step, retry_step)
+    apply_actions={"adjust_lobe_slice"}, # allow-list (also: skip_step, retry_step,
+                                         #   redo_phase, goto_phase — the Navigator's
+                                         #   phase moves, off by default for parity)
 ))
 
 class DomainMeta(Metacognition):
@@ -668,6 +669,10 @@ snap.to_json()
 ```python
 t = result.trace
 t.path; t.lobes; t.flow_stages; t.blackboard; t.usage
+# t.blackboard carries the turn scratchpad snapshot (e.g. plan_structure, todos_results).
+# A loop="map" stage records per-worker sub-traces on its flow_stages entry:
+#   t.flow_stages[i]["subagents"] = [{label, status, system_prompt, steps, llm_calls, tokens_used}]
+# (one per fanned-out todo — each with its own isolated prompt + timeline).
 t.timeline()     # ReAct sub-steps (thinking / tool_use / tool_result / answer)
 t.to_json()
 ```

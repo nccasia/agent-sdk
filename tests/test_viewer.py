@@ -55,8 +55,13 @@ async def test_engine_captures_system_prompt_for_prompt_panel():
 
 
 async def test_prompt_provenance_segments_colour_by_lobe():
-    agent = PreactAgent(client=FakeClient(["answer"]), instructions="You are helpful.",
-                        lobes=Lobes.minimal(), stages=Stages.minimal(), flows=Flows.minimal())
+    agent = PreactAgent(
+        client=FakeClient(["answer"]),
+        instructions="You are helpful.",
+        lobes=Lobes.minimal(),
+        stages=Stages.minimal(),
+        flows=Flows.minimal(),
+    )
     result = await agent.query("what?")
     fs = result.trace.flow_stages[0]
     segs = fs["system_segments"]
@@ -68,7 +73,7 @@ async def test_prompt_provenance_segments_colour_by_lobe():
     # every segment maps to actual text and they are ordered/non-overlapping
     last = 0
     for s in segs:
-        assert s["start"] >= last and txt[s["start"]:s["end"]]
+        assert s["start"] >= last and txt[s["start"] : s["end"]]
         last = s["end"]
     # the viewer adapter passes segments through
     vr = to_viewer_record(await probe(agent, "again?"))
@@ -115,7 +120,7 @@ async def test_tools_in_prompt_section():
     sources = [s["source"] for s in fs["system_segments"]]
     assert "tools" in sources  # a colored `tools` provenance section, inline
     tools_seg = next(s for s in fs["system_segments"] if s["source"] == "tools")
-    block = fs["system_prompt"][tools_seg["start"]:tools_seg["end"]]
+    block = fs["system_prompt"][tools_seg["start"] : tools_seg["end"]]
     assert "search(query*, top_k)" in block  # name + params (required = *)
     assert "Search the KB." in block
 
@@ -140,7 +145,8 @@ async def test_tools_in_prompt_off_by_default():
 async def test_to_viewer_record_schema():
     rec = await probe(
         PreactAgent(client=FakeClient(["the answer"]), instructions="bot"),
-        "what is up?", label="t1",
+        "what is up?",
+        label="t1",
     )
     vr = to_viewer_record(rec)
     assert vr["label"] == "t1"

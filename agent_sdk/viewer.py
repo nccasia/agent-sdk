@@ -57,6 +57,7 @@ def _flow_steps(p: ProbeRecord) -> list[dict]:
             "node_count": len(s.get("lobes", [])),
             "system_prompt": s.get("system_prompt", ""),  # composed prompt (Prompt panel)
             "system_segments": s.get("system_segments", []),  # provenance: colour by lobe/section
+            "subagents": s.get("subagents", []),  # per-todo fan-out sub-traces (Subagents panel)
             "metadata": meta,
             "funnel_obs_chars": meta.get("funnel_obs_chars", []),
             "attention": s.get("attention", {"nodes": [], "tiers": []}),
@@ -100,6 +101,7 @@ def to_viewer_record(p: ProbeRecord) -> dict:
         "meta": (p.meta_actions[-1] if p.meta_actions else {}),
         "attention": p.attention or {"nodes": [], "tiers": []},
         "context_funnel": _context_funnel(p),
+        "blackboard": getattr(p, "blackboard", {}) or {},  # turn scratchpad (plan_structure, results)
         "skills": [],
     }
     # Optional task surface for the Tasks panel: a bench/agent may attach

@@ -54,11 +54,29 @@ class SkillSelectLobe(Lobe):
     def activation(self, ctx: dict) -> float:
         return 1.0 if ctx.get("skills_declared") else 0.0
 
-    def prompt_block(self, registry, policy: dict, stage_id: str, *, _ctx=None,
-                     query=None, q_vec=None, embed_one=None, ranking_out=None,
-                     active_slugs=None) -> str:
-        return prompt_block(registry, policy, stage_id, query=query, q_vec=q_vec,
-                            embed_one=embed_one, ranking_out=ranking_out, active_slugs=active_slugs)
+    def prompt_block(
+        self,
+        registry,
+        policy: dict,
+        stage_id: str,
+        *,
+        _ctx=None,
+        query=None,
+        q_vec=None,
+        embed_one=None,
+        ranking_out=None,
+        active_slugs=None,
+    ) -> str:
+        return prompt_block(
+            registry,
+            policy,
+            stage_id,
+            query=query,
+            q_vec=q_vec,
+            embed_one=embed_one,
+            ranking_out=ranking_out,
+            active_slugs=active_slugs,
+        )
 
     def prompt(self, ctx: TurnContext) -> list[PromptContribution]:
         """Own the skill index for the NON-SELECTED states. State-aware: a skill
@@ -72,8 +90,12 @@ class SkillSelectLobe(Lobe):
         in_use = list(ctx.lobe_outputs.get("skills_in_use") or [])
         ranking: list = []
         block = prompt_block(
-            registry, dict(ctx.policy), ctx.stage_id,
-            query=getattr(ctx, "query", None), ranking_out=ranking, skills_in_use=in_use,
+            registry,
+            dict(ctx.policy),
+            ctx.stage_id,
+            query=getattr(ctx, "query", None),
+            ranking_out=ranking,
+            skills_in_use=in_use,
         )
         ctx.lobe_outputs["skill_ranking"] = ranking
         return [PromptContribution(block, stability="stable", source=self.id)] if block else []
@@ -89,9 +111,13 @@ class SkillSelectLobe(Lobe):
         # — they only duplicated it. Keep the read-directive hint (a niche signal
         # a skill can raise to demand activation).
         return [
-            self.state_node("skill.read:hint", when="has_read_directive", order=2,
-                            produce=self._produce_read_hint,
-                            desc="ACTIVATING: a skill declares a read directive — call skill.read"),
+            self.state_node(
+                "skill.read:hint",
+                when="has_read_directive",
+                order=2,
+                produce=self._produce_read_hint,
+                desc="ACTIVATING: a skill declares a read directive — call skill.read",
+            ),
         ]
 
     def _produce_read_hint(self, ctx: TurnContext) -> list[ContextNode]:
@@ -101,10 +127,14 @@ class SkillSelectLobe(Lobe):
             if not target:
                 continue
             sid = getattr(s, "id", None) or getattr(s, "name", None) or "skill"
-            out.append(ContextNode(
-                id=f"skill.read:hint:{sid}", kind="skill_read_hint",
-                text=f"Skill '{sid}' is a strong candidate for '{target}': activate it with ActivateSkill before answering.",
-                menu_hint=f"read directive for {sid}"))
+            out.append(
+                ContextNode(
+                    id=f"skill.read:hint:{sid}",
+                    kind="skill_read_hint",
+                    text=f"Skill '{sid}' is a strong candidate for '{target}': activate it with ActivateSkill before answering.",
+                    menu_hint=f"read directive for {sid}",
+                )
+            )
         return out
 
 

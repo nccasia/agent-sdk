@@ -30,9 +30,15 @@ def prompt_block(
     from agent_sdk.skills import build_skill_prompt_block
 
     return build_skill_prompt_block(
-        registry, policy, stage_id,
-        query=query, q_vec=q_vec, embed_one=embed_one, ranking_out=ranking_out,
-        active_slugs=active_slugs, skills_in_use=skills_in_use,
+        registry,
+        policy,
+        stage_id,
+        query=query,
+        q_vec=q_vec,
+        embed_one=embed_one,
+        ranking_out=ranking_out,
+        active_slugs=active_slugs,
+        skills_in_use=skills_in_use,
     )
 
 
@@ -63,7 +69,7 @@ def skill_flags(ctx: TurnContext) -> dict[str, float]:
         "skills_declared": 1.0 if skills else 0.0,
         "skills_unselected": 1.0 if (skills and not in_use) else 0.0,
         "skills_in_use": 1.0 if in_use else 0.0,
-        "has_read_directive": 1.0 if any(
-            getattr(s, "read_directive", None) or getattr(s, "has_read", False) for s in skills
-        ) else 0.0,
+        "has_read_directive": 1.0
+        if any(getattr(s, "read_directive", None) or getattr(s, "has_read", False) for s in skills)
+        else 0.0,
     }

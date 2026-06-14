@@ -52,7 +52,7 @@ def _patch(st: Stage, cfg: dict) -> Stage:
     """Clone ``st`` (all fields preserved) with the honored overrides applied."""
     new = copy.copy(st)
     budget = cfg.get("budget") if isinstance(cfg.get("budget"), dict) else {}
-    if (system_prompt := cfg.get("system_prompt")):
+    if system_prompt := cfg.get("system_prompt"):
         new.system_prompt = system_prompt
     if (temperature := cfg.get("temperature")) is not None:
         new.temperature = temperature
@@ -76,9 +76,6 @@ def apply_stage_overrides(stages: list[Stage], overrides: Any) -> list[Stage]:
     """
     if not isinstance(overrides, dict) or not overrides:
         return list(stages)
-    out = [
-        _patch(st, cfg) if (cfg := _override_for(st.id, overrides)) else st
-        for st in stages
-    ]
+    out = [_patch(st, cfg) if (cfg := _override_for(st.id, overrides)) else st for st in stages]
     assert_grounded_stages_zero_temp(out)
     return out

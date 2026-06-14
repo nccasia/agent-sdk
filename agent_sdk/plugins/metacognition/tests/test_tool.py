@@ -48,22 +48,21 @@ async def test_bias_flow_records_next_turn_bias():
     assert "NEXT turn" in out
 
 
-async def test_fan_out_writes_worklist_to_scratchpad():
-    turn = _turn()
-    items = [{"label": "a", "input": "do a", "lobes": ["meta_context"]}, {"input": "do b"}]
-    out = await _call(turn, {"action": "fan_out", "items": items})
-    assert turn.scratchpad.get("meta_fanout") == items
-    assert "2 sub-task" in out
-
-
 async def test_regulate_skip_records_request():
     turn = _turn()
-    out = await _call(turn, {"action": "regulate", "request": "skip", "step": "meta_fanout"})
+    out = await _call(turn, {"action": "regulate", "request": "skip", "step": "research"})
     assert turn.scratchpad.get("meta_regulate_request") == {
         "request": "skip",
-        "step": "meta_fanout",
+        "step": "research",
     }
     assert "recorded" in out
+
+
+async def test_fan_out_is_no_longer_a_meta_action():
+    # Delegation/fan-out moved to the dedicated subagents module — meta_control rejects it.
+    turn = _turn()
+    out = await _call(turn, {"action": "fan_out", "items": [{"input": "x"}]})
+    assert "unknown action" in out
 
 
 async def test_regulate_never_skips_a_pinned_step():

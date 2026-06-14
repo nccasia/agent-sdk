@@ -23,9 +23,16 @@ __all__ = ["make_hedge_retry", "DEFAULT_HEDGE_MARKERS", "DEFAULT_HEDGE_DIRECTIVE
 
 # Hedge openings that read as a refusal but precede real content (English).
 DEFAULT_HEDGE_MARKERS: tuple[str, ...] = (
-    "sorry", "i couldn't find", "i could not find", "i couldn't locate",
-    "i don't have", "i do not have", "unfortunately", "i was unable to find",
-    "no specific", "only general",
+    "sorry",
+    "i couldn't find",
+    "i could not find",
+    "i couldn't locate",
+    "i don't have",
+    "i do not have",
+    "unfortunately",
+    "i was unable to find",
+    "no specific",
+    "only general",
 )
 
 DEFAULT_HEDGE_DIRECTIVE = (

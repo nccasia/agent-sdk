@@ -39,11 +39,13 @@ _APPLY = {"on", "1", "true", "enabled", "enable", "apply"}
 # ``meta_review`` has no apply seam — observe-only by construction and
 # cannot be enabled via policy.
 _APPLY_CAPABLE_ACTIONS: frozenset[MetaAction] = frozenset(
-    {"adjust_lobe_slice", "skip_step", "retry_step"}
+    {"adjust_lobe_slice", "skip_step", "retry_step", "redo_phase", "goto_phase"}
 )
-# Production default: trim-only. Widening to ``skip_step``/``retry_step`` is
-# a per-policy opt-in via ``metacognition_apply_actions`` — a deliberate
-# rollout decision.
+# Production default: trim-only. Widening to ``skip_step``/``retry_step`` or the
+# Navigator's ``redo_phase``/``goto_phase`` is a per-policy opt-in via
+# ``metacognition_apply_actions`` — a deliberate rollout decision. Keeping the
+# Navigator out of the default set is what preserves default-network parity (a
+# no-plugin agent's phase cursor never redoes/jumps).
 _DEFAULT_APPLY_ACTIONS: frozenset[MetaAction] = frozenset({"adjust_lobe_slice"})
 
 

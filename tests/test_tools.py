@@ -120,7 +120,10 @@ async def test_missing_required_arg_returns_clean_error():
     assert "positional argument" not in out
     assert "<locals>" not in out
     # a well-formed call still runs
-    assert await rt.call_tool("Write", {"file_path": "A.md", "content": "x"}, [], set()) == "wrote A.md"
+    assert (
+        await rt.call_tool("Write", {"file_path": "A.md", "content": "x"}, [], set())
+        == "wrote A.md"
+    )
 
 
 def test_missing_required_lists_all_absent_args():

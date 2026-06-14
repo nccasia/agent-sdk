@@ -75,8 +75,9 @@ judge the pipeline (the [metacognition](./11-metacognition.md) reconciliation, g
 | `ActivateSkill(slug)` | capability — loads a procedure/SOP | `lobe_outputs["skills_in_use"]` | `skill_active` lobe | live (`skills/runtime.py`) |
 | `skill.read` / `skill.search` | attention — pulls more of a procedure into view (progressive disclosure) | the read-back surface | the tool result itself | live |
 | `memory` (scope=turn) | working set — offload / recall what's held in mind | the scratchpad / flash store | downstream steps recall it | live ([universal-memory](./06-universal-memory.md)) |
-| metacognition control tool | process — re-pick skills / flow / subagents, trim / retry / skip | a meta-decision in turn state | the corresponding deterministic enactor | to build ([metacognition](./11-metacognition.md)) |
-| subagent fan-out | delegation — spawn scoped sub-thinkers over a work-list | `scratchpad[fanout_key]` | `_map_stage` | live ([subagent-fanout](./12-subagent-fanout.md)) |
+| metacognition control tool | process — re-pick skills / flow / subagents, trim / skip, **navigate phases** (advance / redo / goto + brief the next) | a meta-decision in turn state (`meta_*` / `nav_request` / `phase_brief`) | the corresponding deterministic enactor (incl. the engine's movable phase cursor) | live ([metacognition](./11-metacognition.md)) |
+| `TodoWrite(todos=[…])` | plan — decompose the task into designed steps (each with its own prompt/tools/deps) | `scratchpad["todos"]` | `todo_list` lobe (render) + `plan_supervise` lobe (pick structure) | live (`plugins/planning/`) |
+| subagent fan-out | delegation — run one scoped sub-thinker per planned step | `scratchpad[fanout_key]` (the plan *is* the spawn list) | `_map_stage` | live ([subagent-fanout](./12-subagent-fanout.md)) |
 
 Every row is the same shape: a tool call that reshapes some axis of the agent's own cognition, written
 as state, enacted deterministically. **Skills** are the capability family; **metacognition** is the

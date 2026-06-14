@@ -66,5 +66,6 @@ class SurfaceCache:
         if p is None:
             return
         with contextlib.suppress(Exception):
-            p.write_text(json.dumps(compiled.to_json(), ensure_ascii=False, indent=2),
-                         encoding="utf-8")
+            p.write_text(
+                json.dumps(compiled.to_json(), ensure_ascii=False, indent=2), encoding="utf-8"
+            )

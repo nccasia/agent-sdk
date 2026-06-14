@@ -85,11 +85,13 @@ class SessionState:
         if len(h) > last_m:
             older = h[:-last_m]
             tail = h[-last_m:]
-            first = older[:max(0, first_n)]
+            first = older[: max(0, first_n)]
             if first:
                 blocks.append(
-                    "\n".join(f"{'U' if t.role == 'user' else 'A'}: "
-                              f"{_clip(t.content, max_turn_chars)}" for t in first)
+                    "\n".join(
+                        f"{'U' if t.role == 'user' else 'A'}: {_clip(t.content, max_turn_chars)}"
+                        for t in first
+                    )
                 )
             elided = len(older) - len(first)
             if elided > 0:
@@ -98,9 +100,7 @@ class SessionState:
             tail = h
         if blocks:
             out.append({"role": "user", "content": "[Conversation so far]\n" + "\n".join(blocks)})
-        out.extend(
-            {"role": t.role, "content": _clip(t.content, max_turn_chars)} for t in tail
-        )
+        out.extend({"role": t.role, "content": _clip(t.content, max_turn_chars)} for t in tail)
         return out
 
     def transcript(self, *, first_n: int = 1, last_m: int = 6, max_turn_chars: int = 2000) -> str:

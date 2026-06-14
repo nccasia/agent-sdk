@@ -152,8 +152,9 @@ class SkillRegistry:
         ]
 
     def active_for_stage(self, policy: dict, stage_id: str) -> list[SkillPack]:
-        return [pack for pack in self.active_for_policy(policy)
-                if stage_matches(stage_id, pack.stages)]
+        return [
+            pack for pack in self.active_for_policy(policy) if stage_matches(stage_id, pack.stages)
+        ]
 
 
 def stage_matches(stage_id: str, stages: tuple[str, ...]) -> bool:

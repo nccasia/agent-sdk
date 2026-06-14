@@ -74,10 +74,18 @@ class MemoryEntry:
 
     def to_json(self) -> dict:
         return {
-            "handle": self.handle, "kind": self.kind, "scope": self.scope,
-            "digest": self.digest, "tokens": self.tokens, "utility": self.utility,
-            "cds": round(self.cds, 4), "tier": self.tier, "pinned": self.pinned,
-            "source": self.source, "meta": self.meta, "offloaded": self.offloaded,
+            "handle": self.handle,
+            "kind": self.kind,
+            "scope": self.scope,
+            "digest": self.digest,
+            "tokens": self.tokens,
+            "utility": self.utility,
+            "cds": round(self.cds, 4),
+            "tier": self.tier,
+            "pinned": self.pinned,
+            "source": self.source,
+            "meta": self.meta,
+            "offloaded": self.offloaded,
         }
 
 
@@ -151,9 +159,18 @@ class MemoryStore:
         dg = digest if digest is not None else self._summarizer(kind, meta, body)
         dg = self._truncate(dg)
         entry = MemoryEntry(
-            handle=handle, kind=kind, scope=scope, digest=dg, body=body,
-            utility=KIND_UTILITY.get(kind, 1.0), tokens=est_tokens(body), pinned=pinned,
-            recency=float(self._seq), source=source, meta=meta, created_seq=self._seq,
+            handle=handle,
+            kind=kind,
+            scope=scope,
+            digest=dg,
+            body=body,
+            utility=KIND_UTILITY.get(kind, 1.0),
+            tokens=est_tokens(body),
+            pinned=pinned,
+            recency=float(self._seq),
+            source=source,
+            meta=meta,
+            created_seq=self._seq,
             offloaded=offloaded,
         )
         self._bucket(scope)[handle] = entry
@@ -292,7 +309,9 @@ class MemoryStore:
         """Drop the turn's working memory (tool results, reasoning temps). Long-term persists."""
         self._flash.clear()
 
-    def promote(self, handle: str, *, scope: str = "conversation", key: str | None = None) -> str | None:
+    def promote(
+        self, handle: str, *, scope: str = "conversation", key: str | None = None
+    ) -> str | None:
         """Write a flash entry back to long-term (a fact that proved durable, a concluded
         decision), consolidating against an existing entry with the same key. Returns the new
         long-term handle, or None if the source is unknown."""
@@ -300,8 +319,14 @@ class MemoryStore:
         if e is None:
             return None
         return self.remember(
-            e.kind, e.body, scope=scope, key=key or e.meta.get("key"),
-            digest=e.digest, meta=e.meta, pinned=e.pinned, source=e.source or handle,
+            e.kind,
+            e.body,
+            scope=scope,
+            key=key or e.meta.get("key"),
+            digest=e.digest,
+            meta=e.meta,
+            pinned=e.pinned,
+            source=e.source or handle,
         )
 
     # ── funnel integration ─────────────────────────────────────────────────────
@@ -316,11 +341,15 @@ class MemoryStore:
 
         def _summarize(name: str, inp: Any, raw: str) -> str:
             handle = self.remember(
-                "tool_result", raw, scope=FLASH_SCOPE,
-                meta={"tool": name, "args": inp}, source=name,
+                "tool_result",
+                raw,
+                scope=FLASH_SCOPE,
+                meta={"tool": name, "args": inp},
+                source=name,
             )
             digest = self.get(handle).digest  # type: ignore[union-attr]
             return f"{SPENT_MARKER} {digest} · read('{handle}') for full"
+
         return _summarize
 
     # ── discoverability: the always-on memory index ────────────────────────────
@@ -342,8 +371,11 @@ class MemoryStore:
         # With a query, keep recall's RELEVANCE order (so the menu surfaces what the turn needs, not
         # just the newest); with no query, newest-first. Re-sorting by recency here was a bug: at
         # scale it buried the relevant old entry under recent noise.
-        entries = self.recall(query=query, k=10_000) if query else sorted(
-            self.entries(), key=lambda e: -e.recency)
+        entries = (
+            self.recall(query=query, k=10_000)
+            if query
+            else sorted(self.entries(), key=lambda e: -e.recency)
+        )
         by_kind: dict[str, list[MemoryEntry]] = {}
         for e in entries:
             if kinds and e.kind not in kinds:
@@ -370,7 +402,8 @@ class MemoryStore:
     # ── introspection ──────────────────────────────────────────────────────────
     def stats(self) -> dict:
         return {
-            "flash": len(self._flash), "long_term": len(self._long),
+            "flash": len(self._flash),
+            "long_term": len(self._long),
             "flash_tokens": sum(e.tokens for e in self._flash.values()),
             "long_term_tokens": sum(e.tokens for e in self._long.values()),
         }
