@@ -1,0 +1,2239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>engine probe · viewer</title>
+<!--
+  Engine inspection viewer — self-contained, no CDN, no build step.
+  Loads a probe/trace JSON and visualizes the engine's internal behavior on the
+  documented OX (flow/time) × OY (context/lobes) plane with metacognition above
+  (packages/agent-core/docs): timeline · flow (OX) · lobes (OY) · context/memory ·
+  metacognition · skills & tasks · prompt · efficiency · optimize · raw.
+
+  Two ways to feed it data:
+    1. Embedded — a <script id="trace-data" type="application/json">…</script> block
+       (injected by benchmarks/_shared/probe.py::render_probe_html / probe_cli.py).
+    2. Drag-drop / file-picker — open this file directly and drop any results/*.json.
+
+  Accepts {records:[…]}, {turns:[…]}, a bare [...] list, or a single turn {trace:…}.
+-->
+<style>
+  :root{
+    --paper:#FAFAF7; --ink:#0E0E0C; --emerald:#1F6B4A; --amber:#B8845B;
+    --line:#dcdcd4; --dim:#8a8a82; --panel:#fff; --bad:#b23b3b; --soft:#f1f1ea;
+  }
+  *{box-sizing:border-box}
+  body{font:13px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+       margin:0;color:var(--ink);background:var(--paper)}
+  /* The single overview line — a full-width second row inside the emerald header. */
+  .voverview{flex-basis:100%;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;
+    margin-top:.15rem}
+  .voverview:empty{display:none}
+  .vbadge{display:inline-block;padding:.1rem .7rem;border-radius:99px;font-weight:700;
+    letter-spacing:.04em;font-size:12px}
+  .vbadge.READY{background:#dff0e6;color:#0d4d31}
+  .vbadge.NOT_READY{background:#fbe0dc;color:#7a1d16}
+  .vbadge.UNMEASURED{background:#eee;color:#444}
+  .vtot{font-size:12px;font-weight:600;opacity:.95}
+  .vchip{font-size:11px;padding:.08rem .5rem;border-radius:99px;
+    background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25)}
+  .vchip.bad{background:rgba(255,210,205,.95);color:#7a1d16;border-color:transparent}
+  .vreason{flex-basis:100%;color:#ffe3df;font-size:11.5px}
+  code,.mono{font-family:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+  header{position:sticky;top:0;z-index:5;background:var(--emerald);color:#fff;
+         padding:.55rem 1rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;
+         box-shadow:0 1px 4px rgba(0,0,0,.15)}
+  .brand{font-weight:700;letter-spacing:.02em}
+  .brand b{font-weight:400;opacity:.8;margin-left:.4rem}
+  .turns{display:flex;gap:.35rem;flex-wrap:wrap;margin-left:auto;align-items:center}
+  /* Many conversations ⇒ a dropdown instead of a wall of chips. */
+  .turns select{font:inherit;font-size:12px;color:#fff;background:rgba(255,255,255,.12);
+       border:1px solid rgba(255,255,255,.45);border-radius:5px;padding:.22rem 1.6rem .22rem .55rem;
+       cursor:pointer;max-width:46ch;text-overflow:ellipsis;
+       appearance:none;-webkit-appearance:none;
+       background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23fff'/%3E%3C/svg%3E");
+       background-repeat:no-repeat;background-position:right .55rem center}
+  .turns select option{color:var(--ink);background:#fff}
+  .turns .tsel-count{font-size:10.5px;color:rgba(255,255,255,.8)}
+  .turns button{font:inherit;font-size:12px;border:1px solid rgba(255,255,255,.45);
+       background:transparent;color:#fff;padding:.2rem .55rem;border-radius:5px;cursor:pointer}
+  .turns button.on{background:#fff;color:var(--emerald);font-weight:600}
+  .turns button .dot{display:inline-block;width:7px;height:7px;border-radius:50%;
+       margin-right:.35rem;vertical-align:middle;background:#9fd}
+  .turns button .dot.err{background:#f99}
+  .turns button .dot.refused{background:var(--amber)}
+  .turns button .tcount{font-size:10px;background:rgba(255,255,255,.22);border-radius:10px;
+       padding:0 .4rem;margin-left:.35rem;vertical-align:middle}
+  .turns button.on .tcount{background:rgba(31,107,74,.14)}
+  nav.panels{display:flex;gap:.2rem;flex-wrap:wrap;padding:.5rem 1rem 0;
+       border-bottom:1px solid var(--line);background:var(--paper);position:sticky;top:42px;z-index:4}
+  nav.panels button{font:inherit;font-size:12.5px;border:none;background:transparent;
+       color:var(--dim);padding:.4rem .7rem;cursor:pointer;border-bottom:2px solid transparent}
+  nav.panels button.on{color:var(--emerald);border-bottom-color:var(--emerald);font-weight:600}
+  main{padding:1rem 1.1rem 4rem;max-width:100%}
+  h2{color:var(--emerald);margin:.2rem 0 1rem;font-size:18px}
+  h3{color:var(--emerald);margin:1.4rem 0 .5rem;font-size:13.5px;
+     text-transform:uppercase;letter-spacing:.05em}
+  .q{color:#444;margin:.1rem 0 1rem;padding:.4rem .6rem;background:var(--soft);
+     border-left:3px solid var(--emerald);border-radius:0 4px 4px 0}
+  .dim{color:var(--dim)} .right{margin-left:auto}
+  .drop{margin:3rem auto;max-width:560px;border:2px dashed var(--emerald);border-radius:12px;
+        padding:3rem 2rem;text-align:center;color:var(--emerald);background:var(--panel)}
+  .drop.over{background:#eef6f1}
+  .drop label{text-decoration:underline;cursor:pointer}
+  table{border-collapse:collapse;font-size:12px;margin:.3rem 0 .8rem;width:100%}
+  th,td{border:1px solid var(--line);padding:3px 7px;text-align:left;vertical-align:top;
+        overflow-wrap:anywhere}
+  th{background:var(--emerald);color:#fff;font-weight:600;position:sticky;top:0}
+  tr.off td{color:var(--dim);background:var(--soft)}
+  .chip{display:inline-block;background:var(--soft);border:1px solid var(--line);
+        border-radius:4px;padding:0 .4rem;margin:1px;font-size:11px}
+  .chip.tool{background:#eef6f1;border-color:#cfe6db;color:var(--emerald)}
+  .badge{display:inline-block;border-radius:4px;padding:0 .4rem;font-size:11px;font-weight:600}
+  .badge.agentic{background:#fff2e6;color:#a86b2f;border:1px solid #ecd2b3}
+  .badge.single{background:var(--soft);color:var(--dim);border:1px solid var(--line)}
+  .badge.pin{background:#fbeede;color:#8a5a2e;border:1px solid #e6c9a3}
+  .badge.bad{background:#fde9e9;color:var(--bad);border:1px solid #f0c4c4}
+  .badge.ok{background:#e7f3ec;color:var(--emerald);border:1px solid #c4e0d0}
+  pre{background:var(--panel);border:1px solid var(--line);border-radius:6px;
+      padding:.7rem;white-space:pre-wrap;overflow:auto;font-size:11.5px}
+  .err{color:var(--bad);background:#fde9e9;border-color:#f0c4c4}
+  .ans{background:var(--panel)}
+  .cards{display:flex;gap:.8rem;flex-wrap:wrap;margin:.4rem 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+        padding:.6rem .8rem;min-width:150px}
+  .card .k{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+  .card .v{font-size:18px;font-weight:700;color:var(--emerald);font-family:"Geist Mono",monospace}
+  .card .v.small{font-size:14px}
+
+  /* timeline gantt */
+  .gantt{display:flex;width:100%;border:1px solid var(--line);border-radius:6px;
+         overflow:hidden;background:var(--panel);min-height:46px}
+  .gbar{display:flex;flex-direction:column;justify-content:center;padding:.25rem .4rem;
+        border-right:1px solid #fff;color:#fff;min-width:2px;overflow:hidden;white-space:nowrap}
+  .gbar:last-child{border-right:none}
+  .gbar .gstep{font-weight:600;font-size:11px;text-overflow:ellipsis;overflow:hidden}
+  .gbar .gms{font-size:10px;opacity:.85;font-family:"Geist Mono",monospace}
+  .scale{display:flex;justify-content:space-between;font-size:10px;color:var(--dim);margin-top:.2rem}
+  .lobelat{display:grid;grid-template-columns:auto 1fr auto;gap:.2rem .6rem;align-items:center;
+           font-size:11px;margin:.15rem 0}
+  .lobelat .bar{height:9px;background:var(--emerald);border-radius:3px;min-width:2px}
+
+  /* pipeline OX */
+  .pipe{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding-bottom:.4rem}
+  .pstep{flex:0 0 auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;
+         padding:.5rem .65rem;min-width:165px;max-width:230px;position:relative}
+  .pstep.err{border-color:#f0c4c4;background:#fdf3f3}
+  .pstep .pname{font-weight:700;color:var(--emerald)}
+  .pstep .pmeta{font-size:11px;color:var(--dim);margin-top:.2rem}
+  .parrow{display:flex;align-items:center;color:var(--dim);font-size:18px;padding:0 .15rem}
+
+  /* lobe network OY */
+  .lobe-net{position:relative;display:flex;gap:2.2rem;overflow-x:auto;padding:.4rem 0 .6rem}
+  .lcol{display:flex;flex-direction:column;gap:.55rem;min-width:148px;z-index:2}
+  .lcol h4{margin:0 0 .2rem;font-size:11px;color:var(--dim);text-transform:uppercase;
+           letter-spacing:.05em;text-align:center}
+  .lnode{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:.4rem .5rem;
+         cursor:default;transition:transform .1s}
+  .lnode.lit{border-color:var(--emerald);border-width:2px}
+  .lnode.pending{border-style:dashed;border-color:#c4e0d0;opacity:.7}
+  .lnode.current{box-shadow:0 0 0 3px var(--emerald)}
+  .lnode.pin{box-shadow:0 0 0 2px var(--amber) inset}
+  .lnode.pin.current{box-shadow:0 0 0 3px var(--emerald),0 0 0 2px var(--amber) inset}
+  .lnode.off{opacity:.45}
+  /* lobe-network timeline scrubber (OX) */
+  .netscrubwrap{display:flex;align-items:center;gap:.4rem;margin:.3rem 0}
+  .netscrub{display:flex;gap:2px;overflow-x:auto;flex:1;padding:.2rem;background:var(--soft);
+            border:1px solid var(--line);border-radius:6px}
+  .nettick{flex:0 0 auto;width:13px;height:24px;border:1px solid rgba(0,0,0,.12);border-radius:3px;
+           cursor:pointer;padding:0;opacity:.85}
+  .nettick.on{outline:2px solid var(--ink);outline-offset:1px;height:30px;opacity:1}
+  .nettick.muted{opacity:.35}
+  .netstep,.netall{padding:.1rem .45rem}
+  .netpos{font-size:12px;margin:.2rem 0 .5rem;display:flex;align-items:center;gap:.4rem}
+  .lnode .lid{font-weight:600;font-size:12px}
+  .lnode .lact{font-family:"Geist Mono",monospace;font-size:11px;color:var(--emerald);float:right}
+  .lnode .lreason{font-size:10.5px;color:var(--dim);margin-top:.15rem;white-space:nowrap;
+                  overflow:hidden;text-overflow:ellipsis}
+  .lnode details{margin-top:.25rem}
+  .lnode summary{font-size:10.5px;color:var(--emerald);cursor:pointer}
+  .lnode details pre{font-size:10px;padding:.4rem;margin:.3rem 0 0}
+  svg.edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
+
+  details.raw summary{cursor:pointer;color:var(--emerald);font-weight:600;margin:.4rem 0}
+  button.copy{font:inherit;font-size:11px;border:1px solid var(--emerald);color:var(--emerald);
+              background:#fff;border-radius:5px;padding:.15rem .5rem;cursor:pointer}
+  .hint{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--amber);
+        border-radius:0 6px 6px 0;padding:.45rem .65rem;margin:.35rem 0}
+  .hint .ht{font-weight:600}
+  .none{color:var(--dim);font-style:italic}
+
+  /* conversation thread */
+  .thread{display:flex;flex-direction:column;gap:1rem;max-width:820px}
+  .turnblk{border:1px solid var(--line);border-radius:10px;padding:.7rem .85rem;background:var(--panel)}
+  .turnblk.focus{border-color:var(--emerald);box-shadow:0 0 0 1px var(--emerald)}
+  .turnblk .tnum{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem}
+  .msg{display:flex;gap:.6rem;margin:.3rem 0}
+  .msg .who{flex:0 0 42px;font-size:10px;text-transform:uppercase;letter-spacing:.04em;
+            color:#fff;background:var(--dim);border-radius:4px;padding:.05rem .1rem;text-align:center;height:fit-content}
+  .msg.user .who{background:var(--ink)} .msg.bot .who{background:var(--emerald)}
+  .msg.bot.err .who{background:var(--bad)}
+  .msg .txt{white-space:pre-wrap;overflow-wrap:anywhere;flex:1}
+  .msg.bot .txt{color:#1a3a2c}
+  .tmeta{display:flex;gap:.3rem;flex-wrap:wrap;align-items:center;margin-top:.5rem;
+         padding-top:.45rem;border-top:1px dashed var(--line)}
+  .tmeta .jump{margin-left:auto}
+
+  /* context evolution */
+  .ctxscroll{overflow-x:auto;margin:.4rem 0}
+  table.ctxmatrix td{font-family:"Geist Mono",monospace;font-size:11px;max-width:18rem}
+  table.ctxmatrix td:first-child{position:sticky;left:0;background:var(--paper);font-weight:600}
+  .cadd{background:#e7f3ec;color:var(--emerald)} td.cadd{background:#e7f3ec}
+  .cchg{background:#fff2e6;color:#a86b2f} td.cchg{background:#fff2e6}
+  .crem{background:#fde9e9;color:var(--bad);text-decoration:line-through} td.crem{background:#fde9e9}
+  span.cadd,span.cchg,span.crem{text-decoration:none;border:1px solid currentColor;border-radius:4px;padding:0 .35rem}
+  .cmut{margin:.2rem 0} .cdiff{margin:.35rem 0;display:flex;gap:.25rem;flex-wrap:wrap}
+  .turnblk .jump{margin-top:.4rem}
+
+  /* turn master timeline + inspector */
+  .ansbox{margin:.4rem 0 1rem} .ansbox summary{cursor:pointer;color:var(--emerald);font-weight:600}
+  .turnlayout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:1rem;align-items:start}
+  @media(max-width:760px){.turnlayout{grid-template-columns:1fr}}
+  .evlist{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;
+          overflow:hidden;background:var(--panel)}
+  .evrow{display:grid;grid-template-columns:88px 1fr 130px;gap:.5rem;align-items:center;
+         padding:.32rem .55rem;border-bottom:1px solid var(--soft);cursor:pointer;font-size:12px}
+  .evrow:last-child{border-bottom:none}
+  .evrow:hover{background:var(--soft)}
+  .evrow.sel{background:#eef6f1;box-shadow:inset 3px 0 0 var(--emerald)}
+  .evrow.muted{opacity:.45}
+  .evlane{color:#fff;font-size:9.5px;text-transform:uppercase;letter-spacing:.03em;
+          padding:.05rem .3rem;border-radius:4px;text-align:center;white-space:nowrap}
+  .evtitle{overflow:hidden;text-overflow:ellipsis}
+  .evtitle .evsub{display:block;font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .evbarwrap{display:flex;align-items:center;gap:.3rem;justify-content:flex-end}
+  .evbar{height:8px;background:var(--emerald);border-radius:3px;display:inline-block}
+  .evms{font-size:10px;white-space:nowrap}
+  .evdetail{position:sticky;top:84px;border:1px solid var(--line);border-radius:8px;
+            background:var(--panel);padding:.7rem .85rem;max-height:80vh;overflow:auto}
+  .insp-head{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;
+             border-bottom:1px solid var(--line);padding-bottom:.4rem;flex-wrap:wrap}
+  .evdetail h4{margin:.8rem 0 .25rem;font-size:11px;text-transform:uppercase;
+               letter-spacing:.04em;color:var(--emerald)}
+  table.kv{width:auto} table.kv th{background:var(--soft);color:var(--ink);text-align:right;
+           font-weight:600;white-space:nowrap} table.kv td{font-family:"Geist Mono",monospace}
+  /* OY slice at a timeline point + metacognition effect */
+  .oyslice{display:flex;flex-direction:column;gap:.2rem;margin:.2rem 0 .3rem}
+  .oyrow{display:grid;grid-template-columns:74px 1fr;gap:.4rem;align-items:start}
+  .oylab{font-size:9.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;
+         text-align:right;padding-top:.18rem}
+  .oychips{display:flex;gap:.2rem;flex-wrap:wrap}
+  .oychip{font-size:10px;font-family:"Geist Mono",monospace;border-radius:4px;padding:0 .3rem;
+          border:1px solid var(--line)}
+  .oychip.lit{background:var(--emerald);color:#fff;border-color:var(--emerald)}
+  .oychip.pending{background:#e7f3ec;color:var(--emerald);border-color:#c4e0d0}
+  .oychip.dark{background:var(--soft);color:var(--dim)}
+  .metabar{background:#fff7ef;border:1px dashed var(--amber);border-radius:6px;
+           padding:.3rem .5rem;font-size:11.5px;margin:.2rem 0}
+  .metanote{font-size:11.5px;color:#8a5f3c;margin:.2rem 0}
+  .mu{display:inline-block;background:var(--amber);color:#fff;border-radius:50%;width:14px;height:14px;
+      line-height:14px;text-align:center;font-size:10px;font-weight:700;margin:0 .2rem}
+  .lane-intent{background:var(--ink)} .lane-memory{background:#5a7d6b}
+  .lane-skill{background:#7a6aa8} .lane-cognition{background:var(--emerald)}
+  .lane-expression{background:var(--amber)} .lane-reasoning{background:#2f6f8f}
+  .lane-tools{background:#a8632f} .lane-metacog{background:#8a5a8a} .lane-lobe{background:var(--dim)}
+  /* conversation grouping (header) + conversation timeline dividers */
+  .convlab{font-size:10px;opacity:.85;align-self:center;text-transform:uppercase;letter-spacing:.05em}
+  .convsep{width:1px;align-self:stretch;background:rgba(255,255,255,.4);margin:0 .15rem}
+  .tlturn{margin:.9rem 0 .35rem}
+  .tldiv{background:#eef6f1;border:1px solid #cfe6db;border-left:3px solid var(--emerald);
+         border-radius:6px;padding:.45rem .6rem;cursor:pointer;user-select:none}
+  .tldiv:hover{background:#e4f0e9}
+  .tldiv.collapsed{opacity:.92;border-left-style:dashed}
+  .tldnum{font-weight:700;color:var(--emerald);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  .tlchev{display:inline-block;width:.8em;color:var(--emerald)}
+  .tlcount{font-weight:400;text-transform:none;letter-spacing:0;color:var(--dim);margin-left:.4rem}
+  .tldiv.collapsed .tlmsg.dim,.tldiv.collapsed .tlmeta{display:none}
+  .tlmsg{font-size:12px;margin-top:.2rem;word-break:break-word}
+  .tlmeta{font-size:11px;color:var(--dim);margin-top:.25rem;font-family:"Geist Mono",monospace}
+  .tlevents{margin-top:.15rem}
+  .tlfold{font-size:10.5px;padding:.05rem .4rem;margin-left:.3rem}
+  /* Prompt panel */
+  .pturns{display:flex;gap:.4rem;flex-wrap:wrap;margin:0 0 .9rem;padding-bottom:.7rem;
+          border-bottom:1px solid var(--line)}
+  .pturn{font:inherit;font-size:11.5px;border:1px solid var(--line);background:var(--panel);
+         border-radius:7px;padding:.3rem .6rem;cursor:pointer;display:inline-flex;align-items:center;
+         gap:.4rem;max-width:320px;white-space:nowrap}
+  .pturn.on{border-color:var(--emerald);background:#f0f7f3;font-weight:600}
+  .pturn .dim{overflow:hidden;text-overflow:ellipsis;font-weight:400}
+  .cdot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--emerald);flex:none}
+  .cdot.err{background:var(--bad)} .cdot.refused{background:var(--amber)}
+  .pstepsel{display:flex;gap:.4rem;flex-wrap:wrap;margin:.3rem 0 .7rem}
+  .pstepbtn{font:inherit;border:1px solid var(--line);background:var(--panel);border-radius:6px;
+            padding:.25rem .6rem;cursor:pointer}
+  .pstepbtn.on{border-color:var(--emerald);color:var(--emerald);font-weight:600}
+  .legend{display:flex;gap:.35rem;flex-wrap:wrap;margin:.2rem 0 .7rem}
+  .legchip{font:inherit;font-size:11.5px;border:1px solid var(--line);background:var(--panel);
+           border-radius:20px;padding:.15rem .55rem;cursor:pointer;display:inline-flex;align-items:center;gap:.35rem}
+  .legchip.off{opacity:.38} .legchip.clear{border-style:dashed;color:var(--dim)}
+  .legchip .sw,.ldhead .sw{width:11px;height:11px;border-radius:3px;display:inline-block;flex:none}
+  .promptlayout{display:flex;gap:1rem;align-items:flex-start}
+  .promptmain{flex:1;min-width:0}
+  .promptside{width:340px;flex:none;position:sticky;top:70px;max-height:84vh;overflow:auto}
+  .psplit{flex:none;align-self:stretch;width:7px;cursor:col-resize;border-radius:4px;
+          background:var(--line);transition:background .12s}
+  .psplit:hover,.psplit.drag{background:var(--emerald)}
+  body.col-resizing{cursor:col-resize;user-select:none}
+  @media(max-width:900px){ .promptlayout{flex-direction:column} .psplit{display:none}
+                           .promptside{width:100%!important;position:static;max-height:none} }
+  .promptbox{white-space:pre-wrap;word-break:break-word;font-family:"Geist Mono",ui-monospace,monospace;
+             font-size:12px;line-height:1.85;background:var(--panel);border:1px solid var(--line);
+             border-radius:8px;padding:1rem}
+  .promptbox .seg{border-radius:2px;cursor:pointer;transition:filter .1s}
+  .promptbox .seg:hover{filter:brightness(.92)}
+  .promptbox .seg.sel{background:#ffe7c4 !important;box-shadow:0 0 0 1px var(--amber)}
+  .promptbox .seg.dim{opacity:.3}
+  .cachebreak{font-size:10px;color:var(--amber);text-align:center;margin:.3rem 0;letter-spacing:.04em;
+              border-top:1px dashed var(--amber);border-bottom:1px dashed var(--amber);padding:.15rem 0}
+  .hopbtn{font:inherit;font-size:11.5px;border:1px solid var(--line);background:var(--panel);
+          border-radius:6px;padding:.2rem .55rem;cursor:pointer}
+  .hopbtn.on{border-color:var(--emerald);color:var(--emerald);font-weight:600}
+  .toolrow{display:flex;gap:.3rem;flex-wrap:wrap;margin:.3rem 0 .6rem}
+  .toolsoffered{margin:.4rem 0 .7rem;border:1px solid var(--line);border-radius:8px;padding:.4rem .7rem;background:var(--panel)}
+  .toolsoffered summary{cursor:pointer;color:var(--emerald);font-weight:600;font-size:12.5px}
+  .tooldef{margin:.45rem 0;padding-left:.2rem;border-left:2px solid var(--line)}
+  .tooldef code{font-size:12px;background:var(--soft);padding:.05rem .35rem;border-radius:4px}
+  .tooldef.called{border-left-color:var(--emerald)}
+  .tdesc{font-size:11.5px;margin:.15rem 0 0 .4rem}
+  .toolarea{margin:.6rem 0 .1rem;font-size:11.5px;font-weight:600;color:var(--ink);letter-spacing:.01em}
+  .toolarea .acount{color:var(--dim);font-weight:400}
+  .toolarea .apref{font-family:var(--mono,monospace);background:var(--soft);padding:0 .3rem;border-radius:4px;color:var(--emerald)}
+  .areabar{font-size:11.5px;color:var(--dim);margin:.1rem 0 .3rem}
+  .areabar b{color:var(--emerald)}
+  .badge.inprompt{background:#fbeede;color:#8a5a2e;border:1px solid #e6c9a3}
+  .optsec{margin:.7rem 0;border:1px solid var(--line);border-radius:8px;padding:.5rem .8rem;background:var(--panel)}
+  .optsec summary{cursor:pointer;color:var(--emerald);font-weight:600;font-size:13px}
+  .glance{display:flex;gap:.4rem;flex-wrap:wrap;margin:.45rem 0}
+  .gchip{font-size:11.5px;background:var(--soft);border:1px solid var(--line);border-radius:20px;padding:.12rem .55rem}
+  .msgs{display:flex;flex-direction:column;gap:.5rem;margin-top:.3rem}
+  .msg-row{display:flex;gap:.5rem;border:1px solid var(--line);border-radius:8px;padding:.45rem .6rem;background:var(--panel)}
+  .msg-row.role-user{border-left:3px solid #2f6f8f} .msg-row.role-assistant{border-left:3px solid var(--emerald)}
+  .mrole{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);flex:none;width:62px;padding-top:.1rem}
+  .mbody{flex:1;min-width:0}
+  .mtext{white-space:pre-wrap;word-break:break-word;font-size:12.5px}
+  .mtool{margin:.25rem 0;color:#a86b2f} .mtoolr{margin:.25rem 0;color:var(--emerald)}
+  .mtool pre,.mtoolr pre{margin:.15rem 0 0;font-size:11px;max-height:200px;overflow:auto}
+  .mthink{margin:.25rem 0;color:#8a5a8a;font-style:italic}
+  .mthink pre{margin:.15rem 0 0;font-size:11px;max-height:200px;overflow:auto;white-space:pre-wrap}
+  /* timeline ReAct nesting */
+  .evrow.depth1{padding-left:1.7rem;background:linear-gradient(90deg,transparent 0,transparent .9rem,var(--soft) .9rem)}
+  .evrow.depth1 .evtitle{font-size:12px}
+  .evrow.react-result .evtitle,.evrow.react-tooluse .evtitle{font-family:var(--mono,monospace)}
+  .stepchev{cursor:pointer;color:var(--dim);font-weight:700;margin-right:.25rem;user-select:none}
+  .hopchip{font-size:10px;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:0 .35rem;color:var(--dim);margin-left:.3rem}
+  .insp-react pre{white-space:pre-wrap;word-break:break-word;font-size:11.5px;max-height:420px;overflow:auto;background:var(--soft);border-radius:6px;padding:.5rem .6rem}
+  .funnelnote{font-size:11px;color:#8a5a2e;margin:.2rem 0}
+  /* prominent final-answer block in the timeline (the actual agent response) */
+  .evrow.answerblock{display:block;border:1px solid var(--emerald);border-left:4px solid var(--emerald);
+    border-radius:8px;background:#f7fbf9;padding:.5rem .7rem;margin:.35rem 0}
+  .evrow.answerblock.sel{box-shadow:0 0 0 2px var(--emerald) inset}
+  .evrow.answerblock .ablabel{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--emerald);font-weight:700;margin-bottom:.3rem}
+  .evrow.answerblock .atext{white-space:pre-wrap;word-break:break-word;font-size:12.5px;color:var(--ink);max-height:340px;overflow:auto}
+  .callmeta{margin-bottom:.8rem;padding-bottom:.7rem;border-bottom:1px solid var(--line)}
+  .callmeta h4{margin:0 0 .35rem}
+  .ldraw{border:1px solid var(--emerald);border-radius:8px;padding:.7rem .9rem;background:#f7fbf9}
+  .ldraw.dim{border-color:var(--line);background:var(--soft);color:var(--dim)}
+  .ldhead{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin-bottom:.3rem}
+
+  /* top-level page nav (Overview | Inspect) + header status badge */
+  nav.pagenav{display:flex;gap:.3rem;align-items:center;margin-left:.4rem}
+  nav.pagenav button{font:inherit;font-size:13px;font-weight:600;border:1px solid rgba(255,255,255,.45);
+    background:transparent;color:#fff;padding:.28rem .95rem;border-radius:7px;cursor:pointer}
+  nav.pagenav button.on{background:#fff;color:var(--emerald)}
+  .statusbadge{display:inline-flex;align-items:center;gap:.4rem;font-size:12px;font-weight:600}
+  .statusbadge:empty{display:none}
+  .statusbadge .vbadge{margin:0}
+  /* overview page */
+  .ovverdict{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;margin:.1rem 0 1rem}
+  .ovverdict .vbadge{font-size:14px;padding:.25rem 1rem;letter-spacing:.04em}
+  .ovverdict .vbadge.READY{background:#e7f3ec;color:var(--emerald)}
+  .ovverdict .vbadge.NOT_READY{background:#fde9e9;color:var(--bad)}
+  .ovverdict .vbadge.UNMEASURED{background:var(--soft);color:var(--dim)}
+  .ovtot{font-size:13px;font-weight:600;color:var(--ink)}
+  .ovreason{color:var(--bad);font-size:12.5px;margin:.1rem 0 .5rem}
+  .spark{background:#fff;border:1px solid var(--line);border-radius:8px;display:block;margin-top:.3rem}
+  details.rubric{border:1px solid var(--line);border-radius:8px;background:var(--panel);
+    margin:.5rem 0;padding:.1rem .8rem}
+  details.rubric>summary{cursor:pointer;font-weight:600;padding:.5rem 0;list-style:none}
+  details.rubric>summary::-webkit-details-marker{display:none}
+  details.rubric>summary.bad{color:var(--bad)}
+  details.rubric .rmeta{font-weight:400;color:var(--dim);margin-left:.4rem}
+  tr.rowlink{cursor:pointer} tr.rowlink:hover td{background:var(--soft)}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">engine probe<b id="label"></b></div>
+  <nav class="pagenav" id="pagenav" hidden></nav>
+  <div id="statusbadge" class="statusbadge"></div>
+  <div class="turns" id="turns"></div>
+</header>
+<nav class="panels" id="panelnav" hidden></nav>
+<div class="drop" id="drop" hidden>
+  <p><strong>Drop a probe / trace JSON here</strong></p>
+  <p class="dim">or <label>browse<input type="file" id="file" accept=".json,application/json" hidden></label> — accepts any benchmark's <code>results/*.json</code></p>
+</div>
+<main id="panel"></main>
+
+<script id="trace-data" type="application/json">{"label": "corgictionbech · metacognition", "records": [], "verdict": {"status": "READY", "reasons": [], "gates": {"monitor_all_pass": true, "regulate_all_pass": true, "pinned_all_pass": true, "channel_all_pass": true, "plugin_surface_all_pass": true, "plan_compile_all_pass": true}, "metrics": {"pinned.pinned_steps": 2}}, "modes": {"monitor": {"checks": [{"id": "monitor.context_tight", "ok": true, "detail": "observed"}, {"id": "monitor.empty_lobe_slice", "ok": true, "detail": "observed"}, {"id": "monitor.empty_step_context", "ok": true, "detail": "observed"}, {"id": "monitor.inactive_lobe_group", "ok": true, "detail": "observed"}, {"id": "monitor.low_confidence_path", "ok": true, "detail": "observed"}, {"id": "monitor.step_disabled", "ok": true, "detail": "observed"}], "n": 6, "pass": 6, "all_pass": true, "metrics": {}}, "regulate": {"checks": [{"id": "regulate.healthy_continue", "ok": true, "detail": "action=continue (want continue)"}, {"id": "regulate.low_conf_review", "ok": true, "detail": "action=meta_review (want meta_review)"}, {"id": "regulate.tight_adjust", "ok": true, "detail": "action=adjust_lobe_slice (want adjust_lobe_slice)"}, {"id": "regulate.empty_skip", "ok": true, "detail": "action=skip_step (want skip_step)"}, {"id": "regulate.empty_step_retry", "ok": true, "detail": "action=retry_step (want retry_step)"}, {"id": "regulate.precedence_review", "ok": true, "detail": "action=meta_review (want meta_review)"}], "n": 6, "pass": 6, "all_pass": true, "metrics": {}}, "pinned": {"checks": [{"id": "pinned.cite_never_skipped", "ok": true, "detail": "action=meta_review (pinned step must escalate, not skip)"}, {"id": "pinned.filter_never_skipped", "ok": true, "detail": "action=meta_review (pinned step must escalate, not skip)"}], "n": 2, "pass": 2, "all_pass": true, "metrics": {"pinned_steps": 2}}, "channel": {"checks": [{"id": "channel.apply_default_trim", "ok": true, "detail": "apply mode applies the default trim action"}, {"id": "channel.apply_withholds_skip", "ok": true, "detail": "skip_step needs an explicit allowlist (not default)"}, {"id": "channel.observe_never_mutates", "ok": true, "detail": "observe is the floor — monitors but never mutates"}, {"id": "channel.allowlist_widens", "ok": true, "detail": "an explicit allowlist enables skip_step"}], "n": 4, "pass": 4, "all_pass": true, "metrics": {}}, "plugin_surface": {"checks": [{"id": "surface.lobes", "ok": true, "detail": "lobes=['meta_context', 'nav_brief']"}, {"id": "surface.stage", "ok": true, "detail": "stages=['meta_reflect']"}, {"id": "surface.flow", "ok": true, "detail": "flows=['meta']"}, {"id": "surface.tool", "ok": true, "detail": "tools=['meta_control']"}, {"id": "enact.skills_write", "ok": true, "detail": "use_skills writes skills_in_use and strips pinned cite/filter"}, {"id": "enact.flow_write", "ok": true, "detail": "bias_flow records the next-turn flow bias"}, {"id": "enact.navigate_write", "ok": true, "detail": "navigate records the phase-cursor request (redo/goto/done)"}, {"id": "enact.pinned_never_skipped", "ok": true, "detail": "a grounding step (cite/filter) is never a meta skip decision"}, {"id": "enact.navigate_never_targets_pinned", "ok": true, "detail": "navigate cannot target a pinned grounding step"}], "n": 9, "pass": 9, "all_pass": true, "metrics": {}}, "plan_compile": {"checks": [{"id": "plan.single_no_fanout", "ok": true, "detail": "one aspect → ['act']"}, {"id": "plan.expands_act_per_aspect", "ok": true, "detail": "three aspects → ['act', 'act', 'act', 'synthesize', 'cite', 'filter']"}, {"id": "plan.subjects_threaded", "ok": true, "detail": "act subjects = ['cost', 'scale', 'ops']"}, {"id": "plan.synthesize_folds", "ok": true, "detail": "states=['act', 'act', 'act', 'synthesize', 'cite', 'filter']"}, {"id": "plan.pinned_grounding_appended", "ok": true, "detail": "grounded tail = ['cite', 'filter']"}, {"id": "plan.deterministic", "ok": true, "detail": "same plan → same compiled states"}], "n": 6, "pass": 6, "all_pass": true, "metrics": {}}}}</script>
+
+<script>
+"use strict";
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const num = n => (n==null||isNaN(n)) ? '–' : (Math.round(n*100)/100).toLocaleString();
+const ms  = n => (n==null||isNaN(n)) ? '–' : (n>=10?Math.round(n):Math.round(n*10)/10)+'ms';
+const LAYERS = {2:"B2 memory",3:"B3 skill",4:"B4 cognition",5:"B5 expression"};
+// Organized around the engine's documented model (packages/agent-core/docs):
+// the turn is a point on an OX (flow/time) × OY (context/lobes) plane, with
+// metacognition watching above, then the optimization surfaces.
+const PANELS = [
+  ["timeline","Timeline"],
+  ["flow","Flow"],["lobes","Lobes"],["context","Context"],
+  ["metacog","Metacognition"],["skills","Skills"],["tasks","Tasks"],["subagents","Subagents"],
+  ["prompt","Prompt"],["efficiency","Efficiency"],
+  ["hotspots","Optimize"],["raw","Raw JSON"],
+];
+
+let DATA = {label:"", records:[]};
+let page = "overview";                                    // top-level page: "overview" | "inspect"
+let turn = 0, panel = "turn", selEvent = 0, netPos = -1;  // netPos: lobe-network scrubber (-1 = last/full)
+let promptStep = 0, promptSource = null, promptHop = -1;  // Prompt panel: stage + source filter + hop (-1=last)
+let promptSideW = 340;                    // Prompt panel: inspector column width (drag-resizable)
+let tlSel = {turn:0, evt:0};              // Conversation-timeline: selected (turn, event) within the conversation
+let tlCollapsed = new Set();              // Conversation-timeline: collapsed turn indices (fold internal traces)
+let tlStepFold = new Set();               // Conversation-timeline: folded ReAct children, key `${turn}:${stepEventIndex}`
+
+// Group records into conversations by trace.conversation_id. Records with no id
+// are standalone (a new chat / no session = its own conversation). Adjacent or
+// not, same id = one conversation; the timeline + thread panels scope to one.
+function convGroups(){
+  const recs = DATA.records || [], groups = [], byId = {};
+  recs.forEach((r,i)=>{
+    const cid = (r.trace||{}).conversation_id || null;
+    const key = cid || ("solo:"+i);
+    if(byId[key]==null){ byId[key] = groups.length; groups.push({cid, key, idxs:[]}); }
+    groups[byId[key]].idxs.push(i);
+  });
+  return groups;
+}
+function curConv(){ const g = convGroups(); return g.find(gr=>gr.idxs.includes(turn)) || g[0] || {cid:null, idxs:[]}; }
+
+// Turn selector WITHIN the current conversation (turns are the smaller unit we
+// drill into after picking a conversation in the header). Switches the focused
+// `turn`; shared by the Prompt and Lobe-network panels.
+function convTurnStrip(){
+  const conv = curConv(), recs = DATA.records || [];
+  if(conv.idxs.length <= 1) return "";
+  return `<div class="pturns">`+ conv.idxs.map((i,k)=>{
+    const rr = recs[i], st = (rr.status||"").toLowerCase();
+    const dot = st==="error" ? "err" : (rr.refusal_reason ? "refused" : "");
+    return `<button class="pturn${i===turn?' on':''}" data-gturn="${i}" title="${esc(rr.query||'')}">`+
+      `<span class="cdot ${dot}"></span><b>t${k+1}</b>`+
+      (rr.query?` <span class="dim">${esc(rr.query.slice(0,40))}${rr.query.length>40?'…':''}</span>`:"")+
+      `</button>`;
+  }).join("") + `</div>`;
+}
+function wireConvTurnStrip(){
+  document.querySelectorAll(".pturn[data-gturn]").forEach(b=> b.onclick = ()=>{
+    turn = +b.dataset.gturn; selEvent = 0; netPos = -1; promptStep = 0; promptSource = null; promptHop = -1;
+    tlSel.turn = Math.max(0, curConv().idxs.indexOf(turn));
+    renderPanel();   // same conversation → no chrome re-render needed
+  });
+}
+
+function normalize(raw){
+  if(!raw || typeof raw !== "object") return {label:"", records:[], verdict:null, modes:null};
+  let records = raw.records || raw.turns;
+  if(!records && Array.isArray(raw)) records = raw;
+  if(!records && raw.trace) records = [raw];           // a single turn
+  return {label: raw.label || raw.benchmark || "", records: records || [],
+          verdict: raw.verdict || null, modes: raw.modes || null};
+}
+
+function load(raw){
+  DATA = normalize(raw);
+  turn = 0;
+  // Two pages: Overview (verdict + metrics + rubrics + full-run roll-up) is the
+  // home whenever the payload carries a benchmark verdict/modes; otherwise a plain
+  // trace dump opens straight into Inspect. One Timeline panel is the Inspect home.
+  const hasOverview = !!(DATA.verdict || DATA.modes);
+  page = hasOverview ? "overview" : "inspect";
+  panel = "timeline";
+  selEvent = 0;
+  document.getElementById("drop").hidden = true;
+  if(!DATA.records.length && !hasOverview){
+    document.getElementById("panel").innerHTML = '<p class="none">No turns found in this JSON.</p>';
+    return;
+  }
+  renderChrome(); renderPanel();
+}
+
+function checkTotals(){
+  const modes = DATA.modes || {};
+  let pass = 0, n = 0;
+  Object.keys(modes).forEach(g=>{ const p = modes[g]; if(p){ pass += p.pass||0; n += p.n||0; } });
+  return {pass, n};
+}
+function renderStatusBadge(){
+  // A small at-a-glance verdict badge in the header (the full verdict + per-mode
+  // rubrics live on the Overview page). Shown only when the payload has a verdict.
+  const el = document.getElementById("statusbadge");
+  if(!el) return;
+  const v = DATA.verdict;
+  if(!v){ el.innerHTML = ""; return; }
+  const {pass, n} = checkTotals();
+  el.innerHTML = `<span class="vbadge ${esc(v.status||'?')}">${esc(v.status||'?')}</span>`+
+                 (n?`<span class="vtot">${pass}/${n}</span>`:"");
+}
+function renderPageNav(){
+  // The two large top-level pages: Overview (verdict/metrics/rubrics/roll-up) and
+  // Inspect (per-turn detail). Only shown when there is an Overview to switch to.
+  const nav = document.getElementById("pagenav");
+  if(!nav) return;
+  if(!(DATA.verdict || DATA.modes)){ nav.hidden = true; nav.innerHTML = ""; return; }
+  nav.hidden = false;
+  nav.innerHTML = [["overview","Overview"],["inspect","Inspect"]].map(([id,name])=>
+    `<button data-page="${id}" class="${id===page?'on':''}">${esc(name)}</button>`).join("");
+  nav.querySelectorAll("button[data-page]").forEach(b=> b.onclick = ()=>{
+    page = b.dataset.page; renderChrome(); renderPanel();
+  });
+}
+
+function renderChrome(){
+  document.getElementById("label").textContent = DATA.label ? " · "+DATA.label : "";
+  renderPageNav();
+  renderStatusBadge();
+  const tw = document.getElementById("turns");
+  // Overview owns the whole page — no conversation selector / panel tabs there.
+  if(page!=="inspect"){
+    tw.innerHTML = "";
+    const pn = document.getElementById("panelnav"); pn.hidden = true; pn.innerHTML = "";
+    return;
+  }
+  tw.innerHTML = "";
+  // We inspect BY CONVERSATION — one button per conversation (turns are a
+  // smaller component, navigated inside the Timeline). The button label is the
+  // scenario/conversation name (the per-turn "· tN" suffix is stripped); a pill
+  // shows the turn count for multi-turn conversations.
+  const groups = convGroups();
+  const metas = groups.map((g,gi)=>{
+    const recs = g.idxs.map(i=>DATA.records[i]);
+    const anyErr = recs.some(r=>(r.status||"").toLowerCase()==="error");
+    const anyRef = recs.some(r=>r.refusal_reason);
+    const base = (recs[0].label || ("conv "+(gi+1))).replace(/\s*·\s*t\d+\s*$/i, "").trim()
+                 || ("conv "+(gi+1));
+    return { g, gi, dot: anyErr ? "err" : (anyRef ? "refused" : ""), base };
+  });
+  // Shared "focus this conversation" reset.
+  const jump = g=>{ turn=g.idxs[0]; selEvent=0; netPos=-1; promptStep=0; promptSource=null; promptHop=-1;
+                    tlSel={turn:0,evt:0}; tlCollapsed=new Set(); renderChrome(); renderPanel(); };
+  // Conversation selector is always a dropdown (one option per conversation) —
+  // turns are the smaller unit, navigated inside the Timeline. Hidden when there
+  // is only one conversation (nothing to pick).
+  if(metas.length>1){
+    const sel = document.createElement("select");
+    sel.title = "Select conversation";
+    metas.forEach(m=>{
+      const o = document.createElement("option");
+      o.value = m.gi;
+      const mark = m.dot==="err" ? "● " : (m.dot==="refused" ? "◆ " : "");
+      o.textContent = mark + m.base + (m.g.idxs.length>1 ? ` (${m.g.idxs.length} turns)` : "");
+      if(m.g.idxs.includes(turn)) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.onchange = ()=>jump(groups[+sel.value]);
+    tw.appendChild(sel);
+    const cur = metas.find(m=>m.g.idxs.includes(turn)) || metas[0];
+    const cnt = document.createElement("span");
+    cnt.className = "tsel-count";
+    cnt.textContent = `${(cur?cur.gi:0)+1} / ${metas.length}`;
+    tw.appendChild(cnt);
+  }
+  const nav = document.getElementById("panelnav"); nav.hidden=false; nav.innerHTML="";
+  PANELS.forEach(([id,name])=>{
+    const b = document.createElement("button");
+    b.className = id===panel ? "on" : ""; b.textContent = name;
+    b.onclick = ()=>{ panel=id; renderChrome(); renderPanel(); };
+    nav.appendChild(b);
+  });
+}
+
+function renderPanel(){
+  if(page==="overview"){
+    document.getElementById("panel").innerHTML = panelOverview();
+    wireOverview();
+    return;
+  }
+  if(panel==="timeline"){
+    document.getElementById("panel").innerHTML = panelTimeline();
+    wireTimeline();
+    return;
+  }
+  if(panel==="context"){
+    document.getElementById("panel").innerHTML = panelContext();
+    wireJump();
+    return;
+  }
+  const r = DATA.records[turn] || {};
+  const t = r.trace || {};
+  const head = `<h2>${esc(r.label || "turn "+(turn+1))}</h2>`+
+    (r.query ? `<div class="q"><strong>query:</strong> ${esc(r.query)}</div>` : "")+
+    axisChips(t, r);
+  const body = ({ flow:panelFlow, lobes:panelLobes,
+                  metacog:panelMeta, skills:panelSkills, tasks:panelTasks, subagents:panelSubagents,
+                  prompt:panelPrompt,
+                  efficiency:panelEfficiency, hotspots:panelHotspots, raw:panelRaw }[panel])(t, r);
+  document.getElementById("panel").innerHTML = head + body;
+  if(panel==="lobes"){ requestAnimationFrame(drawEdges); wireLobes(t, r); }
+  if(panel==="prompt") wirePrompt(t, r);
+  if(panel==="raw") wireCopy();
+}
+
+/* ── Overview page ─────────────────────────────────────────────────────────────
+   The full-run summary: the verdict, headline metrics, the per-mode rubric (check)
+   tables, and a per-scenario roll-up. Reads DATA.verdict + DATA.modes + DATA.records
+   (the same data the Inspect page drills into). Customized per bench purely by the
+   metrics/modes each bench passes — the layout is identical everywhere. */
+function isCurve(v){ return Array.isArray(v) && v.length>=2 && v.every(p=>Array.isArray(p)&&p.length===2); }
+function sparkline(series, w, h){
+  w=w||220; h=h||44;
+  const lx = series.map(p=>Math.log10(Math.max(+p[0],1))), ys = series.map(p=>+p[1]);
+  const x0=Math.min(...lx), x1=Math.max(...lx), y0=Math.min(...ys), y1=Math.max(...ys);
+  const px=i=>(6+(lx[i]-x0)/((x1-x0)||1)*(w-12)).toFixed(1);
+  const py=i=>(h-6-(ys[i]-y0)/((y1-y0)||1)*(h-12)).toFixed(1);
+  const pts = series.map((_,i)=>`${px(i)},${py(i)}`).join(" ");
+  const dots = series.map((_,i)=>`<circle cx="${px(i)}" cy="${py(i)}" r="2.5" fill="var(--emerald)"/>`).join("");
+  return `<svg class="spark" width="${w}" height="${h}"><polyline points="${pts}" fill="none" `+
+         `stroke="var(--emerald)" stroke-width="1.5"/>${dots}</svg>`;
+}
+function metricCards(metrics){
+  const keys = Object.keys(metrics||{});
+  if(!keys.length) return "";
+  return `<div class="cards">`+ keys.map(k=>{
+    const v = metrics[k];
+    if(isCurve(v)) return `<div class="card" style="min-width:240px"><div class="k">${esc(k)}</div>${sparkline(v)}</div>`;
+    const disp = (typeof v==="number") ? num(v) : esc(v);
+    return `<div class="card"><div class="k">${esc(k)}</div><div class="v small">${disp}</div></div>`;
+  }).join("") + `</div>`;
+}
+function rubricTables(){
+  const modes = DATA.modes || {}, gs = Object.keys(modes);
+  if(!gs.length) return "";
+  let h = `<h3>Rubrics <span class="dim">— per-mode checks</span></h3>`;
+  gs.forEach(g=>{
+    const p = modes[g]; if(!p) return;
+    if(p.skipped){
+      h += `<details class="rubric"><summary>${esc(g)} <span class="rmeta">UNMEASURED — `+
+           `${esc(p.skip_reason||"skipped")}</span></summary></details>`;
+      return;
+    }
+    const ok = p.all_pass;
+    const rows = (p.checks||[]).map(c=>
+      `<tr><td>${c.ok?'✓':'✗'}</td><td class="mono">${esc(c.id)}</td>`+
+      `<td>${esc(String(c.detail||"").slice(0,140))}</td></tr>`).join("");
+    h += `<details class="rubric"${ok?"":" open"}><summary class="${ok?'':'bad'}">${esc(g)} `+
+      `<span class="rmeta">${p.pass}/${p.n}</span></summary>`+
+      (Object.keys(p.metrics||{}).length?metricCards(p.metrics):"")+
+      (rows?`<table><tr><th></th><th>check</th><th>detail</th></tr>${rows}</table>`
+           :`<p class="none">(no checks)</p>`)+
+      `</details>`;
+  });
+  return h;
+}
+function overviewRollup(){
+  const recs = DATA.records || [];
+  if(!recs.length) return "";
+  let h = `<h3>Full run <span class="dim">— ${recs.length} turn(s) · click a row to inspect</span></h3>`;
+  h += `<table><tr><th>#</th><th>scenario</th><th>flow</th><th>status</th><th>tools</th><th>answer</th></tr>`;
+  recs.forEach((r,i)=>{
+    const t = r.trace||{}, fl = (t.flow||{}).name || (t.path||{}).name || "?";
+    const st = r.status||"?", stc = st==="answered" ? "ok" : (st==="error"||r.error ? "bad" : "");
+    const ans = String(r.answer||r.error||"").replace(/\s+/g," ").slice(0,80);
+    h += `<tr class="rowlink" data-turn="${i}"><td class="mono">${i+1}</td>`+
+      `<td>${esc(r.label||r.query||("turn "+(i+1)))}</td>`+
+      `<td><span class="chip">${esc(fl)}</span></td>`+
+      `<td><span class="badge ${stc}">${esc(st)}</span></td>`+
+      `<td class="mono">${(r.tool_calls||[]).length}</td>`+
+      `<td class="dim">${esc(ans)}</td></tr>`;
+  });
+  return h + `</table>`;
+}
+function panelOverview(){
+  const v = DATA.verdict || {}, {pass, n} = checkTotals();
+  if(!v.status && !Object.keys(DATA.modes||{}).length && !(DATA.records||[]).length)
+    return `<h2>Overview</h2><p class="none">No verdict, modes, or turns in this report.</p>`;
+  let h = `<h2>${esc(DATA.label||"benchmark")} <span class="dim">— overview</span></h2>`;
+  h += `<div class="ovverdict"><span class="vbadge ${esc(v.status||'UNMEASURED')}">`+
+       `${esc(v.status||'—')}</span>`+ (n?`<span class="ovtot">${pass}/${n} checks</span>`:"") +`</div>`;
+  (v.reasons||[]).forEach(r=>{ if(r) h += `<div class="ovreason">${esc(r)}</div>`; });
+  h += metricCards(v.metrics||{});
+  h += rubricTables();
+  h += overviewRollup();
+  return h;
+}
+function wireOverview(){
+  document.querySelectorAll("tr.rowlink[data-turn]").forEach(tr=> tr.onclick = ()=>{
+    turn = +tr.dataset.turn; page = "inspect"; panel = "timeline"; selEvent = 0; netPos = -1;
+    const conv = curConv(); tlSel = {turn: Math.max(0, conv.idxs.indexOf(turn)), evt: 0};
+    tlCollapsed = new Set();
+    renderChrome(); renderPanel();
+  });
+}
+
+/* ── Conversation (multi-turn thread) ─────────────────────────────────────── */
+function panelConversation(){
+  const all = DATA.records || [], conv = curConv(), ng = convGroups().length;
+  const sess = conv.cid ? `session ${esc(String(conv.cid).slice(0,8))}` : "standalone (no session id)";
+  let h = `<h2>Conversation <span class="dim">— ${conv.idxs.length} turn(s) · ${sess}`+
+          `${ng>1?` · ${ng} separate conversations in this report (showing the focused one)`:""}</span></h2><div class="thread">`;
+  conv.idxs.forEach(i=>{
+    const r = all[i], t = r.trace || {}, p = t.path || {};
+    const bot = r.error ? ("⚠ "+r.error)
+      : (r.refusal_reason ? ("refused — "+r.refusal_reason) : (r.answer || "(no answer)"));
+    h += `<div class="turnblk${i===turn?" focus":""}">
+      <div class="tnum">#${i+1} · ${esc(r.label||"")}</div>
+      <div class="msg user"><span class="who">user</span><div class="txt">${esc(r.query||"")}</div></div>
+      <div class="msg bot ${r.error?'err':''}"><span class="who">bot</span><div class="txt">${esc(bot)}</div></div>
+      <div class="tmeta">
+        <span class="chip">path: ${esc(p.name||"?")} (${num(p.score)})</span>
+        <span class="chip">flow: ${esc((t.flow||{}).name||"?")}</span>
+        <span class="chip">${(t.flow_steps||[]).length} step(s)</span>
+        <span class="badge ${r.status==='error'?'bad':'ok'}">${esc(r.status||"?")}</span>
+        ${t.total_latency_ms!=null?`<span class="chip mono">${ms(t.total_latency_ms)}</span>`:""}
+        ${(t.degraded||[]).length?`<span class="badge bad">degraded</span>`:""}
+        <button class="copy jump" data-turn="${i}">inspect →</button>
+      </div>
+    </div>`;
+  });
+  return h+`</div>`;
+}
+function wireJump(){
+  document.querySelectorAll(".jump").forEach(b=>{
+    b.onclick = ()=>{
+      turn = +b.dataset.turn; panel = "timeline"; selEvent = 0; netPos = -1;
+      const conv = curConv(); tlSel = {turn: Math.max(0, conv.idxs.indexOf(turn)), evt: 0};
+      tlCollapsed = new Set();
+      renderChrome(); renderPanel();
+    };
+  });
+}
+
+/* ── Context evolution (scratchpad diff over time) ────────────────────────── */
+const vstr = v => (v && typeof v==="object") ? JSON.stringify(v) : String(v==null?"":v);
+function panelContext(){
+  const all = DATA.records || [], idxs = curConv().idxs, ng = convGroups().length;
+  const recs = idxs.map(i => all[i]);
+  const at = Math.max(0, idxs.indexOf(turn));   // active turn, local to this conversation
+  const ctx = recs.map(r => r.context || {});
+  const tr = (all[turn] || {}).trace || {};       // focused turn's trace
+  const sp = tr.scratchpad || {};                 // RAM (turn flash memory)
+  const memos = tr.memos || [];                   // research findings
+  const hasAny = ctx.some(c => (c.memory_items||[]).length || (c.memory_mutations||[]).length
+    || (c.ctxvars||[]).length || c.session) || Object.keys(sp).length || memos.length;
+  if(!hasAny) return `<h2>Context</h2>
+    <p class="none">No context surfaces captured this turn — RAM / durable memory / context vars /
+    session / memos. They are recorded per turn by <code>probe_turn</code>.</p>`;
+
+  // per-turn scoped-memory state keyed by scope:key
+  const states = ctx.map(c => {
+    const m = {};
+    (c.memory_items||[]).forEach(it => { m[`${it.scope||"?"}:${it.key||"?"}`] = it; });
+    return m;
+  });
+  const keys = [...new Set(states.flatMap(s => Object.keys(s)))].sort();
+
+  let h = `<h2>Context <span class="dim">— every context surface this turn: RAM · durable memory · context vars · session · memos${ng>1?" (focused conversation)":""}</span></h2>`;
+
+  // ── RAM: the turn's flash memory (scratchpad) — ephemeral working state ──
+  const spk = Object.keys(sp);
+  if(spk.length){
+    h += `<h3>RAM <span class="dim">— turn flash memory (scratchpad), turn #${turn+1} · ephemeral, this turn only</span></h3>`;
+    h += `<table class="kv"><tr><th>key</th><th>value</th></tr>`+ spk.map(k=>{
+      const v = sp[k], s = (typeof v==="string") ? v : JSON.stringify(v, null, 1);
+      return `<tr><th>${esc(k)}</th><td><pre style="margin:0;white-space:pre-wrap">${esc(s)}</pre></td></tr>`;
+    }).join("") + `</table>`;
+  }
+
+  // ── durable memory: scope:key store, diff turn-over-turn ──
+  h += `<h3>Durable memory <span class="dim">— scope:key store across ${recs.length} turn(s) ·
+    <span class="cadd">added</span> · <span class="cchg">changed</span> · <span class="crem">removed</span></span></h3>`;
+
+  // ── state-over-time matrix ──
+  if(keys.length){
+    h += `<div class="ctxscroll"><table class="ctxmatrix"><tr><th>scope : key</th>`+
+      recs.map((r,i)=>`<th>#${idxs[i]+1}<div class="dim" style="font-weight:400">${esc((r.label||"").slice(0,14))}</div></th>`).join("")+`</tr>`;
+    keys.forEach(k=>{
+      h += `<tr><td class="mono">${esc(k)}</td>`;
+      states.forEach((s,i)=>{
+        const cur = s[k], prev = i>0 ? states[i-1][k] : undefined;
+        let cls="", txt="·", title="";
+        if(cur){ txt = vstr(cur.value); title = cur.description||"";
+          if(!prev) cls="cadd"; else if(vstr(prev.value)!==vstr(cur.value)) cls="cchg"; }
+        else if(prev){ cls="crem"; txt="✕ removed"; }
+        h += `<td class="${cls}" title="${esc(title)}">${esc(txt).slice(0,80)}</td>`;
+      });
+      h += `</tr>`;
+    });
+    h += `</table></div>`;
+  } else {
+    h += `<p class="none">No scoped memory entries were loaded in any turn.</p>`;
+  }
+
+  // ── per-turn change feed (what the agent actively drove) ──
+  h += `<h3>What the agent drove, per turn</h3><div class="thread">`;
+  recs.forEach((r,i)=>{
+    const c = ctx[i], muts = c.memory_mutations||[];
+    const prev = i>0 ? states[i-1] : {}, cur = states[i];
+    const added = Object.keys(cur).filter(k=>!(k in prev));
+    const changed = Object.keys(cur).filter(k=>k in prev && vstr(cur[k].value)!==vstr(prev[k].value));
+    const removed = Object.keys(prev).filter(k=>!(k in cur));
+    const empty = !muts.length && !added.length && !changed.length && !removed.length;
+    h += `<div class="turnblk${idxs[i]===turn?" focus":""}">
+      <div class="tnum">#${idxs[i]+1} · ${esc(r.label||"")}</div>
+      ${muts.length?`<div class="cmut">${muts.map(m=>`<span class="badge ${m.action==='forget'?'bad':'ok'}">${esc(m.action)} ${esc(m.scope||"")}:${esc(m.key||"")}</span>`).join(" ")}</div>`:""}
+      <div class="cdiff">
+        ${added.map(k=>`<span class="chip cadd">+ ${esc(k)}</span>`).join("")}
+        ${changed.map(k=>`<span class="chip cchg">~ ${esc(k)}</span>`).join("")}
+        ${removed.map(k=>`<span class="chip crem">− ${esc(k)}</span>`).join("")}
+        ${empty?'<span class="none">no scratchpad change</span>':""}
+      </div>
+      <button class="copy jump" data-turn="${idxs[i]}">inspect →</button>
+    </div>`;
+  });
+  h += `</div>`;
+
+  // ── system context (ctxvars + session facts) on the active turn ──
+  const c = ctx[at] || {};
+  if((c.ctxvars||[]).length){
+    h += `<h3>System-resolved context vars <span class="dim">— turn #${turn+1}</span></h3>`;
+    h += rows((c.ctxvars||[]).map(v=>({key:v.key, line:v.line})), ["key","line"]);
+  }
+  if(c.session && (c.session.summary || Object.keys(c.session.facts||{}).length)){
+    h += `<h3>Session memory <span class="dim">— rolling summary + facts, turn #${turn+1}</span></h3>`;
+    if(c.session.summary) h += `<pre>${esc(c.session.summary)}</pre>`;
+    const facts = Object.entries(c.session.facts||{});
+    if(facts.length) h += rows(facts.map(([k,v])=>({fact:k, value:vstr(v)})), ["fact","value"]);
+  }
+  // ── memos: research findings (compression invariant — only memos cross stages) ──
+  if(memos.length){
+    h += `<h3>Memos <span class="dim">— research findings, turn #${turn+1} · only memo-shaped objects cross stage boundaries</span></h3>`;
+    memos.forEach(m=>{
+      const claims = m.claims || [];
+      h += `<div class="turnblk"><div class="tnum">${esc(m.aspect_id||"memo")}</div>`;
+      if(claims.length) h += `<ul style="margin:.2rem 0 0;padding-left:1.1rem">`+ claims.map(cl=>
+        `<li>${esc(cl.text||vstr(cl))} `+
+        (cl.supporting_chunk_ids||[]).map(id=>`<span class="chip">${esc(id)}</span>`).join("")+`</li>`
+      ).join("") + `</ul>`;
+      if((m.unresolved||[]).length)
+        h += `<div class="dim" style="margin-top:.2rem">unresolved: ${m.unresolved.map(esc).join("; ")}</div>`;
+      h += `</div>`;
+    });
+  }
+  return h;
+}
+
+/* ── Turn master timeline ─────────────────────────────────────────────────────
+   One ordered stream of the turn's reasoning flow: intent recognition → lobe
+   firings (recall → skill → cognition) → reasoning steps → tool calls →
+   expression lobes → metacognition. Click any event to inspect what happened at
+   that point — signals, edges, context written, tool input, etc. Ordering is the
+   engine's execution order; durations are per-event latency where recorded. */
+// ── ReAct loop model (per stage) ────────────────────────────────────────────
+const SPENT_MARKER = "[spent observation]";
+function _txt(o){ return typeof o==="string" ? o : (o==null?"":JSON.stringify(o)); }
+function oneline(s, n){ n=n||90; s=_txt(s).replace(/\s+/g," ").trim(); return s.length>n?s.slice(0,n)+"…":s; }
+
+// Build a per-hop ReAct model for a stage from `t.llm_calls`. PREFERS the
+// captured assistant `response` (reasoning/thinking/tool_use) + full
+// `tool_results`; FALLS BACK to reconstructing from the last hop's cumulative
+// `messages` (+ record.answer) for OLD captures with neither field.
+function reactHops(t, stage){
+  const calls = callsForStage(t, stage);
+  if(!calls.length) return [];
+  const hasResp = calls.some(c => Array.isArray(c.response) || Array.isArray(c.tool_results));
+  const hops = [];
+  if(hasResp){
+    // collect the funnel-compacted (spent) tool_result content seen in ANY hop's
+    // cumulative messages, keyed by tool_use_id, to flag the full↔spent delta.
+    const compacted = {};
+    calls.forEach(c => (c.messages||[]).forEach(m => {
+      if(Array.isArray(m.content)) m.content.forEach(b => {
+        if(b && b.type==="tool_result" && typeof b.content==="string" && b.content.indexOf(SPENT_MARKER)===0)
+          compacted[b.tool_use_id] = b.content; });
+    }));
+    calls.forEach(c => {
+      const h = {hop:c.hop, stop_reason:c.stop_reason, usage:c.usage||{},
+                 reasoning:[], thinking:[], tool_uses:[], results:[]};
+      (c.response||[]).forEach(b => {
+        if(!b) return;
+        if(b.type==="text" && (b.text||"").trim()) h.reasoning.push(b.text);
+        else if(b.type==="thinking") h.thinking.push(b.thinking||"");
+        else if(b.type==="redacted_thinking") h.thinking.push("[redacted]");
+        else if(b.type==="tool_use") h.tool_uses.push({id:b.id, name:b.name, input:b.input});
+      });
+      (c.tool_results||[]).forEach(tr => h.results.push({
+        tool_use_id:tr.tool_use_id, name:tr.name, output:tr.output,
+        compactedLater: compacted[tr.tool_use_id]!=null, compactedText: compacted[tr.tool_use_id]||null}));
+      hops.push(h);
+    });
+  } else {
+    // OLD capture — reconstruct from the LAST hop's cumulative message history.
+    const msgs = (calls[calls.length-1].messages)||[];
+    let cur = null;
+    msgs.forEach(m => {
+      if(m.role==="assistant" && Array.isArray(m.content)){
+        cur = {hop:hops.length, stop_reason:null, usage:{}, reasoning:[], thinking:[], tool_uses:[], results:[]};
+        m.content.forEach(b => {
+          if(b && b.type==="text" && (b.text||"").trim()) cur.reasoning.push(b.text);
+          else if(b && b.type==="thinking") cur.thinking.push(b.thinking||"");
+          else if(b && b.type==="tool_use") cur.tool_uses.push({id:b.id, name:b.name, input:b.input});
+        });
+        hops.push(cur);
+      } else if(m.role==="user" && Array.isArray(m.content) && cur){
+        m.content.forEach(b => {
+          if(b && b.type==="tool_result"){
+            const txt = _txt(b.content);
+            cur.results.push({tool_use_id:b.tool_use_id, name:null, output:txt,
+              compactedLater: txt.indexOf(SPENT_MARKER)===0, compactedText:null}); }
+        });
+      }
+    });
+  }
+  return hops;
+}
+
+// Per-stage ReAct hops → flat indented child events (reasoning/thinking/tool_use/
+// tool_result/answer) that nest under their flow-step in the timeline.
+function reactEvents(t, stage, r, isLast){
+  const hops = reactHops(t, stage);
+  const out = []; let sawAnswer = false;
+  hops.forEach(h => {
+    const hl = `hop ${h.hop}`;
+    const isAnswer = h.tool_uses.length===0;  // assistant text with NO tool call = the final answer
+    h.thinking.forEach(tx => out.push({kind:"react", lane:"metacog", depth:1,
+      title:`${hl} · ✦ thinking`, sub:oneline(tx), data:{rk:"thinking", text:tx, hop:h.hop}}));
+    h.reasoning.forEach(tx => {
+      if(isAnswer){ sawAnswer = true; out.push({kind:"react", lane:"expression",
+        title:`${hl} · ✓ answer`, sub:oneline(tx),
+        data:{rk:"answer", text:tx, hop:h.hop, stop:h.stop_reason, usage:h.usage}}); }
+      else out.push({kind:"react", lane:"reasoning", depth:1, title:`${hl} · reasoning`,
+        sub:oneline(tx), data:{rk:"reason", text:tx, hop:h.hop}});
+    });
+    h.tool_uses.forEach(tu => out.push({kind:"react", lane:"tools", depth:1,
+      title:`▸ ${tu.name||"tool"}`, sub:oneline(JSON.stringify(tu.input||{})),
+      data:{rk:"tool_use", id:tu.id, name:tu.name, input:tu.input, hop:h.hop, stop:h.stop_reason, usage:h.usage}}));
+    h.results.forEach(rs => {
+      const isErr = typeof rs.output==="string" && rs.output.indexOf("Error")===0;
+      out.push({kind:"react", lane:"tools", depth:1, bad:isErr, title:`◂ ${rs.name||"result"}`,
+        sub:(rs.compactedLater?"⊘ funnel-compacted later · ":"")+oneline(rs.output),
+        data:{rk:"tool_result", ...rs, hop:h.hop}});
+    });
+  });
+  if(isLast && !sawAnswer){  // OLD capture (or loop ended on tool_use): answer lives on the record
+    const ans = r.answer || t.final_answer || t.synthesis;
+    if(ans) out.push({kind:"react", lane:"expression", title:"✓ answer",
+      sub:oneline(ans), data:{rk:"answer", text:ans}});
+  }
+  return out;
+}
+
+function turnEvents(t, r){
+  const ev = [];
+  const p = t.path || {};
+  if(p.name) ev.push({order:0, kind:"path", lane:"intent", title:"intent: "+p.name,
+    sub:`score ${num(p.score)}${p.emergent?" · emergent":""}`, dur:0, data:p});
+  (t.lobes||[]).forEach((l,i)=>{
+    ev.push({order:(l.layer||4)*100+i, kind:"lobe",
+      lane:(LAYERS[l.layer]||"lobe").split(" ").pop(),
+      title:l.id, sub:l.reason||"", dur:l.latency_ms||0,
+      pinned:l.pinned, muted:!l.activated, data:l});
+  });
+  const steps = t.flow_steps || [];
+  const hasCapture = (t.llm_calls||[]).length>0;  // per-hop capture present this turn
+  steps.forEach((s,i)=>{
+    const md = s.metadata || {};
+    const children = hasCapture ? reactEvents(t, s.step, r, i===steps.length-1) : [];
+    ev.push({order:480+i, kind:"step", lane:"reasoning", title:"step: "+s.step,
+      sub:`${s.loop||"single"} · ${num(s.tokens_in)}→${num(s.tokens_out)} tok`,
+      dur:s.latency_ms||0, bad:md.error||md.skipped, data:s, children});
+  });
+  if(!hasCapture){  // no per-stage capture → fall back to the flat tool-call markers
+    (r.tool_calls||[]).forEach((c,i)=>{
+      ev.push({order:485+i*0.1, kind:"tool", lane:"tools",
+        title:c.name||c.path||"tool", sub:c.path||"", dur:0, data:c});
+    });
+  }
+  const meta = t.meta || {};
+  if(Object.keys(meta).length) ev.push({order:700, kind:"meta", lane:"metacog",
+    title:"metacognition: "+(meta.action||"?"),
+    sub:meta.reasoning?String(meta.reasoning).slice(0,70):"", dur:0, data:meta});
+  ev.sort((a,b)=>a.order-b.order);
+  // Splice each step's ReAct children inline, immediately after it — keeps a flat
+  // index space (selection by data-i stays valid) while rendering nested.
+  const out = [];
+  ev.forEach(e => {
+    out.push(e);
+    if(e.kind==="step" && (e.children||[]).length)
+      e.children.forEach((ch,ci)=>{ ch.order = e.order + (ci+1)*0.001; out.push(ch); });
+  });
+  return out;
+}
+
+function kvtable(obj){
+  const e = Object.entries(obj).filter(([k,v])=>v!=null && v!=="");
+  if(!e.length) return "";
+  return `<table class="kv">`+e.map(([k,v])=>`<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join("")+`</table>`;
+}
+
+// OY slice at a point in time: the layered context lobes, lit if they have
+// fired by this point (order ≤ uptoOrder), dim if pending/inactive. The vertical
+// OY slice at the selected OX (timeline) position — the engine's core idea.
+function oySlice(events, uptoOrder){
+  const lobeEvents = events.filter(e=>e.kind==="lobe");
+  if(!lobeEvents.length) return "";
+  const byLayer = {};
+  lobeEvents.forEach(e=>{ (byLayer[e.data.layer] = byLayer[e.data.layer]||[]).push(e); });
+  let h = `<h4>OY · context lobes here</h4><div class="oyslice">`;
+  Object.keys(byLayer).map(Number).sort((a,b)=>a-b).forEach(layer=>{
+    h += `<div class="oyrow"><span class="oylab">${esc((LAYERS[layer]||("L"+layer)).split(" ").pop())}</span><span class="oychips">`;
+    byLayer[layer].forEach(e=>{
+      const past = e.order <= uptoOrder;
+      const cls = (past && e.data.activated) ? "lit" : (e.data.activated ? "pending" : "dark");
+      h += `<span class="oychip ${cls}" title="${esc(e.data.reason||"")}">${esc(e.data.id)}</span>`;
+    });
+    h += `</span></div>`;
+  });
+  return h+`</div>`;
+}
+
+// Metacognition (the always-on monitor→regulate layer) effect AT this point:
+// how the turn's meta decision / regulation queue touches the selected event.
+function metaEffect(t, ev){
+  const meta = t.meta || {}, q = t.meta_queue || [];
+  if(!Object.keys(meta).length) return "";
+  const targets = new Set(meta.target_lobes || []);
+  const qmap = {}; q.forEach(x => { qmap[x.target] = x; });
+  let note = "";
+  if(ev.kind==="lobe"){
+    const id = ev.data.id;
+    if(targets.has(id))
+      note = `in the regulation target slice — action <b>${esc(meta.action)}</b>, applied ${esc(String(meta.applied))}`;
+    else if(qmap[id])
+      note = `queued for review — ${esc(qmap[id].reason||"")}${qmap[id].priority!=null?` · priority ${num(qmap[id].priority)}`:""}`;
+  } else if(ev.kind==="step" && meta.target_step && ev.data.step===meta.target_step){
+    note = `acted on this step — <b>${esc(meta.action)}</b> ${meta.applied?"(applied)":"(observe)"} — ${esc(meta.reason||"")}`;
+  }
+  const bar = `<div class="metabar"><span class="mu">μ</span> <b>${esc(meta.action||"?")}</b>`+
+    `${meta.mode?` · ${esc(meta.mode)}`:""}${meta.confidence!=null?` · conf ${num(meta.confidence)}`:""}`+
+    `${meta.target_step?` · targets step <code>${esc(meta.target_step)}</code>`:""}`+
+    `${q.length?` · queue ${q.length}`:""}</div>`;
+  return `<h4>metacognition here</h4>${note?`<div class="metanote">${note}</div>`:""}${bar}`;
+}
+
+function renderInspector(ev, t, r, events){
+  if(!ev) return '<p class="none">Select an event.</p>';
+  const d = ev.data || {};
+  let h = `<div class="insp-head"><span class="evlane lane-${esc(ev.lane)}">${esc(ev.lane)}</span>
+    <strong>${esc(ev.title)}</strong>${ev.dur?` <span class="mono dim">${ms(ev.dur)}</span>`:""}</div>`;
+  if(ev.kind==="lobe"){
+    h += kvtable({activation:num(d.activation), activated:d.activated, pinned:d.pinned,
+      layer:d.layer, behavior:d.behavior, reason:d.reason,
+      tokens:`${num(d.tokens_in)}→${num(d.tokens_after)}`, trimmed:d.trimmed?num(d.trimmed):""});
+    if((d.wrote||[]).length) h += `<h4>wrote to context</h4><div>${d.wrote.map(x=>`<span class="chip">${esc(x)}</span>`).join("")}</div>`;
+    if(d.signals && Object.keys(d.signals).length) h += `<h4>signals</h4><pre>${esc(JSON.stringify(d.signals,null,2))}</pre>`;
+    if(d.in_edges && Object.keys(d.in_edges).length) h += `<h4>in_edges</h4><pre>${esc(JSON.stringify(d.in_edges))}</pre>`;
+    if(d.state_node_summary) h += `<h4>state nodes</h4><pre>${esc(JSON.stringify(d.state_node_summary))}</pre>`;
+  } else if(ev.kind==="step"){
+    h += kvtable({flow:d.flow, loop:d.loop, node_count:num(d.node_count),
+      tokens:`${num(d.tokens_in)}→${num(d.tokens_out)}`, latency:ms(d.latency_ms)});
+    if((d.tools||[]).length) h += `<h4>tools offered</h4><div>${d.tools.map(x=>`<span class="chip tool">${esc(x)}</span>`).join("")}</div>`;
+    if((d.lobe_ids||[]).length) h += `<h4>context lobes</h4><div>${d.lobe_ids.map(x=>`<span class="chip">${esc(x)}</span>`).join("")}</div>`;
+    const fan = (d.metadata||{}).fanout;
+    if(Array.isArray(fan) && fan.length){
+      h += `<h4>fan-out <span class="dim">— ${fan.length} parallel sub-agent(s), one per work-list item</span></h4>`;
+      h += rows(fan.map(f=>({id:f.id, question:f.question, hops:num(f.hops),
+        tokens:`${num(f.tokens_in)}→${num(f.tokens_out)}`, chars:num(f.text_len), error:f.error||""})),
+        ["id","question","hops","tokens","chars","error"]);
+    } else if((d.metadata||{}).fanout_degraded){
+      h += `<p class="dim">fan-out degraded → single run (empty work-list).</p>`;
+    }
+    if(d.metadata && Object.keys(d.metadata).length) h += `<h4>metadata</h4><pre>${esc(JSON.stringify(d.metadata,null,2))}</pre>`;
+  } else if(ev.kind==="tool"){
+    h += kvtable({name:d.name, path:d.path});
+    h += `<h4>input</h4><pre>${esc(JSON.stringify(d.input,null,2))}</pre>`;
+    if(d.output!==undefined) h += `<h4>output</h4><pre>${esc(JSON.stringify(d.output,null,2))}</pre>`;
+  } else if(ev.kind==="react"){
+    const u = d.usage||{}, chips = [];
+    if(d.hop!=null) chips.push(`hop ${d.hop}`);
+    if(d.stop) chips.push(`stop ${esc(d.stop)}`);
+    if(u.input_tokens!=null||u.output_tokens!=null) chips.push(`${num(u.input_tokens)}→${num(u.output_tokens)} tok`);
+    if(chips.length) h += `<div class="glance">${chips.map(x=>`<span class="gchip">${x}</span>`).join("")}</div>`;
+    h += `<div class="insp-react">`;
+    if(d.rk==="thinking") h += `<h4>thinking</h4><pre>${esc(d.text||"")}</pre>`;
+    else if(d.rk==="reason") h += `<h4>reasoning <span class="dim">— assistant text emitted alongside the tool call</span></h4><pre>${esc(d.text||"")}</pre>`;
+    else if(d.rk==="answer") h += `<h4>final answer</h4><pre>${esc(d.text||"")}</pre>`;
+    else if(d.rk==="tool_use"){
+      h += kvtable({name:d.name, id:d.id});
+      h += `<h4>input</h4><pre>${esc(JSON.stringify(d.input||{},null,2))}</pre>`;
+    } else if(d.rk==="tool_result"){
+      h += kvtable({name:d.name, tool_use_id:d.tool_use_id});
+      h += `<h4>full output <span class="dim">— the fresh observation the model saw</span></h4><pre>${esc(_txt(d.output))}</pre>`;
+      if(d.compactedLater){
+        h += `<div class="funnelnote">⊘ the funnel retier later compacted this in the cumulative context${d.compactedText?":":" (spent observation)."}</div>`;
+        if(d.compactedText) h += `<pre>${esc(d.compactedText)}</pre>`;
+      }
+    }
+    h += `</div>`;
+  } else if(ev.kind==="path"){
+    h += kvtable({name:d.name, score:num(d.score), emergent:d.emergent,
+      runner_up:d.runner_up?`${d.runner_up.name} (${num(d.runner_up.score)})`:""});
+  } else if(ev.kind==="meta"){
+    h += `<pre>${esc(JSON.stringify(d,null,2))}</pre>`;
+    if((t.meta_queue||[]).length) h += rows(t.meta_queue, ["id","kind","target","severity"], "Meta queue");
+  }
+  // OY context-lobe slice at this point, then metacognition's effect here.
+  h += oySlice(events, ev.order);
+  h += metaEffect(t, ev);
+  // accumulated context writes — the information actually available by this point
+  const wrote = events.filter(e=>e.kind==="lobe" && e.order<=ev.order && (e.data.wrote||[]).length)
+                      .flatMap(e=>e.data.wrote);
+  if(wrote.length) h += `<h4 class="dim">information available here (context writes)</h4>
+    <div>${[...new Set(wrote)].map(x=>`<span class="chip">${esc(x)}</span>`).join("")}</div>`;
+  return h;
+}
+
+function panelTurn(t, r){
+  const events = turnEvents(t, r);
+  const total = t.total_latency_ms, u = t.usage_rollup || {};
+  const head = `<h2>${esc(r.label || "turn "+(turn+1))}</h2>`+
+    (r.query ? `<div class="q"><strong>query:</strong> ${esc(r.query)}</div>` : "")+
+    `<div class="cards">
+      <div class="card"><div class="k">path</div><div class="v small">${esc((t.path||{}).name||"?")}</div></div>
+      <div class="card"><div class="k">flow</div><div class="v small">${esc((t.flow||{}).name||"?")}</div></div>
+      <div class="card"><div class="k">total latency</div><div class="v">${total!=null?ms(total):"–"}</div></div>
+      <div class="card"><div class="k">events</div><div class="v">${events.length}</div></div>
+      <div class="card"><div class="k">tokens out</div><div class="v small">${num(u.output_tokens)}</div></div>
+    </div>`+
+    ((t.degraded||[]).length?`<p>${t.degraded.map(d=>`<span class="badge bad">${esc(d)}</span>`).join(" ")}</p>`:"")+
+    `<details class="ansbox"><summary>answer <span class="dim">· status=${esc(r.status)}${r.refusal_reason?" · refused":""}</span></summary>`+
+      (r.error?`<pre class="err">${esc(r.error)}</pre>`:"")+
+      `<pre class="ans">${esc(r.answer||"")||'<span class="none">(empty)</span>'}</pre></details>`;
+  if(!events.length) return head+'<p class="none">No events recorded for this turn.</p>';
+  if(selEvent>=events.length || selEvent<0) selEvent = 0;
+  const maxd = Math.max(...events.map(e=>e.dur||0), 1);
+  // metacognition reach: which lobes the turn's meta decision targets / queues —
+  // marked on the timeline so its effect is visible at each point (OX).
+  const meta = t.meta || {};
+  const mTouch = new Set([...(meta.target_lobes||[]), ...((t.meta_queue||[]).map(x=>x.target))]);
+  const list = events.map((e,i)=>{
+    if(e.kind==="react" && e.data && e.data.rk==="answer"){
+      return `<div class="evrow answerblock${i===selEvent?" sel":""}" data-i="${i}">
+        <div class="ablabel">✓ agent response${e.data.hop!=null?` · hop ${e.data.hop}`:""}${e.data.stop?` · ${esc(e.data.stop)}`:""}</div>
+        <div class="atext">${esc(e.data.text||"")||'<span class="none">(empty)</span>'}</div></div>`;
+    }
+    const w = e.dur ? Math.max(e.dur/maxd*100, 4) : 0;
+    const mu = (e.kind==="lobe" && mTouch.has(e.data.id))
+      ? '<span class="mu" title="metacognition target / queued">μ</span>' : "";
+    const depthCls = e.depth ? " depth"+e.depth : "";
+    const reactCls = (e.kind==="react" && e.data) ? " react-"+(e.data.rk||"") : "";
+    return `<div class="evrow${i===selEvent?" sel":""}${e.muted?" muted":""}${depthCls}${reactCls}" data-i="${i}">
+      <span class="evlane lane-${esc(e.lane)}">${esc(e.lane)}</span>
+      <span class="evtitle">${esc(e.title)}${mu}${e.pinned?'<span class="badge pin">pin</span>':""}${e.bad?'<span class="badge bad">err</span>':""}
+        ${e.sub?`<span class="evsub dim">${esc(e.sub)}</span>`:""}</span>
+      <span class="evbarwrap">${e.dur?`<span class="evbar" style="width:${w}%"></span><span class="evms mono dim">${ms(e.dur)}</span>`:""}</span>
+    </div>`;
+  }).join("");
+  return head+`<p class="dim">${events.length} events in execution order — click any point to see the OY lobe slice + metacognition there.</p>
+    <div class="turnlayout">
+      <div class="evlist">${list}</div>
+      <div class="evdetail" id="evdetail">${renderInspector(events[selEvent], t, r, events)}</div>
+    </div>`;
+}
+
+function wireTurn(t, r){
+  const events = turnEvents(t, r);
+  document.querySelectorAll(".evrow").forEach(row=>{
+    row.onclick = ()=>{
+      selEvent = +row.dataset.i;
+      document.querySelectorAll(".evrow").forEach(x=>x.classList.toggle("sel", +x.dataset.i===selEvent));
+      const det = document.getElementById("evdetail");
+      if(det) det.innerHTML = renderInspector(events[selEvent], t, r, events);
+    };
+  });
+}
+
+/* ── Conversation timeline (continuous, across all turns of one conversation) ── */
+function convItems(){
+  const conv = curConv(), all = DATA.records || [];
+  return { conv, items: conv.idxs.map(idx=>{
+    const r = all[idx], t = r.trace || {};
+    return {idx, r, t, events: turnEvents(t, r)};
+  })};
+}
+function panelTimeline(){
+  const {conv, items} = convItems();
+  const n = items.length, ng = convGroups().length;
+  if(!n) return '<h2>Conversation timeline</h2><p class="none">No records.</p>';
+  if(tlSel.turn >= n) tlSel = {turn:0, evt:0};
+  if(tlSel.evt >= (items[tlSel.turn].events.length||1)) tlSel.evt = 0;
+  const sess = conv.cid ? `session ${esc(String(conv.cid).slice(0,8))}` : "standalone (no session id)";
+  let h = `<h2>Conversation timeline <span class="dim">— ${n} turn(s) · ${sess}`+
+          `${ng>1?` · conversation with focus turn (this report has ${ng} separate conversations)`:""}</span></h2>`;
+  if(n===1) h += `<p class="dim">This is a single-turn conversation. A multi-turn shared session (same conversation_id)
+    renders here as one continuous timeline across all its turns.</p>`;
+  let list = "", total = 0;
+  items.forEach((it,ti)=>{
+    const p = it.t.path||{};
+    const bot = it.r.error ? ("⚠ "+it.r.error)
+      : (it.r.refusal_reason ? ("refused — "+it.r.refusal_reason) : (it.r.answer||"(no answer)"));
+    const collapsed = tlCollapsed.has(ti);
+    let rows = "";
+    if(!it.events.length){ rows += `<div class="none" style="padding:.2rem .6rem">no events</div>`; }
+    const maxd = Math.max(...it.events.map(e=>e.dur||0), 1);
+    let stepFolded = false;  // are we inside a folded step's ReAct children?
+    it.events.forEach((e,ei)=>{
+      if(e.kind==="step"){ stepFolded = tlStepFold.has(`${ti}:${ei}`); }
+      else if(e.depth){ if(stepFolded){ total++; return; } }  // hidden under a folded step
+      else { stepFolded = false; }                            // top-level event ends the step's child run
+      // The final agent response — render it as a prominent, full-text block.
+      if(e.kind==="react" && e.data && e.data.rk==="answer"){
+        const selA = (ti===tlSel.turn && ei===tlSel.evt) ? " sel" : "";
+        rows += `<div class="evrow answerblock${selA}" data-turn="${ti}" data-i="${ei}">
+          <div class="ablabel">✓ agent response${e.data.hop!=null?` · hop ${e.data.hop}`:""}${e.data.stop?` · ${esc(e.data.stop)}`:""}</div>
+          <div class="atext">${esc(e.data.text||"")||'<span class="none">(empty)</span>'}</div></div>`;
+        total++; return;
+      }
+      const w = e.dur ? Math.max(e.dur/maxd*100, 4) : 0;
+      const sel = (ti===tlSel.turn && ei===tlSel.evt) ? " sel" : "";
+      const depthCls = e.depth ? " depth"+e.depth : "";
+      const reactCls = (e.kind==="react" && e.data) ? " react-"+(e.data.rk||"") : "";
+      const chev = (e.kind==="step" && (e.children||[]).length)
+        ? `<span class="stepchev" data-stepfold="${ei}" data-sturn="${ti}" title="fold/unfold this step's ReAct loop">${stepFolded?"▸":"▾"}</span>` : "";
+      rows += `<div class="evrow${sel}${e.muted?" muted":""}${depthCls}${reactCls}" data-turn="${ti}" data-i="${ei}">
+        <span class="evlane lane-${esc(e.lane)}">${esc(e.lane)}</span>
+        <span class="evtitle">${chev}${esc(e.title)}${e.pinned?'<span class="badge pin">pin</span>':""}${e.bad?'<span class="badge bad">err</span>':""}
+          ${e.sub?`<span class="evsub dim">${esc(e.sub)}</span>`:""}</span>
+        <span class="evbarwrap">${e.dur?`<span class="evbar" style="width:${w}%"></span><span class="evms mono dim">${ms(e.dur)}</span>`:""}</span>
+      </div>`;
+      total++;
+    });
+    list += `<div class="tlturn">
+      <div class="tldiv${collapsed?" collapsed":""}" data-tturn="${ti}" title="click to fold/unfold this turn's trace">
+        <div class="tldnum"><span class="tlchev">${collapsed?"▸":"▾"}</span> #${it.idx+1} · ${esc(it.r.label||("turn "+(ti+1)))}
+          <span class="tlcount">${it.events.length} events</span></div>
+        <div class="tlmsg"><b>user</b> ${esc(it.r.query||"")}</div>
+        <div class="tlmsg dim"><b>bot</b> ${esc(String(bot).slice(0,200))}</div>
+        <div class="tlmeta">${esc(p.name||"?")} → ${esc((it.t.flow||{}).name||"?")} · ${it.events.length} events${it.t.total_latency_ms!=null?` · ${ms(it.t.total_latency_ms)}`:""}</div>
+      </div>
+      <div class="tlevents"${collapsed?' style="display:none"':""}>${rows}</div>
+    </div>`;
+  });
+  const cur = items[tlSel.turn];
+  h += `<p class="dim">${total} events across ${n} turn(s), in conversation order — click a turn header to fold its trace, or any event to inspect it.
+    <button class="copy tlfold" data-all="collapse">collapse all</button>
+    <button class="copy tlfold" data-all="expand">expand all</button></p>
+    <div class="turnlayout">
+      <div class="evlist">${list}</div>
+      <div class="evdetail" id="evdetail">${renderInspector(cur.events[tlSel.evt], cur.t, cur.r, cur.events)}</div>
+    </div>`;
+  return h;
+}
+function wireTimeline(){
+  const {items} = convItems();
+  document.querySelectorAll(".evlist .evrow").forEach(row=>{
+    row.onclick = ()=>{
+      tlSel = {turn:+row.dataset.turn, evt:+row.dataset.i};
+      // Focus this turn for the per-turn panels (Prompt / Lobes / Hotspots) too —
+      // the conversation stays the same, so no chrome re-render needed.
+      const conv = curConv();
+      if(conv.idxs[tlSel.turn] != null){ turn = conv.idxs[tlSel.turn]; promptStep = 0; }
+      document.querySelectorAll(".evlist .evrow").forEach(x=>
+        x.classList.toggle("sel", +x.dataset.turn===tlSel.turn && +x.dataset.i===tlSel.evt));
+      const it = items[tlSel.turn], det = document.getElementById("evdetail");
+      if(it && det) det.innerHTML = renderInspector(it.events[tlSel.evt], it.t, it.r, it.events);
+    };
+  });
+  // Fold/unfold a single step's nested ReAct loop (chevron only — not the row).
+  document.querySelectorAll(".evlist .stepchev").forEach(ch=>{
+    ch.onclick = (e)=>{
+      e.stopPropagation();
+      const key = `${ch.dataset.sturn}:${ch.dataset.stepfold}`;
+      if(tlStepFold.has(key)) tlStepFold.delete(key); else tlStepFold.add(key);
+      document.getElementById("panel").innerHTML = panelTimeline();
+      wireTimeline();
+    };
+  });
+  // Fold/unfold a turn's internal trace — DOM-only toggle (keeps scroll + selection).
+  function setFold(head, collapse){
+    const ti = +head.dataset.tturn, ev = head.nextElementSibling;
+    if(collapse) tlCollapsed.add(ti); else tlCollapsed.delete(ti);
+    if(ev) ev.style.display = collapse ? "none" : "";
+    head.classList.toggle("collapsed", collapse);
+    const chev = head.querySelector(".tlchev"); if(chev) chev.textContent = collapse ? "▸" : "▾";
+  }
+  document.querySelectorAll(".tldiv[data-tturn]").forEach(head=>{
+    head.onclick = ()=> setFold(head, !tlCollapsed.has(+head.dataset.tturn));
+  });
+  document.querySelectorAll(".tlfold").forEach(b=>{
+    b.onclick = ()=>{
+      const collapse = b.dataset.all === "collapse";
+      document.querySelectorAll(".tldiv[data-tturn]").forEach(head=> setFold(head, collapse));
+    };
+  });
+}
+
+/* ── Context lobes (OY) ───────────────────────────────────────────────────── */
+function panelLobes(t, r){
+  const lobes = t.lobes || [];
+  if(!lobes.length) return '<p class="none">No lobe activation recorded.</p>';
+  const events = turnEvents(t, r);
+  if(netPos < 0 || netPos >= events.length) netPos = events.length - 1;  // default: full network
+  const sel = events[netPos], selOrder = sel.order;
+  const lobeOrder = {};
+  events.filter(e=>e.kind==="lobe").forEach(e=>{ lobeOrder[e.data.id] = e.order; });
+
+  // ── OX scrubber: click any point; the network shows what's active by then ──
+  const ticks = events.map((e,i)=>
+    `<button class="nettick lane-${esc(e.lane)}${i===netPos?" on":""}${e.muted?" muted":""}"
+       data-i="${i}" title="${esc(e.title)}"></button>`).join("");
+  // Turn selector (within the conversation) + flow-stage jumps. Stages are the
+  // flow steps; each composes its OWN prompt (shown below when a stage is selected).
+  let h = convTurnStrip();
+  const stages = events.map((e,i)=>({e,i})).filter(x=>x.e.kind==="step");
+  if(stages.length){
+    h += `<div class="pstepsel"><span class="oylab">stages</span>`+ stages.map(({e,i})=>
+      `<button class="pstepbtn${i===netPos?' on':''}" data-i="${i}" title="jump to stage ${esc(e.data.step)}">`+
+      `${esc(e.data.step)}${e.data.system_prompt?'':' <span class="dim">·no prompt</span>'}</button>`
+    ).join("") + `</div>`;
+  }
+  h += `<h3>Network over the timeline <span class="dim">— click a stage above or any point below to see which lobes are active by then</span></h3>`;
+  h += `<div class="netscrubwrap">
+    <button class="copy netstep" data-d="-1" title="previous point">◀</button>
+    <div class="netscrub">${ticks}</div>
+    <button class="copy netstep" data-d="1" title="next point">▶</button>
+    <button class="copy netall" title="jump to the full network">all</button>
+  </div>`;
+  h += `<div class="netpos"><span class="evlane lane-${esc(sel.lane)}">${esc(sel.lane)}</span>
+    point ${netPos+1}/${events.length} · <b>${esc(sel.title)}</b>${sel.sub?` <span class="dim">${esc(sel.sub)}</span>`:""}</div>`;
+
+  // ── layer token totals, accumulated through the selected point ──
+  const acc = {};
+  events.filter(e=>e.kind==="lobe" && e.order<=selOrder && e.data.activated).forEach(e=>{
+    const lay = (LAYERS[e.data.layer]||"?").split(" ").pop();
+    acc[lay] = (acc[lay]||0) + (+e.data.tokens_after||0);
+  });
+  h += `<h3>Layer token totals <span class="dim">— accumulated through this point</span></h3><div class="cards">`+
+    ["memory","skill","cognition","expression"].map(k=>
+      `<div class="card"><div class="k">${k}</div><div class="v small">${num(acc[k]||0)}</div></div>`).join("")+`</div>`;
+
+  // ── the network (OY) — node state reflects the selected point ──
+  h += `<h3>Lobe network <span class="dim">— recall → skill → cognition → expression · edges = in_edges</span></h3>`;
+  h += `<div class="lobe-net" id="lobenet"><svg class="edges" id="edges"></svg>`;
+  const byLayer = {};
+  lobes.forEach(l=>{ (byLayer[l.layer] = byLayer[l.layer]||[]).push(l); });
+  Object.keys(byLayer).map(Number).sort((a,b)=>a-b).forEach(layer=>{
+    h += `<div class="lcol"><h4>${esc(LAYERS[layer]||("layer "+layer))}</h4>`;
+    byLayer[layer].forEach(l=>{
+      const ord = lobeOrder[l.id] ?? 1e9;
+      const live = ord <= selOrder && l.activated;        // active by this point
+      const state = l.activated ? (live ? "lit" : "pending") : "off";
+      const current = (sel.kind==="lobe" && sel.data.id===l.id) ? " current" : "";
+      const cls = ["lnode", state, l.pinned?"pin":"", current].join(" ").replace(/\s+/g," ").trim();
+      const sig = l.signals && Object.keys(l.signals).length ? JSON.stringify(l.signals,null,1) : "";
+      const edges = l.in_edges && Object.keys(l.in_edges).length ? JSON.stringify(l.in_edges) : "";
+      const sns = l.state_node_summary;
+      h += `<div class="${cls}" data-id="${esc(l.id)}" data-edges='${esc(edges)}' data-live="${live?1:0}">
+        <div><span class="lid">${esc(l.id)}</span><span class="lact">${num(l.activation)}</span></div>
+        <div class="lreason">${esc(l.reason||"")}</div>
+        <div class="pmeta mono dim">${num(l.tokens_in)}→${num(l.tokens_after)} tok${l.trimmed?` · trim ${num(l.trimmed)}`:""}${l.pinned?' · pinned':''}</div>
+        ${(sig||sns)?`<details><summary>signals / state</summary>
+          ${sig?`<pre>${esc(sig)}</pre>`:""}
+          ${sns?`<pre>state: ${esc(JSON.stringify(sns))}</pre>`:""}</details>`:""}
+      </div>`;
+    });
+    h += `</div>`;
+  });
+  h += `</div>`;
+
+  // ── the stage's OWN prompt (each flow stage composes its own system prompt) ──
+  if(sel.kind==="step"){
+    const sc = callsForStage(t, sel.data.step);
+    if(sc.length){
+      const c0 = sc[0], u = sc[sc.length-1].usage||{};
+      h += `<div class="metanote">exact payload: ${esc(c0.model||'?')} · T=${num(c0.temperature)} · max_tokens=${num(c0.max_tokens)} · `+
+        `${sc.length} hop(s) · ${esc(sc[sc.length-1].stop_reason||'?')} · tools ${num(c0.tool_count)} `+
+        `<span class="dim">(full messages/tools in the Prompt tab)</span></div>`;
+    }
+    if(sel.data.system_prompt){
+      const psegs = (sel.data.system_segments||[]).slice().sort((a,b)=>a.start-b.start);
+      h += `<h3>Stage prompt <span class="dim">— stage <b>${esc(sel.data.step)}</b> · composed system prompt, colored by source lobe</span></h3>`;
+      h += `<div class="promptbox">${renderColored(sel.data.system_prompt, psegs)}</div>`;
+    } else {
+      h += `<p class="none">No captured prompt for stage <b>${esc(sel.data.step)}</b> — re-run with <code>AGENT_CORE_CAPTURE_PROMPTS=1</code>.</p>`;
+    }
+  }
+  return h;
+}
+
+function wireLobes(t, r){
+  const events = turnEvents(t, r);
+  const set = i => { netPos = Math.max(0, Math.min(events.length-1, i)); renderPanel(); };
+  wireConvTurnStrip();
+  document.querySelectorAll(".pstepbtn[data-i]").forEach(btn => btn.onclick = ()=>set(+btn.dataset.i));
+  document.querySelectorAll(".nettick").forEach(btn => btn.onclick = ()=>set(+btn.dataset.i));
+  document.querySelectorAll(".netstep").forEach(btn => btn.onclick = ()=>set(netPos + (+btn.dataset.d)));
+  const all = document.querySelector(".netall"); if(all) all.onclick = ()=>set(events.length-1);
+}
+
+function drawEdges(){
+  const net = document.getElementById("lobenet"); if(!net) return;
+  const svg = document.getElementById("edges"); if(!svg) return;
+  const base = net.getBoundingClientRect();
+  svg.setAttribute("viewBox",`0 0 ${net.scrollWidth} ${net.scrollHeight}`);
+  svg.setAttribute("width",net.scrollWidth); svg.setAttribute("height",net.scrollHeight);
+  const pos = {}, live = {};
+  net.querySelectorAll(".lnode").forEach(n=>{
+    const r = n.getBoundingClientRect();
+    pos[n.dataset.id] = {
+      l:r.left-base.left+net.scrollLeft, r:r.right-base.left+net.scrollLeft,
+      cy:r.top-base.top+net.scrollTop+r.height/2, w:r.width,
+    };
+    live[n.dataset.id] = n.dataset.live === "1";
+  });
+  let paths="";
+  net.querySelectorAll(".lnode").forEach(n=>{
+    const tgt = pos[n.dataset.id]; if(!tgt) return;
+    if(!live[n.dataset.id]) return;  // only draw edges into lobes active by this point
+    let edges; try{ edges = JSON.parse(n.dataset.edges||"{}"); }catch(e){ edges={}; }
+    Object.entries(edges).forEach(([src,w])=>{
+      const s = pos[src]; if(!s || !live[src]) return;  // and from active sources only
+      const x1=s.r, y1=s.cy, x2=tgt.l, y2=tgt.cy, mx=(x1+x2)/2;
+      const sw = Math.max(0.8, Math.min(3.5, Math.abs(w)*2.5));
+      const col = w>=0 ? "#1F6B4A" : "#b23b3b";
+      paths += `<path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"
+        fill="none" stroke="${col}" stroke-width="${sw}" opacity="0.5"/>`;
+    });
+  });
+  svg.innerHTML = paths;
+}
+window.addEventListener("resize", ()=>{ if(panel==="lobes") drawEdges(); });
+/* keep the Lobe-network panel id stable: dispatch uses "lobes" */
+
+
+/* ── Prompt (composed system prompt, colored by source lobe) ──────────────── */
+// Stable hue per source string (FNV-1a → 0..359) so each lobe/region gets its
+// own distinct color across renders.
+function hueOf(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return (h>>>0)%360; }
+// Soft tint only — readable black text on a faint per-source wash. The saturated
+// hue shows in the legend swatch + hover, not as an underline on every line.
+function srcStyle(src){ const h=hueOf(src); return `background:hsl(${h} 68% 93%)`; }
+function srcSwatch(src){ return `hsl(${hueOf(src)} 58% 44%)`; }
+
+// Non-lobe prompt regions: a one-line description shown when you click a span
+// whose source isn't an actual lobe in trace.lobes.
+const SOURCE_INFO = {
+  system_prompt:"Base stage prompt — bot persona / default synthesis instructions (policy.system_prompt or the stage default).",
+  stage_override:"Per-stage system_prompt override — replaces the whole composed prompt.",
+  mezon_style:"Mezon chat-style overlay (conversational, heading-free) — Mezon surface only.",
+  voice:"Persona voice overlay (policy.voice).",
+  tone:"Tone directive (policy.tone).",
+  language:"Language directive (policy.language, adaptive mode).",
+  response_format:"Response-format directive (policy.response_format).",
+  rules_must:"Positive rules — policy.must_include.",
+  rules_must_not:"Negative rules — policy.must_not_include.",
+  golden:"Golden-answer tool directive — search_golden.",
+  identity:"Identity block — who the bot talks to + the channel (context resolver).",
+  system_hints:"System-prompt hints injected by the worker/runtime.",
+  datetime:"Current date/time — volatile tail.",
+  mandatory_refusal:"Mandatory-refusal directive — turn-scoped.",
+  lobe_context:"Header of the '## Lobe context' section (the live lobe-axis output appended to the base prompt).",
+  flow_step:"Prior flow-step output carried forward via the blackboard (the inter-step evidence channel).",
+};
+
+function promptSteps(t){
+  return (t.flow_steps||[]).filter(s=> typeof s.system_prompt === "string" && s.system_prompt.length);
+}
+
+function renderColored(text, segs){
+  let out="", cur=0;
+  segs.forEach((g,i)=>{
+    if(g.start>cur) out += esc(text.slice(cur, g.start));   // uncolored gap (e.g. join separators)
+    if(g.start<cur) return;                                  // overlap guard (shouldn't happen)
+    const seg = text.slice(g.start, g.end);
+    const dim = promptSource && promptSource!==g.source ? " dim" : "";
+    const tip = `${g.source} · ${g.stability} · ${g.end-g.start} chars`;
+    out += `<span class="seg${dim}" style="${srcStyle(g.source)}" data-src="${esc(g.source)}" title="${esc(tip)}">${esc(seg)}</span>`;
+    cur = g.end;
+  });
+  if(cur<text.length) out += esc(text.slice(cur));
+  return out;
+}
+
+// ── exact-payload helpers (trace.llm_calls — the REAL bytes sent per hop) ──────
+function callsForStage(t, stage){
+  return (t.llm_calls||[]).filter(c=>c.stage===stage).sort((a,b)=>(a.hop||0)-(b.hop||0));
+}
+// Flatten the real system param (string OR cache_control block array) → {text,
+// cacheBreak} where cacheBreak is the char index after the last cached block.
+function flatSystem(system){
+  if(typeof system === "string") return {text:system, cacheBreak:-1};
+  if(Array.isArray(system)){
+    let text="", brk=-1;
+    system.forEach((b,i)=>{ const tx=(b&&b.text)||""; if(i>0) text+="\n"; text+=tx;
+      if(b && b.cache_control) brk=text.length; });
+    return {text, cacheBreak:brk};
+  }
+  return {text:String(system==null?"":system), cacheBreak:-1};
+}
+// Re-anchor the reconstructed system_segments (offsets into reconText) onto the
+// REAL system text by sequential substring find. Exact where they match; spans
+// that don't locate are dropped → render uncolored (never wrong).
+function realignSegs(reconText, reconSegs, realText){
+  const out=[]; let cur=0;
+  (reconSegs||[]).slice().sort((a,b)=>a.start-b.start).forEach(g=>{
+    const sub = reconText.slice(g.start, g.end); if(!sub) return;
+    let idx = realText.indexOf(sub, cur); if(idx<0) idx = realText.indexOf(sub);
+    if(idx<0) return;
+    out.push({source:g.source, stability:g.stability, start:idx, end:idx+sub.length});
+    cur = idx+sub.length;
+  });
+  return out;
+}
+// Render a messages array as the literal ReAct reasoning flow.
+function renderMessages(msgs){
+  if(!msgs || !msgs.length) return '<p class="none">(no messages)</p>';
+  const block = b => {
+    if(typeof b === "string") return `<div class="mtext">${esc(b)}</div>`;
+    if(b && b.type==="text") return `<div class="mtext">${esc(b.text||"")}</div>`;
+    if(b && (b.type==="thinking"||b.type==="redacted_thinking"))
+      return `<div class="mthink">✦ thinking<pre>${esc(b.type==="redacted_thinking"?"[redacted]":(b.thinking||""))}</pre></div>`;
+    if(b && b.type==="tool_use") return `<div class="mtool">▸ tool_use <b>${esc(b.name||"")}</b>`+
+      `<pre>${esc(JSON.stringify(b.input||{},null,1))}</pre></div>`;
+    if(b && b.type==="tool_result"){ const c=b.content;
+      return `<div class="mtoolr">◂ tool_result <span class="dim">${esc(b.tool_use_id||"")}</span>`+
+        `<pre>${esc(typeof c==="string"?c:JSON.stringify(c,null,1))}</pre></div>`; }
+    return `<div class="mtext dim">${esc(JSON.stringify(b))}</div>`;
+  };
+  return `<div class="msgs">`+ msgs.map(m=>{
+    const role = m.role||"?";
+    const body = typeof m.content==="string" ? `<div class="mtext">${esc(m.content)}</div>`
+      : Array.isArray(m.content) ? m.content.map(block).join("")
+      : `<div class="mtext dim">${esc(JSON.stringify(m.content))}</div>`;
+    return `<div class="msg-row role-${esc(role)}"><span class="mrole">${esc(role)}</span><div class="mbody">${body}</div></div>`;
+  }).join("") + `</div>`;
+}
+// The exact-payload section for a stage (hops · params · tools · messages).
+function payloadSection(t, stage){
+  const calls = callsForStage(t, stage);
+  if(!calls.length){
+    return `<h3>Exact LLM payload</h3><p class="none">No exact-payload capture for stage <b>${esc(stage)}</b> — `+
+      `re-run with <code>AGENT_CORE_CAPTURE_PROMPTS=1</code> (records the real messages/tools/params per hop).</p>`;
+  }
+  let hop = promptHop < 0 || promptHop >= calls.length ? calls.length-1 : promptHop;  // default: last hop = full flow
+  const c = calls[hop], u = c.usage||{};
+  let h = `<h3>Exact LLM payload <span class="dim">— stage <b>${esc(stage)}</b> · the real bytes sent to ${esc(c.model||"the model")}${calls.length>1?` · ${calls.length} hops`:""}</span></h3>`;
+  if(calls.length>1){
+    h += `<div class="pstepsel"><span class="oylab">hops</span>`+ calls.map((cc,i)=>
+      `<button class="hopbtn${i===hop?' on':''}" data-hop="${i}" data-stage="${esc(stage)}">hop ${cc.hop}`+
+      `${cc.stop_reason?` <span class="dim">${esc(cc.stop_reason)}</span>`:""}</button>`).join("") + `</div>`;
+  }
+  // (model/temperature/max_tokens/stop_reason/tools/tokens/cache_read now live
+  // in the Prompt panel's side panel — see panelPrompt's callmeta block.)
+  // Which tools the model actually invoked this stage (tool_use blocks across hops).
+  const called = new Set();
+  calls.forEach(cc => (cc.messages||[]).forEach(m => {
+    if(Array.isArray(m.content)) m.content.forEach(b => {
+      if(b && b.type==="tool_use" && b.name) called.add(b.name); });
+  }));
+  if((c.tools||[]).length){
+    // The 14 tools land via the SDK `tools` param, not the prompt prose — so a
+    // flat list is hard to trace. Group by AREA (the namespace before the first
+    // `.`; un-namespaced tools → "core") and flag the ones whose name ALSO
+    // appears in the system prompt text (announced in prose, e.g. skill.read in
+    // the skill index), so "what's actually offered where" reads at a glance.
+    const sysText = c.system!=null
+      ? (typeof c.system==="string" ? c.system : flatSystem(c.system).text) : "";
+    // A tool is "named in the prompt" only as a whole token (bounded by
+    // non-identifier chars, treating `.` as part of the name) — so `memory`
+    // doesn't match inside another word and `kb.retrieve` ≠ `kb.retrieved`.
+    const namedInPrompt = nm => {
+      if(!sysText) return false;
+      const e = nm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(`(^|[^\\w.])${e}([^\\w.]|$)`).test(sysText);
+    };
+    const area = n => { const i=n.indexOf("."); return i>0 ? n.slice(0,i) : "core"; };
+    const groups = {};
+    c.tools.forEach(tl => { (groups[area(tl.name)] = groups[area(tl.name)]||[]).push(tl); });
+    const order = Object.keys(groups).sort((a,b)=>
+      groups[b].length-groups[a].length || a.localeCompare(b));
+    const bar = order.map(a=>{
+      const cl = groups[a].filter(tl=>called.has(tl.name)).length;
+      return `<b>${esc(a)}</b> ${groups[a].length}${cl?` <span class="badge ok">✓${cl}</span>`:""}`;
+    }).join(" · ");
+    h += `<details class="toolsoffered" open><summary>tools offered (${c.tools.length}) `+
+      `<span class="dim">— the SDK \`tools\` param (NOT prompt prose); grouped by area · ✓ = called this stage · `+
+      `<span class="badge inprompt">prompt</span> = name also announced in the prompt text</span></summary>`;
+    h += `<div class="areabar">${order.length} area(s): ${bar}</div>`;
+    order.forEach(a=>{
+      const list = groups[a];
+      const calledN = list.filter(tl=>called.has(tl.name)).length;
+      h += `<div class="toolarea"><span class="apref">${esc(a)}</span> `+
+        `<span class="acount">— ${list.length} tool${list.length!==1?"s":""}`+
+        `${calledN?` · ${calledN} called`:""}</span></div>`;
+      h += list.map(tl=>{
+        const params = (tl.params && tl.params.length
+            ? tl.params : (tl.input_schema_keys||[]).map(k=>({name:k,required:false})))
+          .map(p=>esc(p.name)+(p.required?'*':'')).join(', ');
+        const isCalled = called.has(tl.name);
+        const ok = isCalled ? ` <span class="badge ok">✓ called</span>` : "";
+        const inP = namedInPrompt(tl.name)
+          ? ` <span class="badge inprompt">prompt</span>` : "";
+        const desc = tl.description ? `<div class="dim tdesc">${esc(tl.description)}</div>` : "";
+        return `<div class="tooldef${isCalled?" called":""}"><code>${esc(tl.name)}(${params})</code>${ok}${inP}${desc}</div>`;
+      }).join("");
+    });
+    h += `</details>`;
+  }
+  // Adaptive tool exposure (the tool_select lobe): what the relevance scorer
+  // KEPT vs DROPPED for this stage. Only present when tool_strategy=adaptive.
+  const tsel = (t.tool_selection||[]).find(x=>x.stage===stage);
+  if(tsel){
+    const kept = tsel.kept||[], dropped = tsel.dropped||[];
+    h += `<details class="toolsoffered optsec" open><summary>tool_select — adaptive exposure (${kept.length} kept · ${dropped.length} dropped) `+
+      `<span class="dim">— the lobe scored well-known tools by turn relevance; essentials (★) + external MCP always kept</span></summary>`;
+    h += rows(kept.map(k=>({
+      tool:(k.essential?"★ ":"")+k.name, l1:k.l1!=null?num(k.l1):"", l2:k.l2!=null?num(k.l2):"",
+      activation:k.activation!=null?num(k.activation):"", in:"✓ kept"})).concat(
+      dropped.map(d=>({tool:d.name, l1:num(d.l1), l2:num(d.l2), activation:num(d.activation),
+        in:"✗ "+(d.reason||"dropped"), disabled:true}))),
+      ["tool","l1","l2","activation","in"]);
+    h += `</details>`;
+  }
+  // Adaptive skill list (skill_activate lobe, skill_strategy=adaptive): the
+  // ranked on_demand index — which skill lines survived into the prompt.
+  const ssel = (t.skill_selection||[]).find(x=>x.stage===stage);
+  if(ssel && (ssel.ranking||[]).length){
+    const rk = ssel.ranking;
+    h += `<details class="toolsoffered optsec" open><summary>skill_select — adaptive skill list (${rk.filter(x=>x.kept).length}/${rk.length} kept) `+
+      `<span class="dim">— on_demand index ranked by relevance; trimmed skills stay skill.read-able by slug; eager always inlined</span></summary>`;
+    h += rows(rk.slice().sort((a,b)=>(b.activation||0)-(a.activation||0)).map(x=>({
+      skill:x.label, l1:x.l1!=null?num(x.l1):"", l2:x.l2!=null?num(x.l2):"",
+      activation:x.activation!=null?num(x.activation):"", in:x.kept?"✓ listed":"✗ trimmed",
+      disabled:!x.kept})), ["skill","l1","l2","activation","in"]);
+    h += `</details>`;
+  }
+  // LLM-reasoned activation (skill_strategy="reason"): the per-turn decision of
+  // which DECLARED skills the turn needs — what scoped the skill block above.
+  const sreason = t.skill_reasoning;
+  if(sreason && (sreason.considered||[]).length){
+    const sel = new Set(sreason.selected||[]);
+    h += `<details class="toolsoffered optsec" open><summary>skill_reason — LLM-chosen skills (${(sreason.selected||[]).length}/${(sreason.considered||[]).length} active) `+
+      `<span class="dim">— a reasoning step picked which declared skills this turn needs${sreason.reason?` · “${esc(sreason.reason)}”`:""}</span></summary>`;
+    h += rows((sreason.considered||[]).map(s=>({skill:s, in:sel.has(s)?"✓ active":"✗ off", disabled:!sel.has(s)})), ["skill","in"]);
+    h += `</details>`;
+  }
+  if(c.truncated) h += `<p class="dim">⚠ ${c.truncated} oversized field(s) elided for size</p>`;
+  h += `<h4>messages <span class="dim">— the conversation/ReAct flow this hop actually sent</span></h4>`;
+  h += renderMessages(c.messages);
+  return h;
+}
+
+// ── "Is this prompt right?" — the signals that shaped the prompt (this turn) ──
+function promptGlance(t, r, stage, stageCalls){
+  const att = t.attention || {}, nodes = att.nodes || [];
+  const sel = nodes.filter(n=>n.selected).length;
+  const mem = ((r.context||{}).memory_items || []).length;
+  const c0 = stageCalls[0] || {};
+  const fstep = (t.flow_steps||[]).find(s=>s.step===stage) || {};
+  const sysLen = c0.system != null
+    ? (typeof c0.system==="string" ? c0.system.length : flatSystem(c0.system).text.length)
+    : (fstep.system_prompt||"").length;
+  const parts = [
+    `system ${num(sysLen)}ch`,
+    `${stageCalls.length||1} hop(s)`,
+    c0.tool_count!=null ? `tools ${num(c0.tool_count)}` : "",
+    nodes.length ? `context ${sel}/${nodes.length} selected` : "",
+    att.total_tokens!=null ? `${num(att.total_tokens)}/${num(att.budget_tokens)} ctx-tok` : "",
+    `memory ${mem}`,
+  ].filter(Boolean);
+  let h = `<div class="glance">`+parts.map(p=>`<span class="gchip">${esc(p)}</span>`).join("")+`</div>`;
+  const skills = t.skills || {};
+  if(Object.keys(skills).length)
+    h += `<div class="dim" style="font-size:11.5px">skills: `+
+      Object.entries(skills).map(([k,v])=>esc(k)+":"+esc(v)).join(" · ")+`</div>`;
+  return h;
+}
+function attentionSection(t){
+  const att = t.attention;
+  if(!att || !(att.nodes||[]).length)
+    return `<p class="dim">No adaptive attention captured (static context strategy, or not recorded).</p>`;
+  const nodes = att.nodes.slice().sort((a,b)=>(b.activation||0)-(a.activation||0));
+  const lt = att.layer_totals || {};
+  let h = `<details open class="optsec"><summary>Context &amp; attention (this turn) `+
+    `<span class="dim">— ${num(att.total_tokens)}/${num(att.budget_tokens)} tok · floor ${num(att.min_activation)} · injected vs dropped</span></summary>`;
+  h += `<div class="cards">`+["memory","skill","cognition","expression"].map(k=>
+    `<div class="card"><div class="k">${k}</div><div class="v small">${num(lt[k]||0)}</div></div>`).join("")+`</div>`;
+  h += rows(nodes.map(n=>({
+    kind:n.kind, id:n.id, l1:num(n.l1), l2:num(n.l2), activation:num(n.activation),
+    tokens:num(n.tokens), in: n.selected ? (n.pinned?"✓ pinned":"✓ selected") : "✗ dropped",
+    disabled: !n.selected,  // dims the row (rows() honors row.disabled)
+  })), ["kind","id","l1","l2","activation","tokens","in"]);
+  h += `</details>`;
+  return h;
+}
+function memorySkillsSection(t, r){
+  const ctx = r.context || {};
+  const mem = ctx.memory_items||[], muts = ctx.memory_mutations||[], cv = ctx.ctxvars||[];
+  const skills = t.skills||{}, sp = t.scratchpad||{};
+  if(!mem.length && !muts.length && !cv.length && !Object.keys(skills).length && !Object.keys(sp).length)
+    return "";
+  let h = `<details class="optsec"><summary>Memory &amp; skills injected `+
+    `<span class="dim">— durable facts available, agent writes, skills, ctxvars, RAM</span></summary>`;
+  if(Object.keys(skills).length) h += `<div class="toolrow">`+
+    Object.entries(skills).map(([k,v])=>`<span class="chip ${v==='activated'||v==='driving'?'tool':''}">${esc(k)}: ${esc(v)}</span>`).join("")+`</div>`;
+  if(mem.length) h += rows(mem.map(m=>({scope:m.scope, key:m.key,
+      value:vstr(m.value).slice(0,80), note:m.description||""})), ["scope","key","value","note"],
+      "durable memory available");
+  else h += `<p class="dim">No durable memory items loaded this turn.</p>`;
+  if(muts.length) h += `<div style="margin:.3rem 0">agent wrote: `+
+    muts.map(m=>`<span class="badge ${m.action==='forget'?'bad':'ok'}">${esc(m.action)} ${esc(m.scope||'')}:${esc(m.key||'')}</span>`).join(" ")+`</div>`;
+  if(cv.length) h += rows(cv.map(v=>({key:v.key, line:v.line})), ["key","line"], "system context vars");
+  const spk = Object.keys(sp);
+  if(spk.length) h += `<div style="margin:.3rem 0">RAM keys: `+
+    spk.map(k=>`<span class="chip">${esc(k)}</span>`).join(" ")+` <span class="dim">(see RAM tab)</span></div>`;
+  h += `</details>`;
+  return h;
+}
+function lobeBudgetSection(t){
+  const lobes = (t.lobes||[]).filter(l=>l.activated);
+  if(!lobes.length) return "";
+  let h = `<details class="optsec"><summary>Per-lobe contribution &amp; budget (this turn) `+
+    `<span class="dim">— tokens in→after (−trimmed) per activated lobe</span></summary>`;
+  h += rows(lobes.map(l=>{
+    const sns = l.state_node_summary || {};
+    const empty = (sns.total||0)>0 && (sns.enabled||0)===0;
+    return {lobe:l.id, reason:l.reason||"",
+      "tok in→after":`${num(l.tokens_in)}→${num(l.tokens_after)}`,
+      trimmed: l.trimmed ? ("−"+num(l.trimmed)) : "",
+      wrote: empty ? "⚠ all state-nodes sub-threshold" : ((l.wrote||[]).join(", "))};
+  }), ["lobe","reason","tok in→after","trimmed","wrote"]);
+  h += `</details>`;
+  return h;
+}
+function degradeMetaSection(t){
+  const deg = t.degraded||[], meta = t.meta||{};
+  let h = "";
+  if(deg.length) h += `<p class="err" style="padding:.4rem .6rem;border-radius:6px;border:1px solid #f0c4c4">`+
+    `⚠ infra degraded: ${deg.map(esc).join(", ")} — the prompt may be MISSING grounded context.</p>`;
+  if(meta.action && meta.action!=="continue") h += `<p class="dim">metacognition: <b>${esc(meta.action)}</b>`+
+    `${meta.target_step?` on ${esc(meta.target_step)}`:""}`+
+    `${(meta.target_lobes||[]).length?` (lobes ${meta.target_lobes.map(esc).join(", ")})`:""} — may have trimmed the prompt.</p>`;
+  return h;
+}
+
+function panelPrompt(t, r){
+  const steps = promptSteps(t);
+  const calls = t.llm_calls || [];
+  if(!steps.length && !calls.length){
+    return `<h3>System prompt</h3><p class="none">No captured prompts in this trace.</p>
+      <p class="dim">Re-run the probe with <code>AGENT_CORE_CAPTURE_PROMPTS=1</code> to record the composed
+      system prompt + per-lobe provenance + the exact LLM payload (messages/tools/params) for each flow step.</p>`;
+  }
+  // Stage list: flow steps with a reconstructed prompt, else derive from real calls.
+  const stageNames = steps.length ? steps.map(s=>s.step)
+    : [...new Set(calls.map(c=>c.stage))];
+  if(promptStep>=stageNames.length) promptStep=0;
+  const stageName = stageNames[promptStep];
+  const s = steps.find(x=>x.step===stageName);
+
+  // System text + provenance to color. Prefer the REAL captured system (hop 0 of
+  // this stage); overlay the reconstructed per-lobe segments re-anchored onto it.
+  const stageCalls = callsForStage(t, stageName);
+  const realSys = stageCalls.length ? flatSystem(stageCalls[0].system) : null;
+  const reconText = s ? s.system_prompt : "";
+  let text, segs, cacheBreak = -1, sysNote = "";
+  if(realSys){
+    text = realSys.text; cacheBreak = realSys.cacheBreak;
+    segs = s ? realignSegs(reconText, s.system_segments, text) : [];
+    sysNote = "real bytes sent · provenance overlay is best-effort";
+  } else {                                   // old artifact: reconstructed only
+    text = reconText; segs = (s && s.system_segments || []).slice().sort((a,b)=>a.start-b.start);
+    sysNote = "reconstructed (no exact-payload capture)";
+  }
+  const order=[], seen=new Set();
+  segs.forEach(g=>{ if(!seen.has(g.source)){ seen.add(g.source); order.push(g.source); } });
+  // Insert a visible cache_control breakpoint marker into the rendered system.
+  let sysHtml = renderColored(text, segs);
+  if(cacheBreak > 0){
+    // re-render in two halves around the breakpoint so the marker lands cleanly
+    const head = renderColored(text.slice(0,cacheBreak), segs.filter(g=>g.end<=cacheBreak));
+    const tailSegs = segs.filter(g=>g.start>=cacheBreak).map(g=>({...g,start:g.start-cacheBreak,end:g.end-cacheBreak}));
+    const tail = renderColored(text.slice(cacheBreak), tailSegs);
+    sysHtml = head + `<div class="cachebreak">— cache_control: ephemeral breakpoint —</div>` + tail;
+  }
+
+  let h = convTurnStrip();
+  h += `<h3>System prompt <span class="dim">— ${esc((DATA.records[turn]||{}).label||("turn "+(turn+1)))} · stage <b>${esc(stageName)}</b> · ${esc(sysNote)} · click a span to inspect it</span></h3>`;
+  h += promptGlance(t, r, stageName, stageCalls);  // the "is everything here?" read
+  h += `<div class="pstepsel">`+ stageNames.map((nm,i)=>{
+      const st = steps.find(x=>x.step===nm), n = callsForStage(t,nm).length;
+      return `<button class="pstepbtn${i===promptStep?' on':''}" data-step="${i}">${esc(nm)}`+
+        ` <span class="dim mono">${st?num((st.system_prompt||'').length)+'ch':''}${n?` · ${n}h`:""}</span></button>`;
+    }).join("") + `</div>`;
+  h += `<div class="legend">`+ order.map(src=>
+      `<button class="legchip${promptSource&&promptSource!==src?' off':''}" data-src="${esc(src)}">`+
+      `<span class="sw" style="background:${srcSwatch(src)}"></span>${esc(src)}</button>`
+    ).join("") + (promptSource?`<button class="legchip clear" data-src="">clear filter</button>`:"") + `</div>`;
+  // LLM-call params live in the side panel (top), above the click-to-inspect
+  // area — the exact bytes' model/temperature/tokens/cache for this stage.
+  let metaHtml = "";
+  if(stageCalls.length){
+    const hp = promptHop<0||promptHop>=stageCalls.length ? stageCalls.length-1 : promptHop;
+    const cc = stageCalls[hp], u = cc.usage||{};
+    metaHtml = `<div class="callmeta"><h4>LLM call${stageCalls.length>1?` <span class="dim">hop ${cc.hop}</span>`:""}</h4>`+
+      kvtable({model:cc.model, temperature:cc.temperature, max_tokens:cc.max_tokens,
+        stop_reason:cc.stop_reason, tools:cc.tool_count,
+        tokens:`${num(u.input_tokens)}→${num(u.output_tokens)}`,
+        cache_read:u.cache_read_input_tokens!=null?num(u.cache_read_input_tokens):""})+`</div>`;
+  }
+  h += `<div class="promptlayout" id="promptlayout">`+
+       `<div class="promptmain"><div class="promptbox" id="promptbox">${sysHtml}</div></div>`+
+       `<div class="psplit" id="psplit" title="drag to resize"></div>`+
+       `<aside class="promptside" id="lobedrawer" style="width:${promptSideW}px">`+
+         metaHtml +
+         `<div id="lobedraw"><div class="ldraw dim">Click a colored span to inspect the lobe / region that produced it.</div></div>`+
+       `</aside>`+
+       `</div>`;
+  // The rest of the real call — messages (reasoning flow), tools, params, per hop.
+  h += payloadSection(t, stageName);
+  // ── "Is this prompt right?" — the signals that shaped it (this turn) ──
+  h += `<h3 style="margin-top:1.6rem">Is this prompt right? `+
+    `<span class="dim">— right info / attention / context / memory / skills · selected vs dropped (this turn)</span></h3>`;
+  h += attentionSection(t);
+  h += memorySkillsSection(t, r);
+  h += lobeBudgetSection(t);
+  h += degradeMetaSection(t);
+  return h;
+}
+
+function lobeDrawer(t, src){
+  const lobe = (t.lobes||[]).find(l=>l.id===src);
+  if(lobe){
+    const sig = lobe.signals||{};
+    let h = `<div class="ldraw"><div class="ldhead">`+
+      `<span class="sw" style="background:${srcSwatch(src)}"></span><b>${esc(lobe.id)}</b>`+
+      `<span class="badge ${lobe.activated?'ok':'bad'}">${lobe.activated?'activated':'inactive'}</span>`+
+      `<span class="chip">${esc(LAYERS[lobe.layer]||('L'+lobe.layer))}</span>`+
+      `<span class="chip mono">act ${num(lobe.activation)}</span>`+
+      (lobe.pinned?`<span class="badge pin">pinned</span>`:``)+`</div>`;
+    if(lobe.reason) h += `<div class="dim">reason: ${esc(lobe.reason)}</div>`;
+    if(lobe.wrote&&lobe.wrote.length) h += `<div style="margin:.3rem 0">wrote: ${lobe.wrote.map(w=>`<span class="chip">${esc(w)}</span>`).join(" ")}</div>`;
+    if(Object.keys(sig).length){ h += `<h4>signals</h4>`+kvtable(sig); }
+    const sn = lobe.state_nodes||[];
+    if(sn.length) h += rows(sn.map(n=>({id:n.id,stability:n.stability,activation:num(n.activation),description:n.description})),
+                            ["id","stability","activation","description"], "state nodes");
+    return h+`</div>`;
+  }
+  const info = SOURCE_INFO[src] || "Prompt region — policy/runtime-composed chrome, not a lobe.";
+  return `<div class="ldraw"><div class="ldhead"><span class="sw" style="background:${srcSwatch(src)}"></span>`+
+    `<b>${esc(src)}</b> <span class="chip">prompt region</span></div><div class="dim">${esc(info)}</div></div>`;
+}
+
+function wirePrompt(t, r){
+  wireConvTurnStrip();
+  document.querySelectorAll(".pstepbtn").forEach(b=> b.onclick=()=>{ promptStep=+b.dataset.step; promptSource=null; promptHop=-1; renderPanel(); });
+  document.querySelectorAll(".hopbtn").forEach(b=> b.onclick=()=>{ promptHop=+b.dataset.hop; renderPanel(); });
+  document.querySelectorAll(".legchip").forEach(b=> b.onclick=()=>{ promptSource = b.dataset.src||null; renderPanel(); });
+  document.querySelectorAll("#promptbox .seg").forEach(sp=> sp.onclick=()=>{
+    document.querySelectorAll("#promptbox .seg.sel").forEach(x=>x.classList.remove("sel"));
+    sp.classList.add("sel");
+    // Write into the sub-div so the call-meta block at the top of the side panel stays put.
+    document.getElementById("lobedraw").innerHTML = lobeDrawer(t, sp.dataset.src);
+  });
+  // Drag the splitter to resize the inspector column (dragging left widens it).
+  const split = document.getElementById("psplit"),
+        side  = document.getElementById("lobedrawer"),
+        wrap  = document.getElementById("promptlayout");
+  if(split && side && wrap){
+    split.onmousedown = e=>{
+      e.preventDefault();
+      const startX = e.clientX, startW = side.offsetWidth, total = wrap.offsetWidth;
+      split.classList.add("drag"); document.body.classList.add("col-resizing");
+      const move = ev=>{
+        const w = Math.max(220, Math.min(total-260, startW - (ev.clientX - startX)));
+        promptSideW = Math.round(w); side.style.width = promptSideW + "px";
+      };
+      const up = ()=>{ split.classList.remove("drag"); document.body.classList.remove("col-resizing");
+        window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+      window.addEventListener("mousemove", move); window.addEventListener("mouseup", up);
+    };
+  }
+}
+
+/* ── per-turn axis chips (the OX/OY/metacognition glance) ─────────────────── */
+function axisChips(t, r){
+  const p = t.path||{}, f = t.flow||{}, m = t.meta||{}, u = t.usage_rollup||{};
+  const st = (r.status||"").toLowerCase();
+  const c = [
+    `<span class="gchip">path <b>${esc(p.name||"?")}</b>${p.score!=null?` ${num(p.score)}`:""}${p.emergent?" ·emergent":""}</span>`,
+    `<span class="gchip">flow <b>${esc(f.name||"?")}</b></span>`,
+    `<span class="gchip">${(t.flow_steps||[]).length} step(s)</span>`,
+  ];
+  if(m.mode||m.action) c.push(`<span class="gchip">μ ${esc(m.mode||"observe")}${m.action?` · ${esc(m.action)}`:""}</span>`);
+  if(t.total_latency_ms!=null) c.push(`<span class="gchip">${ms(t.total_latency_ms)}</span>`);
+  c.push(`<span class="gchip">tok in ${num(u.input_tokens)} · out ${num(u.output_tokens)}</span>`);
+  c.push(`<span class="badge ${st==='error'?'bad':(r.refusal_reason?'pin':'ok')}">${esc(r.status||'?')}${r.refusal_reason?' · refused':''}</span>`);
+  (t.degraded||[]).forEach(d=>c.push(`<span class="badge bad">${esc(d)}</span>`));
+  return `<div class="glance">${c.join("")}</div>`;
+}
+
+/* ── Flow · OX (path → flow → steps over time) ────────────────────────────── */
+function panelFlow(t, r){
+  const steps = t.flow_steps||[], p = t.path||{}, f = t.flow||{};
+  const loopBadge = lp => `<span class="badge ${lp==='agentic'?'agentic':'single'}">${esc(lp||'single')}</span>`;
+  let h = `<p class="dim">How this turn progressed: the recognized intent picks a flow, and the flow runs an ordered list of steps (left → right). Each step runs a small loop and consults a set of lobes for context.</p>`;
+  h += `<div class="cards">
+    <div class="card"><div class="k">intent (recognized path)</div><div class="v small">${esc(p.name||'?')}</div>
+      <div class="dim">${p.score!=null?`score ${num(p.score)}`:''}${p.emergent?' · emergent':''}${p.runner_up?` · runner-up ${esc(p.runner_up.name)} ${num(p.runner_up.score)}`:''}</div></div>
+    <div class="card"><div class="k">flow (pipeline)</div><div class="v small">${esc(f.name||'?')}</div><div class="dim">${steps.length} step(s)</div></div>
+  </div>`;
+  if(!steps.length) return h+'<p class="none">No flow steps recorded for this turn.</p>';
+  h += `<h3>Steps, in order</h3>`;
+  h += `<div class="pipe">`+ steps.map((s,i)=>{
+    const md = s.metadata||{}, lobes = s.lobe_ids||s.lobes||[];
+    const sigNodes = (s.state_nodes||[]).filter(n=>String(n.id||'').endsWith(':signal'));
+    const box = `<div class="pstep${md.error?' err':''}">
+      <div class="pname">${esc(s.step||s.name||'?')}${s.type?` <span class="chip" title="running model — how the stage executes">${esc(s.type)}</span>`:''}</div>
+      <div class="pmeta">${loopBadge(s.loop)}${md.hops?` · ${md.hops} hop(s)`:''}</div>
+      ${sigNodes.length?`<div class="pmeta">signal: ${sigNodes.map(n=>`<span class="oychip ${n.activated?'lit':'dark'}" title="${esc(n.reason||'')}">${esc(String(n.id).replace(/:signal$/,''))}${n.activated?' ✓':''}</span>`).join(' ')}</div>`:''}
+      <div class="pmeta">in ${num(s.tokens_in)} · out ${num(s.tokens_out)}${s.latency_ms!=null?` · ${ms(s.latency_ms)}`:''}</div>
+      ${lobes.length?`<div class="toolrow">${lobes.slice(0,8).map(l=>`<span class="chip">${esc(l)}</span>`).join('')}${lobes.length>8?`<span class="chip">+${lobes.length-8}</span>`:''}</div>`
+                    :`<div class="pmeta" style="color:var(--bad)">∅ empty lobe slice</div>`}
+      ${(s.tools||[]).length?`<details><summary class="dim">${s.tools.length} tool(s)</summary><div class="toolrow">${s.tools.map(x=>`<span class="chip tool">${esc(x)}</span>`).join('')}</div></details>`:''}
+      ${md.error?`<div class="pmeta" style="color:var(--bad)">${esc(md.error)}</div>`:''}
+    </div>`;
+    return box + (i<steps.length-1?`<div class="parrow">→</div>`:'');
+  }).join('')+`</div>`;
+  const series = steps.flatMap(s=>((s.metadata||{}).funnel_obs_chars)||[]);
+  if(series.length>1) h += `<h3>per-hop observation funnel <span class="dim">— message-tail chars</span></h3><p class="dim mono">${series.map(v=>num(v)).join(' → ')}</p>`;
+  h += `<p class="dim"><b>loop</b>: agentic = tool/ReAct loop · single = one model call · none = pure prompt build. <b>lobes</b> = the context workers that step consulted (open the Lobes tab for detail). Tune a step's lobe set with <code>flow_&lt;step&gt;__lobe_&lt;id&gt;__add/remove</code>.</p>`;
+  return h;
+}
+
+/* ── Metacognition (monitor → regulate, always on) ────────────────────────── */
+function panelMeta(t, r){
+  const m = t.meta||{}, q = t.meta_queue||[];
+  let h = `<h3>Metacognition <span class="dim">— monitor → regulate, always on</span></h3>`;
+  if(!Object.keys(m).length && !q.length) return h+'<p class="none">No metacognition record on this turn.</p>';
+  const mode = m.mode||"observe";
+  h += `<div class="cards">
+    <div class="card"><div class="k">mode</div><div class="v small">${esc(mode)}</div><div class="dim">${mode==='apply'?'live — applies allow-listed actions':'shadow — monitors only'}</div></div>
+    <div class="card"><div class="k">decision</div><div class="v small">${esc(m.action||'—')}</div><div class="dim">${m.applied?'applied':'not applied'}${m.confidence!=null?` · conf ${num(m.confidence)}`:''}</div></div>
+    ${m.target_step?`<div class="card"><div class="k">target step</div><div class="v small">${esc(m.target_step)}</div></div>`:''}
+  </div>`;
+  if(m.reason) h += `<div class="metabar"><span class="mu">μ</span> ${esc(m.reason)}</div>`;
+  if((m.target_lobes||[]).length) h += `<h4 class="dim">regulation target lobes</h4><div>${m.target_lobes.map(x=>`<span class="chip">${esc(x)}</span>`).join('')}</div>`;
+  h += `<h3>Observations</h3>`;
+  h += q.length ? rows(q, ["id","kind","target","severity","detail"]) : '<p class="none">No observations queued.</p>';
+  h += `<details class="optsec"><summary>vocabulary &amp; hard limits</summary>
+    <p><b>Observations:</b> context_tight · empty_lobe_slice · empty_step_context · low_confidence_path <span class="dim">(deferred: context_overflow · missing_memory)</span></p>
+    <p><b>Decisions:</b> continue · adjust_lobe_slice <span class="dim">(trims optional lobes only)</span> · retry_step · skip_step · meta_review <span class="dim">(deferred tier-moves: trim/summarize/retrieve/expand_context)</span></p>
+    <p class="dim">Hard limits — pinned steps <code>cite</code> and <code>filter</code> are never skippable; ground-or-refuse is never a metacognition decision.</p></details>`;
+  return h;
+}
+
+/* ── Skills (workflows the model is driven through) ───────────────────────── */
+// Lifecycle (01-architecture.md): skill:list → select:cue → read:hint →
+// in_use → guide. trace.skills records the live coarse state per active skill
+// {slug: selecting|activated|driving}; the declared roster rides record.context.
+const _SKILL_STAGES = ["selecting","activated","driving"];
+const _SKILL_STATE_BADGE = {selecting:"single", activated:"ok", driving:"agentic"};
+function panelSkills(t, r){
+  const live = t.skills||{};
+  const declared = (r.context||{}).skills_declared||[];
+  const roster = [...new Set([...declared, ...Object.keys(live)])].sort();
+  let h = `<h3>Skills <span class="dim">— workflows the model is driven through</span></h3>`;
+  h += `<p class="dim">lifecycle: skill:list → select:cue → read:hint → in_use → guide</p>`;
+  if(roster.length){
+    h += `<table><tr><th>skill</th><th>state</th><th>lifecycle</th></tr>`+ roster.map(s=>{
+      const state = live[s] || "inactive", idx = _SKILL_STAGES.indexOf(state);
+      const badge = _SKILL_STATE_BADGE[state] || "single";
+      const chips = _SKILL_STAGES.map((st,i)=>`<span class="oychip ${st===state?'lit':(idx>=0&&i<idx?'pending':'dark')}">${esc(st)}</span>`).join(" ");
+      return `<tr><td><b>${esc(s)}</b></td><td><span class="badge ${badge}">${esc(state)}</span></td><td>${chips}</td></tr>`;
+    }).join("")+`</table>`;
+  } else h += '<p class="none">No skills declared or activated this turn.</p>';
+  if((t.skill_selection||[]).length)
+    h += rows(t.skill_selection.flatMap(s=>(s.ranking||[]).map(d=>({stage:s.stage, ...d}))),
+              ["stage","label","activation","kept"], "Adaptive skill selection (per stage)");
+  if(t.skill_reasoning) h += `<h4>reasoned activation</h4><pre>${esc(JSON.stringify(t.skill_reasoning,null,2))}</pre>`;
+  return h;
+}
+
+/* ── Tasks (long-rail autonomous execution) ───────────────────────────────── */
+// 01-architecture.md: a task advances a bot_task_todos checklist across
+// fires. Two lists: the TEMPLATE catalog (what can be authored) and the active
+// task STATES (the running checklists). Both ride record.context (probe.py).
+function panelTasks(t, r){
+  const ctx = r.context||{};
+  const templates = ctx.task_templates||[];
+  const items = ctx.task_items||[];
+  const sp = t.scratchpad||{};
+  let h = `<h3>Task templates <span class="dim">— the catalog a turn can author from</span></h3>`;
+  if(templates.length){
+    h += `<table><tr><th>slug</th><th>name</th><th>description</th><th>vars</th><th>default cron</th></tr>`+
+      templates.map(tp=>{
+        const vars = (tp.variables||[]).map(v=>`${esc(v.name)}${v.required?'*':''}`).join(", ");
+        return `<tr><td class="mono">${esc(tp.slug)}</td><td>${esc(tp.name)}</td><td>${esc(tp.description||'')}</td>`+
+               `<td>${vars||'<span class="dim">–</span>'}</td><td class="mono">${esc(tp.default_cron||'–')}</td></tr>`;
+      }).join("")+`</table>`;
+  } else h += '<p class="none">No task templates in scope (the catalog is only loaded on task-management turns).</p>';
+
+  h += `<h3>Task states <span class="dim">— active checklists (the todo rail)</span></h3>`;
+  const STC = {done:"#1F6B4A",skipped:"#6b7280",todo:"#B8845B",doing:"#2563eb",blocked:"#b91c1c"};
+  if(items.length){
+    h += items.map(it=>{
+      const st = (it.status||"").toLowerCase();
+      const badge = st==="blocked"||st==="failed"||st==="waiting_for_human" ? "bad"
+                  : (st==="done"||st==="completed" ? "ok" : "single");
+      const todos = (it.todos||[]);
+      const done = todos.filter(td=>["done","skipped"].includes((td.status||"").toLowerCase())).length;
+      const pct = todos.length ? Math.round(100*done/todos.length) : 0;
+      const rows = todos.map(td=>{
+        const s=(td.status||"todo").toLowerCase(), c=STC[s]||"#46443d";
+        const deps=(td.deps&&td.deps.length)?` <span class="mono dim">⟂ needs ${td.deps.map(esc).join(", ")}</span>`:"";
+        const off=(s==="done"||s==="skipped")?"opacity:.55;text-decoration:line-through":"";
+        const res=td.result?` <span class="dim">→ ${esc(td.result)}</span>`:"";
+        return `<li style="margin:2px 0;${off}"><span style="display:inline-block;min-width:62px;color:${c};`+
+               `font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em">${esc(s)}</span> `+
+               `${esc(td.title)}${deps}${res}</li>`;
+      }).join("");
+      const bar = `<div style="background:#e9e6dd;border-radius:5px;height:7px;margin:5px 0 9px;overflow:hidden">`+
+                  `<div style="background:#1F6B4A;height:100%;width:${pct}%"></div></div>`;
+      return `<div class="turnblk"><b>${esc(it.title||it.id||'task')}</b> `+
+             `<span class="badge ${badge}">${esc(it.status||'?')}</span> `+
+             `<span class="dim">· ${done}/${todos.length} todos done</span>`+
+             (it.goal||it.instruction?`<div class="dim" style="margin:3px 0 2px">${esc(it.goal||it.instruction)}</div>`:"")+
+             bar + `<ol style="list-style:decimal;margin:0;padding-left:24px;font-size:13px">${rows}</ol></div>`;
+    }).join("");
+  } else h += '<p class="none">No active tasks this turn.</p>';
+
+  h += `<h3>Execution scratchpad <span class="dim">— rail: recall_state → advance → checkpoint → report → continue?</span></h3>`;
+  h += Object.keys(sp).length ? `<pre>${esc(JSON.stringify(sp,null,2))}</pre>`
+     : '<p class="none">No task scratchpad on this turn (not a task-execution fire).</p>';
+  return h;
+}
+
+/* ── Subagents (plan-driven fan-out: one worker per todo) ──────────────────── */
+// Each map stage records per-worker sub-traces on flow_steps[].subagents:
+// {label, status, system_prompt, steps:[{kind,...}], llm_calls, tokens_used}. Every
+// worker has its OWN isolated context + timeline — this panel shows each one.
+function _subStep(s){
+  const k = s.kind || "?";
+  if(k==="tool_use")    return `<li class="sa-tu">→ <b>${esc(s.name||"tool")}</b>(${esc(JSON.stringify(s.input||{}).slice(0,120))})</li>`;
+  if(k==="tool_result") return `<li class="sa-tr">← ${esc(String(s.output||"").split("\n")[0].slice(0,140))}</li>`;
+  if(k==="thinking")    return `<li class="sa-th dim">· ${esc(String(s.text||"").slice(0,140))}</li>`;
+  if(k==="answer")      return `<li class="sa-an">✓ ${esc(String(s.text||"").slice(0,200))}</li>`;
+  return `<li class="dim">${esc(k)}</li>`;
+}
+function panelSubagents(t, r){
+  const steps = t.flow_steps || [];
+  const groups = steps.filter(s => (s.subagents||[]).length);
+  let h = `<h3>Subagents <span class="dim">— plan-driven fan-out: one isolated worker per todo</span></h3>`;
+  if(!groups.length)
+    return h + '<p class="none">No fan-out on this turn (no stage ran loop="map" with a plan to fan out).</p>';
+  const sp = (r.trace||t||{}).blackboard || {};
+  const structure = sp.plan_structure;
+  if(structure) h += `<p class="dim">execution structure: <span class="badge ${structure==='fanout'?'agentic':'single'}">${esc(structure)}</span> `+
+                     `(${structure==='fanout'?'workers ran in parallel, each isolated':'workers ran in order, carrying prior results'})</p>`;
+  groups.forEach(st=>{
+    const subs = st.subagents||[];
+    h += `<h4 class="dim">stage <code>${esc(st.step)}</code> · ${subs.length} subagent(s)</h4>`;
+    h += subs.map((sa,i)=>{
+      const ok = sa.status!=="failed";
+      const badge = ok ? "ok" : "bad";
+      const tl = (sa.steps||[]).map(_subStep).join("");
+      const promptId = `sa-${st.step}-${i}`;
+      return `<div class="turnblk">
+        <b>${esc(sa.label||("worker "+(i+1)))}</b>
+        <span class="badge ${badge}">${esc(sa.status||"ok")}</span>
+        <span class="dim">· ${(sa.steps||[]).length} step(s) · ${(sa.llm_calls||[]).length} hop(s) · ${num(sa.tokens_used||0)} tok</span>
+        ${sa.system_prompt?`<details class="optsec"><summary>its system prompt (own isolated context)</summary><pre id="${promptId}">${esc(sa.system_prompt)}</pre></details>`:""}
+        <ol class="sa-tl" style="list-style:none;margin:6px 0 0;padding-left:6px;font-size:12.5px;border-left:2px solid #e9e6dd">${tl||'<li class="none">no steps captured</li>'}</ol>
+      </div>`;
+    }).join("");
+  });
+  return h;
+}
+
+/* ── Hotspots & hints ─────────────────────────────────────────────────────── */
+/* ── Context Efficiency (PreAct) ────────────────────────────────────────
+   "Optimizing context, not maximizing context" — useful reasoning per token.
+   Reads attention.{nodes,tiers}, usage_rollup, and flow_steps funnel telemetry.
+   Falls back gracefully on traces that predate the tier/funnel fields. */
+const _TIER = {1:["#1F6B4A","Tier 1 · inject"],2:["#B8845B","Tier 2 · hint"],3:["#8a8a8a","Tier 3 · offload"]};
+function _pct(x){ return x==null ? "–" : (Math.round(x*1000)/10)+"%"; }
+function _effCard(label, value, sub){
+  return `<div style="flex:1;min-width:150px;border:1px solid #ddd;border-radius:8px;padding:10px 12px">
+    <div class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.04em">${esc(label)}</div>
+    <div style="font-size:22px;font-weight:600">${esc(value)}</div>
+    <div class="dim" style="font-size:11px">${esc(sub||"")}</div></div>`;
+}
+function panelEfficiency(t, r){
+  const u = t.usage_rollup || {};
+  const attn = t.attention || {};
+  const anodes = attn.nodes || [];
+  const tiers = attn.tiers || {};
+  const tnodes = tiers.nodes || [];
+
+  // Context efficiency = useful (selected) tokens / total candidate tokens.
+  const totTok = anodes.reduce((a,n)=>a+(n.tokens||0), 0);
+  const selTok = anodes.filter(n=>n.selected).reduce((a,n)=>a+(n.tokens||0), 0);
+  const ctxEff = totTok ? selTok/totTok : null;
+  // Context density = mean CDS of injected (Tier-1) nodes (reasoning value / token).
+  const inj = tnodes.filter(n=>n.tier===1);
+  const meanCds = inj.length ? inj.reduce((a,n)=>a+(n.cds||0),0)/inj.length : null;
+  // Cache hit rate = cache-read / input tokens.
+  const cacheRate = u.input_tokens ? (u.cache_read_input_tokens||0)/u.input_tokens : null;
+  // Budget utilization = selected context tokens / budget.
+  const budgetUtil = attn.budget_tokens ? (attn.total_tokens||0)/attn.budget_tokens : null;
+
+  let h = `<h3>Context efficiency <span class="dim">— useful reasoning per token (PreAct)</span></h3>`;
+  h += `<div style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 16px">`+
+    _effCard("Context efficiency", _pct(ctxEff), totTok?`${num(selTok)} / ${num(totTok)} candidate tok`:"no scored nodes")+
+    _effCard("Context density (CDS)", meanCds==null?"–":num(meanCds), inj.length?`mean over ${inj.length} injected`:"no Tier-1 nodes")+
+    _effCard("Cache hit rate", _pct(cacheRate), `${num(u.cache_read_input_tokens)} / ${num(u.input_tokens)} in-tok`)+
+    _effCard("Budget use", _pct(budgetUtil), attn.budget_tokens?`${num(attn.total_tokens)} / ${num(attn.budget_tokens)} tok`:"no budget")+
+  `</div>`;
+
+  // Tier distribution (the OY funnel): tokens per exposure tier.
+  if(tnodes.length){
+    const tok = {1:0,2:0,3:0}, cnt = {1:0,2:0,3:0};
+    tnodes.forEach(n=>{ const k=n.tier||3; tok[k]=(tok[k]||0)+(n.tokens||0); cnt[k]=(cnt[k]||0)+1; });
+    const tot = (tok[1]+tok[2]+tok[3])||1;
+    h += `<h3>Exposure tiers <span class="dim">— inject-full · hint+tool · offload</span></h3>`;
+    h += `<div style="display:flex;height:22px;border-radius:4px;overflow:hidden;margin:6px 0">`+
+      [1,2,3].map(k=>{ const w=100*tok[k]/tot; return w>0?
+        `<div title="${esc(_TIER[k][1])}: ${cnt[k]} node(s), ${tok[k]} tok" style="width:${w}%;background:${_TIER[k][0]}"></div>`:"";
+      }).join("")+`</div>`;
+    h += `<table><tr><th>tier</th><th>nodes</th><th>tokens</th><th>share</th></tr>`+
+      [1,2,3].map(k=>`<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${_TIER[k][0]}"></span> ${esc(_TIER[k][1])}</td>`+
+        `<td>${cnt[k]}</td><td>${num(tok[k])}</td><td>${_pct(tok[k]/tot)}</td></tr>`).join("")+`</table>`;
+    if(cnt[2]>0) h += `<p class="dim">${cnt[2]} node(s) kept as a recall-to-read hint instead of being silently dropped — PreAct's "no silent drop".</p>`;
+  } else {
+    h += `<p class="none">No tier routing on this turn (set context_strategy=adaptive with react_context_strategy=funnel to populate).</p>`;
+  }
+
+  // Per-hop observation funnel (only on turns with tool hops).
+  const series = (t.flow_steps||[]).flatMap(s=>((s.metadata||{}).funnel_obs_chars)||[]);
+  if(series.length>1){
+    const mx = Math.max(...series)||1;
+    const deltas = series.slice(1).map((v,i)=>v-series[i]);
+    const bounded = deltas.every(d=>d < mx*0.6);
+    h += `<h3>Per-hop observation funnel <span class="dim">— message-tail chars after re-tiering</span></h3>`;
+    h += `<div style="display:flex;gap:6px;align-items:flex-end;height:90px;margin:8px 0">`+
+      series.map((v,i)=>`<div title="hop ${i}: ${v} chars" style="flex:1;background:#1F6B4A;height:${Math.max(4,100*v/mx)}%"></div>`).join("")+`</div>`;
+    h += `<p class="dim">hops: ${series.map(v=>num(v)).join(" → ")} · ${bounded?"funneled (bounded growth — spent observations demoted)":"growing"}</p>`;
+  }
+
+  h += `<p class="dim" style="margin-top:14px">Definitions — efficiency: selected ÷ candidate context tokens · density: mean CDS=(relevance×utility)/cost of injected nodes · cache: provider cache-read ÷ input. See docs/concepts/04-react-context-management.md.</p>`;
+  return h;
+}
+
+function panelHotspots(t, r){
+  const out = [];
+  const steps = t.flow_steps || [], lobes = t.lobes || [];
+  const topStep = [...steps].sort((a,b)=>(b.latency_ms||0)-(a.latency_ms||0)).slice(0,3);
+  if(topStep.length && topStep[0].latency_ms)
+    out.push(["Slowest flow steps", topStep.map(s=>`${s.step} (${ms(s.latency_ms)})`).join(" · ")]);
+  const topLobe = [...lobes].filter(l=>l.latency_ms).sort((a,b)=>(b.latency_ms||0)-(a.latency_ms||0)).slice(0,3);
+  if(topLobe.length) out.push(["Slowest lobes", topLobe.map(l=>`${l.id} (${ms(l.latency_ms)})`).join(" · ")]);
+  const trimmed = lobes.filter(l=>l.trimmed);
+  if(trimmed.length) out.push(["Budget-trimmed lobes", trimmed.map(l=>`${l.id} (−${num(l.trimmed)} tok)`).join(" · ")]);
+  const subthresh = lobes.filter(l=>{ const s=l.state_node_summary; return l.activated && s && (s.total||0)>0 && (s.enabled||0)===0; });
+  if(subthresh.length) out.push(["Activated but all state-nodes sub-threshold", subthresh.map(l=>l.id).join(" · ")]);
+  const empty = steps.filter(s=>(s.node_count||0)===0);
+  if(empty.length) out.push(["Steps that produced no context nodes", empty.map(s=>s.step).join(" · ")]);
+  if((t.degraded||[]).length) out.push(["Infra degradation", (t.degraded).join(" · ")]);
+  const u = t.usage_rollup||{};
+  out.push(["Tokens", `out ${num(u.output_tokens)} · cache-read ${num(u.cache_read_input_tokens)} · in ${num(u.input_tokens)}`]);
+
+  let h = `<h3>Auto-detected hotspots</h3>`;
+  h += out.length ? `<table><tr><th>signal</th><th>detail</th></tr>`+
+       out.map(([k,v])=>`<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("")+`</table>`
+     : '<p class="none">No hotspots flagged.</p>';
+
+  h += `<h3>Engine optimization hints <span class="dim">— suggest_axis_optimizations()</span></h3>`;
+  const hints = r.hints || [];
+  h += hints.length ? hints.map(x=>`<div class="hint">
+      <span class="ht">[${esc(x.axis)}] ${esc(x.target)}</span> — ${esc(x.reason)}
+      ${x.weight_patch&&Object.keys(x.weight_patch).length?`<div class="mono dim">patch: ${esc(JSON.stringify(x.weight_patch))}</div>`:""}
+    </div>`).join("")
+    : '<p class="none">No hints baked into this record (the bench didn\'t attach any).</p>';
+
+  // The three documented tuning levels (01-architecture.md · Inspection and
+  // Optimization Surfaces) — where to act on what this turn surfaced.
+  h += `<details class="optsec" open><summary>Tuning surfaces — lobe unit · flow step · whole engine</summary>
+    <p><b>Lobe unit (OY)</b> — bias or gate a lobe: <code>prior_&lt;lobe&gt;</code>, <code>min_&lt;lobe&gt;</code>, <code>disable_&lt;lobe&gt;_&lt;node&gt;</code> in <code>flow_lobe_weights</code>. See the Lobes panel for activation reasons.</p>
+    <p><b>Flow step (OX)</b> — reshape a step's lobe slice / loop / tools: <code>flow_&lt;step&gt;__lobe_&lt;id&gt;__add/remove</code>, <code>flow_layer_budgets</code>. See the Flow panel.</p>
+    <p><b>Whole engine</b> — context vs flow knobs: <code>context_strategy</code> (static/adaptive/llm), <code>react_context_strategy</code> (funnel/accumulate), <code>flow_strategy</code> (static/adaptive), <code>context_budget_tokens</code>.</p>
+    <p class="dim">Read-only snapshot APIs: <code>inspect_lobe_axis</code> · <code>inspect_flow_axis</code> · <code>snapshot_engine</code> · <code>suggest_axis_optimizations</code> (agent_core.inspection).</p></details>`;
+  return h;
+}
+
+/* ── Raw JSON ─────────────────────────────────────────────────────────────── */
+function panelRaw(t, r){
+  return `<button class="copy" id="copybtn">Copy trace JSON</button>
+    <details class="raw" open><summary>trace</summary><pre id="rawtrace">${esc(JSON.stringify(t,null,2))}</pre></details>
+    <details class="raw"><summary>full record (trace + checks + tools + hints)</summary>
+      <pre>${esc(JSON.stringify(r,null,2))}</pre></details>`;
+}
+function wireCopy(){
+  const b = document.getElementById("copybtn"); if(!b) return;
+  b.onclick = ()=>{ navigator.clipboard.writeText(document.getElementById("rawtrace").textContent)
+    .then(()=>{ b.textContent="Copied ✓"; setTimeout(()=>b.textContent="Copy trace JSON",1200); }); };
+}
+
+/* ── shared table helper ──────────────────────────────────────────────────── */
+function rows(list, cols, title){
+  const t = title ? `<h3>${esc(title)}</h3>` : "";
+  if(!list || !list.length) return t+'<p class="none">(none)</p>';
+  const cell = v => (v && typeof v==="object") ? esc(JSON.stringify(v)) : esc(v);
+  return t+`<table><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join("")}</tr>`+
+    list.map(row=>`<tr class="${row.disabled||row.skipped?'off':''}">`+
+      cols.map(c=>`<td>${cell(row[c])}</td>`).join("")+`</tr>`).join("")+`</table>`;
+}
+
+/* ── boot + drag-drop ─────────────────────────────────────────────────────── */
+function boot(){
+  const embed = document.getElementById("trace-data");
+  if(embed && embed.textContent.trim()){
+    try{ load(JSON.parse(embed.textContent)); return; }catch(e){ console.error("bad embedded JSON",e); }
+  }
+  document.getElementById("drop").hidden = false;
+}
+function readFile(f){ const fr = new FileReader();
+  fr.onload = ()=>{ try{ load(JSON.parse(fr.result)); }catch(e){ alert("Not valid JSON: "+e); } };
+  fr.readAsText(f); }
+document.addEventListener("DOMContentLoaded", ()=>{
+  boot();
+  const drop = document.getElementById("drop");
+  document.getElementById("file").addEventListener("change", e=>{ if(e.target.files[0]) readFile(e.target.files[0]); });
+  ["dragenter","dragover"].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");drop.hidden=false;}));
+  document.addEventListener("dragleave",e=>{ if(e.relatedTarget===null) drop.classList.remove("over"); });
+  document.addEventListener("drop",e=>{ e.preventDefault(); drop.classList.remove("over");
+    if(e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]); });
+});
+</script>
+</body>
+</html>
