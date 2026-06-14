@@ -32,7 +32,7 @@ from agent_sdk.network.activation import LAYER_EXPRESSION, LobeSpec
 # no-citations refusal happens BEFORE this call, in the orchestration — a
 # weight or prompt can never disable it.
 
-SYSTEM_PROMPT = """You are an output filter. Apply the following rules:
+SYSTEM_PROMPT = """Apply the following output-filter rules:
 1. REFUSE (return refusal_reason="no_citations") if no verified citations are present
 2. Redact any PII (emails, phone numbers, SSNs)
 3. Remove speculation, opinions, or information not supported by citations
@@ -47,7 +47,7 @@ USER_TEMPLATE = "Answer to filter:\n{answer}"
 # Flow-axis gate pass (the "filter" FlowStep, _run_pipeline). Its text IS the
 # pipeline's FINAL response — it must ship the grounded answer or a refusal,
 # never an analysis or a JSON verdict.
-FLOW_GATE_PROMPT = """You are the ground-or-refuse gate of a research pipeline.
+FLOW_GATE_PROMPT = """Apply the ground-or-refuse gate of a research pipeline.
 The system context carries the grounded answer (under "## Step output — cite", falling
 back to "## Step output — synthesize") and the evidence index of chunks actually read.
 

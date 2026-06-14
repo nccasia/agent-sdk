@@ -41,6 +41,15 @@ class ProbeRecord:
     meta_actions: list[dict] = field(default_factory=list)
     hints: list[dict] = field(default_factory=list)  # optimization hotspots (axis/target/reason)
     attention: dict = field(default_factory=dict)  # context tiers + per-stage funnel telemetry
+    blackboard: dict = field(default_factory=dict)  # turn scratchpad snapshot (plan/results/etc.)
+    # First-class selection/health signals from the trace — which skills the
+    # skill_select lobe surfaced + their ranking ({stage, ranking:[{label,l1,l2,
+    # activation,kept}]}), the adaptive tool routing, and any degraded-dependency
+    # markers. Carried here so a bench can score skill/tool exposure straight off
+    # the probe, without a second turn.
+    skill_selection: list[dict] = field(default_factory=list)
+    tool_selection: list[dict] = field(default_factory=list)
+    degraded: list[str] = field(default_factory=list)
     error: str | None = None
 
     @property
@@ -87,6 +96,10 @@ async def probe(agent: Any, query: str, *, label: str = "") -> ProbeRecord:
         rec.llm_calls = t.llm_calls
         rec.meta_actions = t.meta_actions
         rec.attention = getattr(t, "attention", {}) or {}
+        rec.blackboard = getattr(t, "blackboard", {}) or {}
+        rec.skill_selection = getattr(t, "skill_selection", []) or []
+        rec.tool_selection = getattr(t, "tool_selection", []) or []
+        rec.degraded = getattr(t, "degraded", []) or []
         # Optimization hotspots — the agent's own weight-patch proposals for this
         # turn (the viewer's "hotspots" function, kept inline in the report).
         suggest = getattr(agent, "suggest_optimizations", None)

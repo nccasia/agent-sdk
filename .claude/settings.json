@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash benchmarks/ci-free-gates.sh)",
+      "Bash(bash benchmarks/loop/ladder.sh)",
+      "Bash(python3 benchmarks/loop/snapshot.py:*)",
+      "Bash(python benchmarks/loop/snapshot.py:*)",
+      "Bash(python3 benchmarks/_shared/improve_cli.py:*)",
+      "Bash(python benchmarks/_shared/improve_cli.py:*)",
+      "Bash(uv run python -m pytest:*)",
+      "Bash(uv run pytest:*)",
+      "Bash(uv run ruff check:*)",
+      "Bash(uv run ruff format:*)",
+      "Bash(python benchmarks/skillbench/run.py:*)",
+      "Bash(python benchmarks/taskbench/run.py:*)",
+      "Bash(python benchmarks/agentbench/run.py:*)",
+      "Bash(python benchmarks/extensionbench/run.py:*)",
+      "Bash(python benchmarks/coding-agent-bench/run.py:*)",
+      "Bash(python benchmarks/toolbench/run.py:*)",
+      "Bash(python3 benchmarks/toolbench/run.py:*)",
+      "Bash(python benchmarks/corgictionbech/run.py:*)",
+      "Bash(python3 benchmarks/corgictionbech/run.py:*)",
+      "Bash(python benchmarks/flowbench/run.py:*)",
+      "Bash(python3 benchmarks/flowbench/run.py:*)",
+      "Bash(python benchmarks/attentionbench/run.py:*)",
+      "Bash(python3 benchmarks/attentionbench/run.py:*)",
+      "Bash(python benchmarks/skillbench/compare.py:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git restore:*)",
+      "Bash(git checkout --:*)"
+    ]
+  }
+}

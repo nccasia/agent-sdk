@@ -11,8 +11,22 @@ __all__ = ["recognize", "TASK_CUES"]
 
 # Analytical / action cues — "a task to accomplish", not a plain question.
 TASK_CUES = (
-    "compute", "calculate", "find ", "identify", "list ", "report", "run ", "total",
-    "how many", "top ", "average", "per ", "summar", "analyz", "rank", "breakdown",
+    "compute",
+    "calculate",
+    "find ",
+    "identify",
+    "list ",
+    "report",
+    "run ",
+    "total",
+    "how many",
+    "top ",
+    "average",
+    "per ",
+    "summar",
+    "analyz",
+    "rank",
+    "breakdown",
 )
 
 

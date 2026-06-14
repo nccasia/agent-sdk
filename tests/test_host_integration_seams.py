@@ -43,12 +43,17 @@ class _KBRuntime:
         self.observed_already: list[set] = []
 
     def get_tool_specs(self) -> list[dict]:
-        return [{
-            "name": "kb_search",
-            "description": "search the KB",
-            "input_schema": {"type": "object", "properties": {"q": {"type": "string"}},
-                             "required": ["q"]},
-        }]
+        return [
+            {
+                "name": "kb_search",
+                "description": "search the KB",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"q": {"type": "string"}},
+                    "required": ["q"],
+                },
+            }
+        ]
 
     async def call_tool(self, name, inp, retrieved_chunks, already_read):
         self.observed_sizes.append(len(retrieved_chunks))
@@ -62,11 +67,17 @@ class _KBRuntime:
 
 async def test_evidence_channel_accumulates_across_hops():
     kb = _KBRuntime()
-    agent = _agentic("kb_search", kb, client=FakeClient([
-        {"tools": [{"name": "kb_search", "input": {"q": "a"}}]},
-        {"tools": [{"name": "kb_search", "input": {"q": "b"}}]},
-        "final answer",
-    ]))
+    agent = _agentic(
+        "kb_search",
+        kb,
+        client=FakeClient(
+            [
+                {"tools": [{"name": "kb_search", "input": {"q": "a"}}]},
+                {"tools": [{"name": "kb_search", "input": {"q": "b"}}]},
+                "final answer",
+            ]
+        ),
+    )
     rec = await probe(agent, "go", label="t")
     assert rec.status == "answered"
     # The SAME pool was threaded into both hops: it grew 0 → 1 (not reset to 0
@@ -80,16 +91,28 @@ async def test_degraded_markers_surface_on_trace():
 
     class _DegradingRuntime:
         def get_tool_specs(self):
-            return [{"name": "kb_search", "description": "d",
-                     "input_schema": {"type": "object", "properties": {}}}]
+            return [
+                {
+                    "name": "kb_search",
+                    "description": "d",
+                    "input_schema": {"type": "object", "properties": {}},
+                }
+            ]
 
         async def call_tool(self, name, inp, retrieved_chunks, already_read):
             current_turn().degraded.append("retrieval:no_readers")
             return "(no readers)"
 
-    agent = _agentic("kb_search", _DegradingRuntime(), client=FakeClient([
-        {"tools": [{"name": "kb_search", "input": {}}]}, "done",
-    ]))
+    agent = _agentic(
+        "kb_search",
+        _DegradingRuntime(),
+        client=FakeClient(
+            [
+                {"tools": [{"name": "kb_search", "input": {}}]},
+                "done",
+            ]
+        ),
+    )
     res = await agent.query("go")
     assert res.status == "answered"
     assert "retrieval:no_readers" in res.trace.degraded
@@ -103,8 +126,13 @@ async def test_evidence_pool_exposed_on_turn_context():
 
     class _Reader:
         def get_tool_specs(self):
-            return [{"name": "kb_search", "description": "d",
-                     "input_schema": {"type": "object", "properties": {}}}]
+            return [
+                {
+                    "name": "kb_search",
+                    "description": "d",
+                    "input_schema": {"type": "object", "properties": {}},
+                }
+            ]
 
         async def call_tool(self, name, inp, retrieved_chunks, already_read):
             retrieved_chunks.append({"chunk_id": "x1", "text": "t"})
@@ -114,9 +142,16 @@ async def test_evidence_pool_exposed_on_turn_context():
             seen["read"] = set(turn.already_read)
             return "ok"
 
-    agent = _agentic("kb_search", _Reader(), client=FakeClient([
-        {"tools": [{"name": "kb_search", "input": {}}]}, "done",
-    ]))
+    agent = _agentic(
+        "kb_search",
+        _Reader(),
+        client=FakeClient(
+            [
+                {"tools": [{"name": "kb_search", "input": {}}]},
+                "done",
+            ]
+        ),
+    )
     await probe(agent, "go", label="t")
     # current_turn().retrieved_chunks IS the pool the runtime mutated.
     assert seen["chunks"] == [{"chunk_id": "x1", "text": "t"}]
@@ -137,8 +172,13 @@ class _HostBoundRuntime:
         self.host = host
 
     def get_tool_specs(self):
-        return [{"name": "host_tool", "description": "d",
-                 "input_schema": {"type": "object", "properties": {}}}]
+        return [
+            {
+                "name": "host_tool",
+                "description": "d",
+                "input_schema": {"type": "object", "properties": {}},
+            }
+        ]
 
     async def call_tool(self, name, inp, retrieved_chunks, already_read):
         return f"host={self.host}"
@@ -153,8 +193,11 @@ class _HostPlugin:
 
 async def test_plugin_mounts_host_bound_runtime():
     agent = PreactAgent(
-        client=FakeClient(["ok"]), instructions="bot",
-        plugins=[_HostPlugin()], host="HOST-123", universal_memory=False,
+        client=FakeClient(["ok"]),
+        instructions="bot",
+        plugins=[_HostPlugin()],
+        host="HOST-123",
+        universal_memory=False,
     )
     names = {s["name"] for s in agent.engine.tools.get_tool_specs()}
     assert "host_tool" in names
@@ -164,14 +207,20 @@ async def test_plugin_mounts_host_bound_runtime():
 
 async def test_priority_runtime_wins_name_collision():
     """A mounted runtime wins the first-seen-name dedup over a @tool fn."""
+
     @tool
     async def kb_search(q: str) -> str:
         return "from fn"
 
     class _RT:
         def get_tool_specs(self):
-            return [{"name": "kb_search", "description": "rt",
-                     "input_schema": {"type": "object", "properties": {}}}]
+            return [
+                {
+                    "name": "kb_search",
+                    "description": "rt",
+                    "input_schema": {"type": "object", "properties": {}},
+                }
+            ]
 
         async def call_tool(self, name, inp, retrieved_chunks, already_read):
             return "from runtime"
@@ -186,8 +235,13 @@ async def test_context_bag_lands_on_turn_identity():
 
     class _IdentityProbe:
         def get_tool_specs(self):
-            return [{"name": "whoami", "description": "d",
-                     "input_schema": {"type": "object", "properties": {}}}]
+            return [
+                {
+                    "name": "whoami",
+                    "description": "d",
+                    "input_schema": {"type": "object", "properties": {}},
+                }
+            ]
 
         async def call_tool(self, name, inp, retrieved_chunks, already_read):
             t = current_turn()
@@ -196,10 +250,10 @@ async def test_context_bag_lands_on_turn_identity():
             return "ok"
 
     agent = _agentic(
-        "whoami", _IdentityProbe(),
+        "whoami",
+        _IdentityProbe(),
         client=FakeClient([{"tools": [{"name": "whoami", "input": {}}]}, "done"]),
-        context={"identity": {"tenant_id": "t1", "user_id": "u9"},
-                 "channel": {"channel_id": "c5"}},
+        context={"identity": {"tenant_id": "t1", "user_id": "u9"}, "channel": {"channel_id": "c5"}},
     )
     await probe(agent, "go", label="t")
     assert seen["identity"] == {"tenant_id": "t1", "user_id": "u9"}
@@ -209,7 +263,8 @@ async def test_context_bag_lands_on_turn_identity():
 # ── Gap 7: skill checklist / context_vars ─────────────────────────────────────
 def test_skill_facade_carries_checklist_and_context_vars():
     sk = Skill(
-        "wizard", when="onboarding",
+        "wizard",
+        when="onboarding",
         checklist=[{"key": "name", "ask": "Your name?"}],
         context_vars=[{"key": "notes", "type": "notes", "title": "Notes"}],
     )
@@ -223,10 +278,17 @@ def test_skill_facade_carries_checklist_and_context_vars():
 
 async def test_skill_spec_roundtrip_preserves_wizard_fields():
     agent = PreactAgent(
-        client=FakeClient(["ok"]), instructions="bot", universal_memory=False,
-        skills=[Skill("wizard", when="onboarding",
-                      checklist=[{"key": "name", "ask": "Your name?"}],
-                      context_vars=[{"key": "notes", "type": "notes"}])],
+        client=FakeClient(["ok"]),
+        instructions="bot",
+        universal_memory=False,
+        skills=[
+            Skill(
+                "wizard",
+                when="onboarding",
+                checklist=[{"key": "name", "ask": "Your name?"}],
+                context_vars=[{"key": "notes", "type": "notes"}],
+            )
+        ],
     )
     spec = build_spec(agent)
     row = next(r for r in spec.skills if r["id"] == "wizard")

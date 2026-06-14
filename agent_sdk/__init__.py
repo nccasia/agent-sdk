@@ -54,6 +54,13 @@ from agent_sdk._blocks import (  # noqa: E402
 from agent_sdk.activable import Activable, Layer
 from agent_sdk.agent import PreactAgent
 from agent_sdk.bench import Harness, Report, Scenario, ScenarioResult
+from agent_sdk.context import (
+    AgentContext,
+    Evidence,
+    Scope,
+    bind_context,
+    current_context,
+)
 from agent_sdk.engine import Engine
 from agent_sdk.events import (
     AgentStream,
@@ -115,6 +122,12 @@ __all__ = [
     "MemoryItem",
     "Scratchpad",
     "SemanticCache",
+    # shared context (one handle, every component, every scope)
+    "AgentContext",
+    "Scope",
+    "Evidence",
+    "current_context",
+    "bind_context",
     "Metacognition",
     "tool",
     "Tool",

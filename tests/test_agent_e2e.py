@@ -18,6 +18,7 @@ from agent_sdk import (
     tool,
 )
 from agent_sdk.clients import FakeClient
+from agent_sdk.plugins import RagPlugin
 from agent_sdk.stores import MemoryStoreInMemory, SessionStoreInMemory
 
 _MIN = dict(lobes=Lobes.minimal(), stages=Stages.minimal(), flows=Flows.minimal())
@@ -81,6 +82,7 @@ async def test_research_flow_with_tools():
         ),
         instructions="Researcher.",
         tools=[search],
+        plugins=[RagPlugin()],  # grounding is opt-in: the rag plugin extracts tool citations
         **_MIN,
     )
     tool_calls = []
@@ -102,7 +104,7 @@ async def test_inspect_is_no_llm():
     snap = agent.inspect("compare A and B in detail please now")
     assert isinstance(snap, ActivationSnapshot)
     assert snap.path[0] == "research"
-    assert any("synthesize" in s for s in snap.flow)  # production: flow-qualified ids
+    assert any("act" in s for s in snap.flow)  # research (deep) = [act, cite, filter]
     assert fake.calls == []  # inspect never touches the model
 
 

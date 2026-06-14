@@ -13,6 +13,7 @@ from agent_sdk.memory.durable import (
     MemoryItem,
     MemoryToolRuntime,
 )
+from agent_sdk.memory.golden_head import GoldenHead, GoldenItem
 from agent_sdk.memory.scratchpad import Scratchpad
 from agent_sdk.memory.semantic_cache import SemanticCache
 
@@ -23,4 +24,6 @@ __all__ = [
     "MemoryToolRuntime",
     "DEFAULT_SCOPES",
     "SemanticCache",
+    "GoldenHead",
+    "GoldenItem",
 ]

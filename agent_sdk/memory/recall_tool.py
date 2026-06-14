@@ -10,12 +10,10 @@ Two tools (kept minimal so the catalog stays lean at scale):
   ``decision`` written at ``scope=conversation`` is durable (long-term); the default is flash.
 
 These are ESSENTIALS — adaptive tool selection never drops them (a digest must always be
-re-expandable). See ``docs/concepts/universal-memory.md``.
+re-expandable). See ``docs/concepts/06-universal-memory.md``.
 """
 
 from __future__ import annotations
-
-from typing import Any
 
 from agent_sdk.memory.universal import FLASH_SCOPE, MemoryStore
 
@@ -47,8 +45,14 @@ class RecallToolRuntime:
                         "query": {"type": "string", "description": "free-text search over digests"},
                         "handle": {"type": "string", "description": "mem://… handle to expand"},
                         "full": {"type": "boolean", "description": "return the full body"},
-                        "grep": {"type": "string", "description": "regex; matching lines of a large body"},
-                        "section": {"type": "string", "description": "section id; one slice of a large body"},
+                        "grep": {
+                            "type": "string",
+                            "description": "regex; matching lines of a large body",
+                        },
+                        "section": {
+                            "type": "string",
+                            "description": "section id; one slice of a large body",
+                        },
                         "kind": {"type": "string", "description": "filter the search by kind"},
                     },
                 },
@@ -66,7 +70,10 @@ class RecallToolRuntime:
                     "properties": {
                         "content": {"type": "string"},
                         "kind": {"type": "string", "enum": list(_WRITE_KINDS)},
-                        "scope": {"type": "string", "enum": [FLASH_SCOPE, "conversation", "user", "bot"]},
+                        "scope": {
+                            "type": "string",
+                            "enum": [FLASH_SCOPE, "conversation", "user", "bot"],
+                        },
                         "key": {"type": "string"},
                     },
                     "required": ["content"],
@@ -113,8 +120,12 @@ class RecallToolRuntime:
         # silently lost facts the model noted without an explicit scope.)
         scope = inp.get("scope") or "conversation"
         handle = self.store.remember(
-            kind, inp.get("content", ""), scope=scope, key=inp.get("key"),
-            pinned=(kind in ("decision", "plan", "obligation")), source="note",
+            kind,
+            inp.get("content", ""),
+            scope=scope,
+            key=inp.get("key"),
+            pinned=(kind in ("decision", "plan", "obligation")),
+            source="note",
         )
         self.writes.append({"kind": kind, "scope": scope, "handle": handle})
         durable = "" if scope == FLASH_SCOPE else " (durable)"

@@ -70,7 +70,9 @@ class DocWriteGuard:
             m = _BASH_WRITE_RE.search(cmd)
             if m:
                 target = m.group(4)
-                self.events.append({"stage": stage_id, "path": target, "action": "blocked_readonly_write"})
+                self.events.append(
+                    {"stage": stage_id, "path": target, "action": "blocked_readonly_write"}
+                )
                 if not self.record_only:
                     return (
                         f"Refused: '{stage_id}' is a read-only step — do not write files here "
@@ -87,7 +89,9 @@ class DocWriteGuard:
         # tool allowlist only hides the spec; the runtime would still execute a tool
         # the model calls from its priors, so the guard is the actual enforcement).
         if stage_id in self.readonly_stages:
-            self.events.append({"stage": stage_id, "path": path, "action": "blocked_readonly_write"})
+            self.events.append(
+                {"stage": stage_id, "path": path, "action": "blocked_readonly_write"}
+            )
             if not self.record_only:
                 return (
                     f"Refused: '{stage_id}' is a read-only step — do not write files here "

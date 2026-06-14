@@ -89,8 +89,14 @@ async def test_viewer_surfaces_real_attention_and_funnel():
 def test_trace_schema_is_additive():
     """`Trace.to_json` keeps every legacy key and adds `attention` (no removals)."""
     legacy = {
-        "trace_id", "path", "lobes", "flow_stages",
-        "blackboard", "usage", "meta_actions", "llm_calls",
+        "trace_id",
+        "path",
+        "lobes",
+        "flow_stages",
+        "blackboard",
+        "usage",
+        "meta_actions",
+        "llm_calls",
     }
     keys = set(Trace().to_json())
     assert legacy <= keys, f"a legacy trace key was dropped: {legacy - keys}"

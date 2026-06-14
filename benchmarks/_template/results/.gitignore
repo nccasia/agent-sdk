@@ -1,0 +1,3 @@
+# generated run artifacts / ratchet state — keep the dir, ignore the contents
+*
+!.gitignore

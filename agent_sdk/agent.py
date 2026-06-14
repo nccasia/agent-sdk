@@ -47,7 +47,7 @@ MEMORY_DIRECTIVE = (
     "preferences, postmortems, agreements — call `note` for EACH distinct fact, one note per fact, "
     "the moment you read it (scope=conversation for things that outlive this turn). Do not skip facts.\n"
     "- RECALL: before answering any question about earlier information, check the `## Memory` list and "
-    "use `recall` to pull the detail. Never answer that you don't have something without recalling first.\n"
+    "use `recall` to pull the detail. Always recall first, then answer.\n"
     "- When a fact changes, note the new value; recall returns the latest."
 )
 
@@ -152,7 +152,9 @@ class PreactAgent:
         # at ANY hop count) instead of only every 24 hops. Overridable via budgets.
         engine_budgets = dict(budgets or {})
         if funnel and "working_set_budget" not in engine_budgets:
-            engine_budgets["working_set_budget"] = 2000   # ~8k chars: compaction triggers on a real loop
+            engine_budgets["working_set_budget"] = (
+                2000  # ~8k chars: compaction triggers on a real loop
+            )
             engine_budgets.setdefault("working_set_keep", 3)
         self.instructions = instructions
         self.session = session
@@ -183,6 +185,18 @@ class PreactAgent:
         # ``plugins`` may be a list OR a PluginRegistry — a registry resolves to its enabled
         # (active) set, so enable/disable/override is managed there.
         active_plugins = plugins.active() if hasattr(plugins, "active") else list(plugins or [])
+        # Grounding is opt-in (RagPlugin) — most agents have no retrieval. But
+        # ``require_citations=True`` is an explicit grounding intent, so auto-enable
+        # the RAG plugin (its finalize hook owns extraction + ground-or-refuse)
+        # unless it is already present or a registry disabled it by name.
+        if require_citations and not any(
+            getattr(p, "name", "") == "rag" for p in active_plugins
+        ):
+            disabled = plugins.is_disabled("rag") if hasattr(plugins, "is_disabled") else False
+            if not disabled:
+                from agent_sdk.plugins.rag import RagPlugin
+
+                active_plugins = [*active_plugins, RagPlugin()]
         for plugin in active_plugins:
             if getattr(plugin, "enabled", True) is False:
                 continue
@@ -192,6 +206,14 @@ class PreactAgent:
             for server in getattr(plugin, "mcp_servers", None) or []:
                 setup.add_mcp_server(server)
         resolved_lobes.extend(setup.lobes)
+        # Dedup lobes by id (keep first): a plugin may re-contribute a lobe the
+        # chosen network already carries (e.g. RagPlugin's ``cite`` on a minimal
+        # network that still lists an inline cite) — one spec per id.
+        _seen_lobe_ids: set[str] = set()
+        resolved_lobes = [
+            lb for lb in resolved_lobes
+            if not (lb.id in _seen_lobe_ids or _seen_lobe_ids.add(lb.id))
+        ]
         resolved_stages.extend(setup.stages)
         resolved_flows.extend(setup.flows)
         self._event_hooks = list(setup.event_hooks)
@@ -280,7 +302,8 @@ class PreactAgent:
         self._memory_runtime = memory_runtime
         extra_runtimes = list(mcp_runtimes) + [r for r in (recall_runtime,) if r is not None]
         tool_runtime = self._compose_tools(
-            list(tools or []) + list(setup.tools) + extra_runtimes, memory_runtime,
+            list(tools or []) + list(setup.tools) + extra_runtimes,
+            memory_runtime,
             priority_runtimes=list(setup.tool_runtimes),
         )
         # Any tool runtime that needs an async connect/discover phase (MCP) — resolved
@@ -328,6 +351,8 @@ class PreactAgent:
         )
         self.engine._prefetch_hooks = prefetch_hooks
         self.engine._tool_filters = list(setup.tool_filters) + list(tool_filters or [])
+        self.engine._finalize_hooks = list(setup.finalize_hooks)
+        self.engine._tool_result_hooks = list(setup.tool_result_hooks)
 
         self._last_trace: Trace | None = None
         self._jobs: dict[str, asyncio.Queue] = {}
@@ -384,8 +409,10 @@ class PreactAgent:
         """Eagerly run the MCP resolve phase (otherwise it runs lazily on the first turn).
         Returns ``{server_name: connected}`` for inspection."""
         await self._resolve_mcp()
-        return {getattr(r, "name", type(r).__name__): bool(getattr(r, "connected", False))
-                for r in self._mcp_runtimes}
+        return {
+            getattr(r, "name", type(r).__name__): bool(getattr(r, "connected", False))
+            for r in self._mcp_runtimes
+        }
 
     # ── core turn plumbing ───────────────────────────────────────────────────
     async def _run_stream(self, input: str, session: Session | None) -> AsyncIterator[Any]:
@@ -412,8 +439,9 @@ class PreactAgent:
 
                 for fact in salient_facts(input):
                     # Topic-keyed: a newer version of the same fact consolidates over the old one.
-                    self._memory_store.remember("fact", fact, scope="conversation", key=fact_key(fact),
-                                                source="establish")
+                    self._memory_store.remember(
+                        "fact", fact, scope="conversation", key=fact_key(fact), source="establish"
+                    )
             if sess is not None:
                 await sess.append(Turn("user", input))
                 await sess.append(Turn("assistant", last_result.text))

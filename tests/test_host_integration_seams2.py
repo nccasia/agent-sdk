@@ -19,7 +19,9 @@ from agent_sdk.spec import PreactSpec, agent_from_spec
 def _single(client, **kw):
     """A deterministic one-LLM-call agent (answer == the script's first item)."""
     return PreactAgent(
-        client=client, instructions="bot", universal_memory=False,
+        client=client,
+        instructions="bot",
+        universal_memory=False,
         flows=[flow("qna", stages=["work"], signal={"const": 1.0})],
         stages=[stage("work", lobes=["synthesize"], loop="single")],
         **kw,
@@ -59,7 +61,10 @@ async def test_pre_turn_gate_async():
 async def test_trace_skill_selection_first_class():
     sk = Skill("kbk", when="look things up", disclosure="on_demand", stages=["work"])
     agent = PreactAgent(
-        client=FakeClient(["done"]), instructions="bot", universal_memory=False, skills=[sk],
+        client=FakeClient(["done"]),
+        instructions="bot",
+        universal_memory=False,
+        skills=[sk],
         flows=[flow("qna", stages=["work"], signal={"const": 1.0})],
         stages=[stage("work", lobes=["synthesize"], loop="single")],
     )
@@ -82,10 +87,15 @@ async def test_trace_tool_selection_first_class():
         return "b"
 
     agent = PreactAgent(
-        client=FakeClient(["done"]), instructions="bot", universal_memory=False,
-        tools=[alpha, beta], budgets={"tool_strategy": "adaptive", "tool_budget_tokens": 50},
+        client=FakeClient(["done"]),
+        instructions="bot",
+        universal_memory=False,
+        tools=[alpha, beta],
+        budgets={"tool_strategy": "adaptive", "tool_budget_tokens": 50},
         flows=[flow("qna", stages=["work"], signal={"const": 1.0})],
-        stages=[stage("work", lobes=["synthesize"], loop="agentic", tools=["alpha", "beta"], hops=2)],
+        stages=[
+            stage("work", lobes=["synthesize"], loop="agentic", tools=["alpha", "beta"], hops=2)
+        ],
     )
     res = await agent.query("go")
     assert res.trace.tool_selection

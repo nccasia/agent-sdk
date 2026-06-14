@@ -11,7 +11,13 @@ import html as _html
 from pathlib import Path
 from typing import Any
 
-__all__ = ["render_consolidated", "write_consolidated"]
+__all__ = [
+    "render_consolidated",
+    "write_consolidated",
+    "render_report_md",
+    "write_report_md",
+    "emit_report",
+]
 
 _CSS = """
 :root{--paper:#FAFAF7;--ink:#0E0E0C;--muted:#6b6b63;--line:#e4e3db;
@@ -198,3 +204,99 @@ def write_consolidated(path: str | Path, **kwargs: Any) -> Path:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(render_consolidated(**kwargs), encoding="utf-8")
     return out
+
+
+# ── markdown report (committable snapshot; mirrors render_consolidated) ───────────────────────────
+def _md_states(probe: Any) -> str:
+    d = probe if isinstance(probe, dict) else probe.to_json()
+    steps = [s.get("step") or s.get("stage") for s in (d.get("trace", {}).get("flow_steps") or [])]
+    return " → ".join(str(s) for s in steps if s) or "—"
+
+
+def render_report_md(
+    *,
+    verdict: dict,
+    modes: dict[str, dict],
+    probes: list | None = None,
+    label: str = "benchmark",
+    generated_at: str | None = None,
+) -> str:
+    """Render a committed-snapshot markdown report — the canonical shape in ``REPORT_TEMPLATE.md``:
+    verdict + headline, metrics, every mode's checks, then any probe traces. Pure (no I/O)."""
+    status = verdict.get("status", "?")
+    n_total = sum(m.get("n", 0) for m in modes.values() if m)
+    n_pass = sum(m.get("pass", 0) for m in modes.values() if m)
+    lines = [
+        f"# {label} — benchmark report",
+        "",
+        f"> **Verdict: {status}** · {n_pass}/{n_total} checks · generated {generated_at or 'n/a'}",
+        "",
+    ]
+    reasons = verdict.get("reasons") or []
+    if reasons:
+        lines.append("**Reasons:**")
+        lines += [f"- {r}" for r in reasons]
+        lines.append("")
+
+    lines.append("## Metrics")
+    lines.append("")
+    metrics = verdict.get("metrics") or {}
+    lines += ([f"- `{k}`: {v}" for k, v in metrics.items()] or ["_none_"])
+    lines.append("")
+
+    lines.append("## Modes")
+    lines.append("")
+    for mode, p in modes.items():
+        if not p:
+            continue
+        lines.append(f"### {mode} — {p.get('pass', 0)}/{p.get('n', 0)}")
+        lines.append("")
+        for c in p.get("checks", []):
+            mark = "✓" if c.get("ok") else "✗"
+            detail = str(c.get("detail", "")).replace("\n", " ")[:120]
+            lines.append(f"- {mark} `{c.get('id')}` — {detail}")
+        lines.append("")
+
+    probes = probes or []
+    if probes:
+        lines.append("## Probe traces")
+        lines.append("")
+        for pr in probes:
+            d = pr if isinstance(pr, dict) else pr.to_json()
+            lines.append(f"### {d.get('label', '?')} · {d.get('flow', '?')} · {d.get('status', '?')}")
+            lines.append("")
+            lines.append(f"- flow: {_md_states(pr)}")
+            lines.append(f"- {len(d.get('tool_calls') or [])} tool calls")
+            lines.append("")
+
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def write_report_md(path: str | Path, **kwargs: Any) -> Path:
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(render_report_md(**kwargs), encoding="utf-8")
+    return out
+
+
+def emit_report(
+    bench_dir: str | Path,
+    name: str,
+    *,
+    label: str,
+    verdict: dict,
+    modes: dict[str, dict],
+    probes: list | None = None,
+    generated_at: str | None = None,
+) -> tuple[Path, Path]:
+    """Write the COMMITTED report snapshot pair to ``<bench_dir>/verdicts/`` — the rich interactive
+    ``<name>.html`` (via the SDK viewer) and the scannable ``<name>.md`` (this module). ``results/``
+    stays the local/transient copy; ``verdicts/`` is the tracked snapshot. Returns (html, md)."""
+    from agent_sdk.viewer import write_viewer
+
+    vdir = Path(bench_dir) / "verdicts"
+    html = write_viewer(vdir / f"{name}.html", probes or [], label=label,
+                        verdict=verdict, modes=modes)
+    md = write_report_md(vdir / f"{name}.md", label=label, verdict=verdict, modes=modes,
+                         probes=probes, generated_at=generated_at)
+    return html, md

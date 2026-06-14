@@ -24,8 +24,13 @@ def test_select_all_inject_by_default():
 
 def test_select_essentials_always_inject():
     sel = select_with_hints(
-        _items(), "weather today", key=lambda i: i["name"], text=lambda i: i["desc"],
-        inject_threshold=0.9, hint_threshold=0.1, essentials=["deploy"],
+        _items(),
+        "weather today",
+        key=lambda i: i["name"],
+        text=lambda i: i["desc"],
+        inject_threshold=0.9,
+        hint_threshold=0.1,
+        essentials=["deploy"],
     )
     by = {s.key: s.tier for s in sel}
     assert by["deploy"] == "inject"  # essential, despite low relevance
@@ -35,8 +40,12 @@ def test_select_essentials_always_inject():
 def test_select_budget_demotes_to_hint():
     items = [{"name": f"t{i}", "desc": "x " * 50} for i in range(5)]  # ~25 tok each
     sel = select_with_hints(
-        items, "x", key=lambda i: i["name"], text=lambda i: i["desc"],
-        budget_tokens=30, min_keep=1,  # fits one, rest demote to hint
+        items,
+        "x",
+        key=lambda i: i["name"],
+        text=lambda i: i["desc"],
+        budget_tokens=30,
+        min_keep=1,  # fits one, rest demote to hint
     )
     tiers = [s.tier for s in sel]
     assert "inject" in tiers and "hint" in tiers  # budget forces tiering

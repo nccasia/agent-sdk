@@ -27,17 +27,24 @@ def fake_mcp(tools, *, record=None):
         method = req.get("method")
         rid = req.get("id")
         if method == "initialize":
-            return {"jsonrpc": "2.0", "id": rid,
-                    "result": {"protocolVersion": "2025-06-18", "serverInfo": {"name": "fake"}}}
+            return {
+                "jsonrpc": "2.0",
+                "id": rid,
+                "result": {"protocolVersion": "2025-06-18", "serverInfo": {"name": "fake"}},
+            }
         if method == "notifications/initialized":
             return {}
         if method == "tools/list":
             return {"jsonrpc": "2.0", "id": rid, "result": {"tools": tools}}
         if method == "tools/call":
             p = req.get("params", {})
-            return {"jsonrpc": "2.0", "id": rid,
-                    "result": {"content": [{"type": "text",
-                                            "text": f"{p.get('name')}({p.get('arguments')})"}]}}
+            return {
+                "jsonrpc": "2.0",
+                "id": rid,
+                "result": {
+                    "content": [{"type": "text", "text": f"{p.get('name')}({p.get('arguments')})"}]
+                },
+            }
         return {"jsonrpc": "2.0", "id": rid, "error": {"code": -32601, "message": "no method"}}
 
     return transport
@@ -87,12 +94,71 @@ def test_specs_empty_before_resolve():
     assert rt.get_tool_specs() == []  # nothing registered until the resolve phase runs
 
 
+# ── connection status taxonomy (why a server is/isn't contributing tools) ──────
+async def test_status_connected_after_resolve():
+    rt = MCPToolRuntime({"name": "wx"}, transport=fake_mcp([WEATHER_TOOL]))
+    assert rt.status == "unreachable"  # before resolve, not yet probed
+    await rt.resolve()
+    assert rt.status == "connected"
+
+
+def test_status_unconfigured_without_endpoint_or_transport():
+    rt = MCPToolRuntime({"name": "wx"})  # no endpoint, no transport
+    assert rt.status == "unconfigured"
+
+
+async def test_status_timeout_classified():
+    def slow(req):
+        raise TimeoutError("no response")
+
+    rt = MCPToolRuntime({"name": "down"}, transport=slow)
+    await rt.resolve()
+    assert rt.status == "timeout" and rt.connected is False
+
+
+async def test_status_unauthorized_classified():
+    def deny(req):
+        raise RuntimeError("HTTP 401 unauthorized")
+
+    rt = MCPToolRuntime({"name": "wx"}, transport=deny)
+    await rt.resolve()
+    assert rt.status == "unauthorized"
+
+
+async def test_status_unreachable_classified():
+    def boom(req):
+        raise ConnectionError("connection refused")
+
+    rt = MCPToolRuntime({"name": "wx"}, transport=boom)
+    await rt.resolve()
+    assert rt.status == "unreachable"
+
+
+async def test_status_bad_response_when_tools_list_errors():
+    def half_up(req):
+        # initialize succeeds, tools/list returns a JSON-RPC error → bad_response
+        if req.get("method") in ("initialize", "notifications/initialized"):
+            return {
+                "jsonrpc": "2.0",
+                "id": req.get("id"),
+                "result": {"protocolVersion": "2025-06-18", "serverInfo": {}},
+            }
+        return {"jsonrpc": "2.0", "id": req.get("id"), "error": {"code": -32000, "message": "boom"}}
+
+    rt = MCPToolRuntime({"name": "wx"}, transport=half_up)
+    await rt.resolve()
+    assert rt.connected is True and rt.status == "bad_response" and rt.get_tool_specs() == []
+
+
 # ── the agent resolve phase wires discovered tools into the runtime ────────────
 async def test_agent_connect_registers_mcp_tools():
     agent = PreactAgent(
         client=FakeClient(),
-        plugins=[PluginMCP(spec={"name": "wx", "transport": "embedded"},
-                           transport=fake_mcp([WEATHER_TOOL]))],
+        plugins=[
+            PluginMCP(
+                spec={"name": "wx", "transport": "embedded"}, transport=fake_mcp([WEATHER_TOOL])
+            )
+        ],
     )
     status = await agent.connect()
     assert status == {"wx": True}

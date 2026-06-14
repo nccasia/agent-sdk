@@ -12,7 +12,9 @@ def test_repeated_full_write_is_steered():
     assert g("document", "write_file", {"path": "ARCHITECTURE.md", "content": "v1"}) is None
     out = g("document", "write_file", {"path": "ARCHITECTURE.md", "content": "v2"})
     assert out is not None and "already written" in out
-    assert g.events == [{"stage": "document", "path": "ARCHITECTURE.md", "action": "redundant_rewrite"}]
+    assert g.events == [
+        {"stage": "document", "path": "ARCHITECTURE.md", "action": "redundant_rewrite"}
+    ]
 
 
 def test_different_paths_not_flagged():
@@ -76,11 +78,21 @@ async def test_guard_intercepts_in_engine():
 
     guard = DocWriteGuard(write_tools=("write_file",))
     agent = PreactAgent(
-        client=FakeClient([
-            {"tools": [{"name": "write_file", "input": {"path": "DOC.md", "content": "first"}}]},
-            {"tools": [{"name": "write_file", "input": {"path": "DOC.md", "content": "second"}}]},
-            "done",
-        ]),
+        client=FakeClient(
+            [
+                {
+                    "tools": [
+                        {"name": "write_file", "input": {"path": "DOC.md", "content": "first"}}
+                    ]
+                },
+                {
+                    "tools": [
+                        {"name": "write_file", "input": {"path": "DOC.md", "content": "second"}}
+                    ]
+                },
+                "done",
+            ]
+        ),
         instructions="bot",
         tools=[write_file],
         tool_filters=[guard],
@@ -100,12 +112,15 @@ async def test_no_filters_default_unchanged():
         return "ok"
 
     agent = PreactAgent(
-        client=FakeClient([
-            {"tools": [{"name": "write_file", "input": {"path": "D.md", "content": "a"}}]},
-            {"tools": [{"name": "write_file", "input": {"path": "D.md", "content": "b"}}]},
-            "done",
-        ]),
-        instructions="bot", tools=[write_file],
+        client=FakeClient(
+            [
+                {"tools": [{"name": "write_file", "input": {"path": "D.md", "content": "a"}}]},
+                {"tools": [{"name": "write_file", "input": {"path": "D.md", "content": "b"}}]},
+                "done",
+            ]
+        ),
+        instructions="bot",
+        tools=[write_file],
         flows=[flow("qna", stages=["work"], signal={"const": 1.0})],
         stages=[stage("work", lobes=["synthesize"], loop="agentic", tools=["write_file"], hops=6)],
     )

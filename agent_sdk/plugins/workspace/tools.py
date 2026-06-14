@@ -46,7 +46,9 @@ class FsToolRuntime:
             },
         ]
 
-    async def call_tool(self, name: str, inp: dict, retrieved_chunks=None, already_read=None) -> str:
+    async def call_tool(
+        self, name: str, inp: dict, retrieved_chunks=None, already_read=None
+    ) -> str:
         try:
             if name == "fs.read":
                 return (await self.ws.read(inp["path"])).decode("utf-8")

@@ -34,18 +34,18 @@ def test_respond_is_a_real_registered_production_lobe():
     assert "respond" in {lb.id for lb in default_lobe_objects()}
 
 
-def test_respond_lobe_emits_dialog_and_framing_sections():
+def test_respond_lobe_emits_framing_only_not_the_transcript():
+    """The conversation lives once — in the ``messages`` array — so the respond lobe no longer
+    re-injects the transcript into the system prompt (de-dup; keeps the cache prefix stable)."""
     from agent_sdk.contracts.turn import TurnContext
-    from agent_sdk.lobes.expression.respond import LOBE
+    from agent_sdk.expression.lobes.respond import LOBE
 
     state = SessionState(history=[Turn("user", "what is X?"), Turn("assistant", "X is foo")])
     contribs = LOBE.prompt(TurnContext(query="and Y?", session_memory=state))
-    sources = [c.source for c in contribs]
-    assert sources == ["conversation", "respond"]  # two chunks → two sections
-    convo = next(c for c in contribs if c.source == "conversation")
-    assert "what is X?" in convo.text and "X is foo" in convo.text
+    assert [c.source for c in contribs] == ["respond"]  # framing only — no "conversation" chunk
+    assert "what is X?" not in "".join(c.text for c in contribs)  # transcript not in system prompt
 
-    # no dialog available → just the framing chunk
+    # no dialog available → still just the framing chunk
     empty = LOBE.prompt(TurnContext(query="hi", session_memory=SessionState()))
     assert [c.source for c in empty] == ["respond"]
 
@@ -79,12 +79,13 @@ def test_respond_framing_only_on_terminal_stage():
     assert "continuing this conversation" not in not_last  # collectors don't get it
 
 
-def test_response_stage_renders_after_the_gathered_notes():
+def test_response_framing_leads_the_volatile_notes_tail():
     agent = _agent()
     sys = _system(agent, is_last=True, notes=["[research] Zephyr ships Friday"])
     assert "Zephyr ships Friday" in sys
-    # the response framing comes AFTER the notes it refers to
-    assert sys.index("Zephyr ships Friday") < sys.index("continuing this conversation")
+    # canonical layer order (cache-prefix): the stable response framing leads; the turn-volatile
+    # notes trail in the tail. The framing is position-independent ("notes gathered this turn").
+    assert sys.index("continuing this conversation") < sys.index("Zephyr ships Friday")
 
 
 def test_no_regreet_framing():
@@ -111,15 +112,17 @@ def test_long_history_is_trimmed_primacy_and_recency():
     assert len(msgs) == 5
     head = msgs[0]
     assert head["role"] == "user" and head["content"].startswith("[Conversation so far]")
-    assert "Q0" in head["content"]               # primacy kept
+    assert "Q0" in head["content"]  # primacy kept
     assert "earlier turns elided" in head["content"]  # middle blurred
     # recency capped — the 5000-char turn never appears whole
     assert all("x" * 300 not in m["content"] for m in msgs)
 
 
 def test_summary_is_folded_into_the_digest_block():
-    st = SessionState(summary="earlier: we discussed the migration",
-                      history=[Turn("user", "and the date?"), Turn("assistant", "Saturday")])
+    st = SessionState(
+        summary="earlier: we discussed the migration",
+        history=[Turn("user", "and the date?"), Turn("assistant", "Saturday")],
+    )
     msgs = st.messages()
     assert msgs[0]["content"].startswith("[Conversation so far]")
     assert "migration" in msgs[0]["content"]
@@ -130,8 +133,11 @@ async def test_second_turn_continues_the_conversation():
     from agent_sdk.session import Session
     from agent_sdk.stores.session import SessionStoreInMemory
 
-    agent = PreactAgent(client=FakeClient(["first answer", "second answer"]),
-                        session=Session("c1", SessionStoreInMemory()), universal_memory=False)
+    agent = PreactAgent(
+        client=FakeClient(["first answer", "second answer"]),
+        session=Session("c1", SessionStoreInMemory()),
+        universal_memory=False,
+    )
     await agent.query("what is X?")
     await agent.query("and Y?")
     turn2_msgs = agent.client.calls[-1]["messages"]

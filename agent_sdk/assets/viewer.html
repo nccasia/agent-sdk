@@ -26,6 +26,20 @@
   *{box-sizing:border-box}
   body{font:13px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
        margin:0;color:var(--ink);background:var(--paper)}
+  /* The single overview line — a full-width second row inside the emerald header. */
+  .voverview{flex-basis:100%;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;
+    margin-top:.15rem}
+  .voverview:empty{display:none}
+  .vbadge{display:inline-block;padding:.1rem .7rem;border-radius:99px;font-weight:700;
+    letter-spacing:.04em;font-size:12px}
+  .vbadge.READY{background:#dff0e6;color:#0d4d31}
+  .vbadge.NOT_READY{background:#fbe0dc;color:#7a1d16}
+  .vbadge.UNMEASURED{background:#eee;color:#444}
+  .vtot{font-size:12px;font-weight:600;opacity:.95}
+  .vchip{font-size:11px;padding:.08rem .5rem;border-radius:99px;
+    background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25)}
+  .vchip.bad{background:rgba(255,210,205,.95);color:#7a1d16;border-color:transparent}
+  .vreason{flex-basis:100%;color:#ffe3df;font-size:11.5px}
   code,.mono{font-family:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
   header{position:sticky;top:0;z-index:5;background:var(--emerald);color:#fff;
          padding:.55rem 1rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;
@@ -331,11 +345,38 @@
   .ldraw{border:1px solid var(--emerald);border-radius:8px;padding:.7rem .9rem;background:#f7fbf9}
   .ldraw.dim{border-color:var(--line);background:var(--soft);color:var(--dim)}
   .ldhead{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin-bottom:.3rem}
+
+  /* top-level page nav (Overview | Inspect) + header status badge */
+  nav.pagenav{display:flex;gap:.3rem;align-items:center;margin-left:.4rem}
+  nav.pagenav button{font:inherit;font-size:13px;font-weight:600;border:1px solid rgba(255,255,255,.45);
+    background:transparent;color:#fff;padding:.28rem .95rem;border-radius:7px;cursor:pointer}
+  nav.pagenav button.on{background:#fff;color:var(--emerald)}
+  .statusbadge{display:inline-flex;align-items:center;gap:.4rem;font-size:12px;font-weight:600}
+  .statusbadge:empty{display:none}
+  .statusbadge .vbadge{margin:0}
+  /* overview page */
+  .ovverdict{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;margin:.1rem 0 1rem}
+  .ovverdict .vbadge{font-size:14px;padding:.25rem 1rem;letter-spacing:.04em}
+  .ovverdict .vbadge.READY{background:#e7f3ec;color:var(--emerald)}
+  .ovverdict .vbadge.NOT_READY{background:#fde9e9;color:var(--bad)}
+  .ovverdict .vbadge.UNMEASURED{background:var(--soft);color:var(--dim)}
+  .ovtot{font-size:13px;font-weight:600;color:var(--ink)}
+  .ovreason{color:var(--bad);font-size:12.5px;margin:.1rem 0 .5rem}
+  .spark{background:#fff;border:1px solid var(--line);border-radius:8px;display:block;margin-top:.3rem}
+  details.rubric{border:1px solid var(--line);border-radius:8px;background:var(--panel);
+    margin:.5rem 0;padding:.1rem .8rem}
+  details.rubric>summary{cursor:pointer;font-weight:600;padding:.5rem 0;list-style:none}
+  details.rubric>summary::-webkit-details-marker{display:none}
+  details.rubric>summary.bad{color:var(--bad)}
+  details.rubric .rmeta{font-weight:400;color:var(--dim);margin-left:.4rem}
+  tr.rowlink{cursor:pointer} tr.rowlink:hover td{background:var(--soft)}
 </style>
 </head>
 <body>
 <header>
-  <div class="brand">engine probe<b id="label"></b><b style="opacity:.65">OX flow × OY context · metacognition</b></div>
+  <div class="brand">engine probe<b id="label"></b></div>
+  <nav class="pagenav" id="pagenav" hidden></nav>
+  <div id="statusbadge" class="statusbadge"></div>
   <div class="turns" id="turns"></div>
 </header>
 <nav class="panels" id="panelnav" hidden></nav>
@@ -359,12 +400,13 @@ const LAYERS = {2:"B2 memory",3:"B3 skill",4:"B4 cognition",5:"B5 expression"};
 const PANELS = [
   ["timeline","Timeline"],
   ["flow","Flow"],["lobes","Lobes"],["context","Context"],
-  ["metacog","Metacognition"],["skills","Skills"],["tasks","Tasks"],
+  ["metacog","Metacognition"],["skills","Skills"],["tasks","Tasks"],["subagents","Subagents"],
   ["prompt","Prompt"],["efficiency","Efficiency"],
   ["hotspots","Optimize"],["raw","Raw JSON"],
 ];
 
 let DATA = {label:"", records:[]};
+let page = "overview";                                    // top-level page: "overview" | "inspect"
 let turn = 0, panel = "turn", selEvent = 0, netPos = -1;  // netPos: lobe-network scrubber (-1 = last/full)
 let promptStep = 0, promptSource = null, promptHop = -1;  // Prompt panel: stage + source filter + hop (-1=last)
 let promptSideW = 340;                    // Prompt panel: inspector column width (drag-resizable)
@@ -411,29 +453,75 @@ function wireConvTurnStrip(){
 }
 
 function normalize(raw){
-  if(!raw || typeof raw !== "object") return {label:"", records:[]};
+  if(!raw || typeof raw !== "object") return {label:"", records:[], verdict:null, modes:null};
   let records = raw.records || raw.turns;
   if(!records && Array.isArray(raw)) records = raw;
   if(!records && raw.trace) records = [raw];           // a single turn
-  return {label: raw.label || raw.benchmark || "", records: records || []};
+  return {label: raw.label || raw.benchmark || "", records: records || [],
+          verdict: raw.verdict || null, modes: raw.modes || null};
 }
 
 function load(raw){
   DATA = normalize(raw);
   turn = 0;
-  // One Timeline panel is the home: a conversation contains its turns (with the
-  // user/bot thread inline), so it covers both the per-turn and thread views.
+  // Two pages: Overview (verdict + metrics + rubrics + full-run roll-up) is the
+  // home whenever the payload carries a benchmark verdict/modes; otherwise a plain
+  // trace dump opens straight into Inspect. One Timeline panel is the Inspect home.
+  const hasOverview = !!(DATA.verdict || DATA.modes);
+  page = hasOverview ? "overview" : "inspect";
   panel = "timeline";
   selEvent = 0;
   document.getElementById("drop").hidden = true;
-  if(!DATA.records.length){ document.getElementById("panel").innerHTML =
-      '<p class="none">No turns found in this JSON.</p>'; return; }
+  if(!DATA.records.length && !hasOverview){
+    document.getElementById("panel").innerHTML = '<p class="none">No turns found in this JSON.</p>';
+    return;
+  }
   renderChrome(); renderPanel();
+}
+
+function checkTotals(){
+  const modes = DATA.modes || {};
+  let pass = 0, n = 0;
+  Object.keys(modes).forEach(g=>{ const p = modes[g]; if(p){ pass += p.pass||0; n += p.n||0; } });
+  return {pass, n};
+}
+function renderStatusBadge(){
+  // A small at-a-glance verdict badge in the header (the full verdict + per-mode
+  // rubrics live on the Overview page). Shown only when the payload has a verdict.
+  const el = document.getElementById("statusbadge");
+  if(!el) return;
+  const v = DATA.verdict;
+  if(!v){ el.innerHTML = ""; return; }
+  const {pass, n} = checkTotals();
+  el.innerHTML = `<span class="vbadge ${esc(v.status||'?')}">${esc(v.status||'?')}</span>`+
+                 (n?`<span class="vtot">${pass}/${n}</span>`:"");
+}
+function renderPageNav(){
+  // The two large top-level pages: Overview (verdict/metrics/rubrics/roll-up) and
+  // Inspect (per-turn detail). Only shown when there is an Overview to switch to.
+  const nav = document.getElementById("pagenav");
+  if(!nav) return;
+  if(!(DATA.verdict || DATA.modes)){ nav.hidden = true; nav.innerHTML = ""; return; }
+  nav.hidden = false;
+  nav.innerHTML = [["overview","Overview"],["inspect","Inspect"]].map(([id,name])=>
+    `<button data-page="${id}" class="${id===page?'on':''}">${esc(name)}</button>`).join("");
+  nav.querySelectorAll("button[data-page]").forEach(b=> b.onclick = ()=>{
+    page = b.dataset.page; renderChrome(); renderPanel();
+  });
 }
 
 function renderChrome(){
   document.getElementById("label").textContent = DATA.label ? " · "+DATA.label : "";
-  const tw = document.getElementById("turns"); tw.innerHTML = "";
+  renderPageNav();
+  renderStatusBadge();
+  const tw = document.getElementById("turns");
+  // Overview owns the whole page — no conversation selector / panel tabs there.
+  if(page!=="inspect"){
+    tw.innerHTML = "";
+    const pn = document.getElementById("panelnav"); pn.hidden = true; pn.innerHTML = "";
+    return;
+  }
+  tw.innerHTML = "";
   // We inspect BY CONVERSATION — one button per conversation (turns are a
   // smaller component, navigated inside the Timeline). The button label is the
   // scenario/conversation name (the per-turn "· tN" suffix is stripped); a pill
@@ -482,6 +570,11 @@ function renderChrome(){
 }
 
 function renderPanel(){
+  if(page==="overview"){
+    document.getElementById("panel").innerHTML = panelOverview();
+    wireOverview();
+    return;
+  }
   if(panel==="timeline"){
     document.getElementById("panel").innerHTML = panelTimeline();
     wireTimeline();
@@ -498,12 +591,104 @@ function renderPanel(){
     (r.query ? `<div class="q"><strong>query:</strong> ${esc(r.query)}</div>` : "")+
     axisChips(t, r);
   const body = ({ flow:panelFlow, lobes:panelLobes,
-                  metacog:panelMeta, skills:panelSkills, tasks:panelTasks, prompt:panelPrompt,
+                  metacog:panelMeta, skills:panelSkills, tasks:panelTasks, subagents:panelSubagents,
+                  prompt:panelPrompt,
                   efficiency:panelEfficiency, hotspots:panelHotspots, raw:panelRaw }[panel])(t, r);
   document.getElementById("panel").innerHTML = head + body;
   if(panel==="lobes"){ requestAnimationFrame(drawEdges); wireLobes(t, r); }
   if(panel==="prompt") wirePrompt(t, r);
   if(panel==="raw") wireCopy();
+}
+
+/* ── Overview page ─────────────────────────────────────────────────────────────
+   The full-run summary: the verdict, headline metrics, the per-mode rubric (check)
+   tables, and a per-scenario roll-up. Reads DATA.verdict + DATA.modes + DATA.records
+   (the same data the Inspect page drills into). Customized per bench purely by the
+   metrics/modes each bench passes — the layout is identical everywhere. */
+function isCurve(v){ return Array.isArray(v) && v.length>=2 && v.every(p=>Array.isArray(p)&&p.length===2); }
+function sparkline(series, w, h){
+  w=w||220; h=h||44;
+  const lx = series.map(p=>Math.log10(Math.max(+p[0],1))), ys = series.map(p=>+p[1]);
+  const x0=Math.min(...lx), x1=Math.max(...lx), y0=Math.min(...ys), y1=Math.max(...ys);
+  const px=i=>(6+(lx[i]-x0)/((x1-x0)||1)*(w-12)).toFixed(1);
+  const py=i=>(h-6-(ys[i]-y0)/((y1-y0)||1)*(h-12)).toFixed(1);
+  const pts = series.map((_,i)=>`${px(i)},${py(i)}`).join(" ");
+  const dots = series.map((_,i)=>`<circle cx="${px(i)}" cy="${py(i)}" r="2.5" fill="var(--emerald)"/>`).join("");
+  return `<svg class="spark" width="${w}" height="${h}"><polyline points="${pts}" fill="none" `+
+         `stroke="var(--emerald)" stroke-width="1.5"/>${dots}</svg>`;
+}
+function metricCards(metrics){
+  const keys = Object.keys(metrics||{});
+  if(!keys.length) return "";
+  return `<div class="cards">`+ keys.map(k=>{
+    const v = metrics[k];
+    if(isCurve(v)) return `<div class="card" style="min-width:240px"><div class="k">${esc(k)}</div>${sparkline(v)}</div>`;
+    const disp = (typeof v==="number") ? num(v) : esc(v);
+    return `<div class="card"><div class="k">${esc(k)}</div><div class="v small">${disp}</div></div>`;
+  }).join("") + `</div>`;
+}
+function rubricTables(){
+  const modes = DATA.modes || {}, gs = Object.keys(modes);
+  if(!gs.length) return "";
+  let h = `<h3>Rubrics <span class="dim">— per-mode checks</span></h3>`;
+  gs.forEach(g=>{
+    const p = modes[g]; if(!p) return;
+    if(p.skipped){
+      h += `<details class="rubric"><summary>${esc(g)} <span class="rmeta">UNMEASURED — `+
+           `${esc(p.skip_reason||"skipped")}</span></summary></details>`;
+      return;
+    }
+    const ok = p.all_pass;
+    const rows = (p.checks||[]).map(c=>
+      `<tr><td>${c.ok?'✓':'✗'}</td><td class="mono">${esc(c.id)}</td>`+
+      `<td>${esc(String(c.detail||"").slice(0,140))}</td></tr>`).join("");
+    h += `<details class="rubric"${ok?"":" open"}><summary class="${ok?'':'bad'}">${esc(g)} `+
+      `<span class="rmeta">${p.pass}/${p.n}</span></summary>`+
+      (Object.keys(p.metrics||{}).length?metricCards(p.metrics):"")+
+      (rows?`<table><tr><th></th><th>check</th><th>detail</th></tr>${rows}</table>`
+           :`<p class="none">(no checks)</p>`)+
+      `</details>`;
+  });
+  return h;
+}
+function overviewRollup(){
+  const recs = DATA.records || [];
+  if(!recs.length) return "";
+  let h = `<h3>Full run <span class="dim">— ${recs.length} turn(s) · click a row to inspect</span></h3>`;
+  h += `<table><tr><th>#</th><th>scenario</th><th>flow</th><th>status</th><th>tools</th><th>answer</th></tr>`;
+  recs.forEach((r,i)=>{
+    const t = r.trace||{}, fl = (t.flow||{}).name || (t.path||{}).name || "?";
+    const st = r.status||"?", stc = st==="answered" ? "ok" : (st==="error"||r.error ? "bad" : "");
+    const ans = String(r.answer||r.error||"").replace(/\s+/g," ").slice(0,80);
+    h += `<tr class="rowlink" data-turn="${i}"><td class="mono">${i+1}</td>`+
+      `<td>${esc(r.label||r.query||("turn "+(i+1)))}</td>`+
+      `<td><span class="chip">${esc(fl)}</span></td>`+
+      `<td><span class="badge ${stc}">${esc(st)}</span></td>`+
+      `<td class="mono">${(r.tool_calls||[]).length}</td>`+
+      `<td class="dim">${esc(ans)}</td></tr>`;
+  });
+  return h + `</table>`;
+}
+function panelOverview(){
+  const v = DATA.verdict || {}, {pass, n} = checkTotals();
+  if(!v.status && !Object.keys(DATA.modes||{}).length && !(DATA.records||[]).length)
+    return `<h2>Overview</h2><p class="none">No verdict, modes, or turns in this report.</p>`;
+  let h = `<h2>${esc(DATA.label||"benchmark")} <span class="dim">— overview</span></h2>`;
+  h += `<div class="ovverdict"><span class="vbadge ${esc(v.status||'UNMEASURED')}">`+
+       `${esc(v.status||'—')}</span>`+ (n?`<span class="ovtot">${pass}/${n} checks</span>`:"") +`</div>`;
+  (v.reasons||[]).forEach(r=>{ if(r) h += `<div class="ovreason">${esc(r)}</div>`; });
+  h += metricCards(v.metrics||{});
+  h += rubricTables();
+  h += overviewRollup();
+  return h;
+}
+function wireOverview(){
+  document.querySelectorAll("tr.rowlink[data-turn]").forEach(tr=> tr.onclick = ()=>{
+    turn = +tr.dataset.turn; page = "inspect"; panel = "timeline"; selEvent = 0; netPos = -1;
+    const conv = curConv(); tlSel = {turn: Math.max(0, conv.idxs.indexOf(turn)), evt: 0};
+    tlCollapsed = new Set();
+    renderChrome(); renderPanel();
+  });
 }
 
 /* ── Conversation (multi-turn thread) ─────────────────────────────────────── */
@@ -1769,7 +1954,7 @@ function panelMeta(t, r){
 }
 
 /* ── Skills (workflows the model is driven through) ───────────────────────── */
-// Lifecycle (agent-core-overview.md): skill:list → select:cue → read:hint →
+// Lifecycle (01-architecture.md): skill:list → select:cue → read:hint →
 // in_use → guide. trace.skills records the live coarse state per active skill
 // {slug: selecting|activated|driving}; the declared roster rides record.context.
 const _SKILL_STAGES = ["selecting","activated","driving"];
@@ -1796,7 +1981,7 @@ function panelSkills(t, r){
 }
 
 /* ── Tasks (long-rail autonomous execution) ───────────────────────────────── */
-// agent-core-overview.md: a task advances a bot_task_todos checklist across
+// 01-architecture.md: a task advances a bot_task_todos checklist across
 // fires. Two lists: the TEMPLATE catalog (what can be authored) and the active
 // task STATES (the running checklists). Both ride record.context (probe.py).
 function panelTasks(t, r){
@@ -1846,6 +2031,48 @@ function panelTasks(t, r){
   h += `<h3>Execution scratchpad <span class="dim">— rail: recall_state → advance → checkpoint → report → continue?</span></h3>`;
   h += Object.keys(sp).length ? `<pre>${esc(JSON.stringify(sp,null,2))}</pre>`
      : '<p class="none">No task scratchpad on this turn (not a task-execution fire).</p>';
+  return h;
+}
+
+/* ── Subagents (plan-driven fan-out: one worker per todo) ──────────────────── */
+// Each map stage records per-worker sub-traces on flow_steps[].subagents:
+// {label, status, system_prompt, steps:[{kind,...}], llm_calls, tokens_used}. Every
+// worker has its OWN isolated context + timeline — this panel shows each one.
+function _subStep(s){
+  const k = s.kind || "?";
+  if(k==="tool_use")    return `<li class="sa-tu">→ <b>${esc(s.name||"tool")}</b>(${esc(JSON.stringify(s.input||{}).slice(0,120))})</li>`;
+  if(k==="tool_result") return `<li class="sa-tr">← ${esc(String(s.output||"").split("\n")[0].slice(0,140))}</li>`;
+  if(k==="thinking")    return `<li class="sa-th dim">· ${esc(String(s.text||"").slice(0,140))}</li>`;
+  if(k==="answer")      return `<li class="sa-an">✓ ${esc(String(s.text||"").slice(0,200))}</li>`;
+  return `<li class="dim">${esc(k)}</li>`;
+}
+function panelSubagents(t, r){
+  const steps = t.flow_steps || [];
+  const groups = steps.filter(s => (s.subagents||[]).length);
+  let h = `<h3>Subagents <span class="dim">— plan-driven fan-out: one isolated worker per todo</span></h3>`;
+  if(!groups.length)
+    return h + '<p class="none">No fan-out on this turn (no stage ran loop="map" with a plan to fan out).</p>';
+  const sp = (r.trace||t||{}).blackboard || {};
+  const structure = sp.plan_structure;
+  if(structure) h += `<p class="dim">execution structure: <span class="badge ${structure==='fanout'?'agentic':'single'}">${esc(structure)}</span> `+
+                     `(${structure==='fanout'?'workers ran in parallel, each isolated':'workers ran in order, carrying prior results'})</p>`;
+  groups.forEach(st=>{
+    const subs = st.subagents||[];
+    h += `<h4 class="dim">stage <code>${esc(st.step)}</code> · ${subs.length} subagent(s)</h4>`;
+    h += subs.map((sa,i)=>{
+      const ok = sa.status!=="failed";
+      const badge = ok ? "ok" : "bad";
+      const tl = (sa.steps||[]).map(_subStep).join("");
+      const promptId = `sa-${st.step}-${i}`;
+      return `<div class="turnblk">
+        <b>${esc(sa.label||("worker "+(i+1)))}</b>
+        <span class="badge ${badge}">${esc(sa.status||"ok")}</span>
+        <span class="dim">· ${(sa.steps||[]).length} step(s) · ${(sa.llm_calls||[]).length} hop(s) · ${num(sa.tokens_used||0)} tok</span>
+        ${sa.system_prompt?`<details class="optsec"><summary>its system prompt (own isolated context)</summary><pre id="${promptId}">${esc(sa.system_prompt)}</pre></details>`:""}
+        <ol class="sa-tl" style="list-style:none;margin:6px 0 0;padding-left:6px;font-size:12.5px;border-left:2px solid #e9e6dd">${tl||'<li class="none">no steps captured</li>'}</ol>
+      </div>`;
+    }).join("");
+  });
   return h;
 }
 
@@ -1919,7 +2146,7 @@ function panelEfficiency(t, r){
     h += `<p class="dim">hops: ${series.map(v=>num(v)).join(" → ")} · ${bounded?"funneled (bounded growth — spent observations demoted)":"growing"}</p>`;
   }
 
-  h += `<p class="dim" style="margin-top:14px">Definitions — efficiency: selected ÷ candidate context tokens · density: mean CDS=(relevance×utility)/cost of injected nodes · cache: provider cache-read ÷ input. See docs/react-context-management.md.</p>`;
+  h += `<p class="dim" style="margin-top:14px">Definitions — efficiency: selected ÷ candidate context tokens · density: mean CDS=(relevance×utility)/cost of injected nodes · cache: provider cache-read ÷ input. See docs/concepts/04-react-context-management.md.</p>`;
   return h;
 }
 
@@ -1954,7 +2181,7 @@ function panelHotspots(t, r){
     </div>`).join("")
     : '<p class="none">No hints baked into this record (the bench didn\'t attach any).</p>';
 
-  // The three documented tuning levels (agent-core-overview.md · Inspection and
+  // The three documented tuning levels (01-architecture.md · Inspection and
   // Optimization Surfaces) — where to act on what this turn surfaced.
   h += `<details class="optsec" open><summary>Tuning surfaces — lobe unit · flow step · whole engine</summary>
     <p><b>Lobe unit (OY)</b> — bias or gate a lobe: <code>prior_&lt;lobe&gt;</code>, <code>min_&lt;lobe&gt;</code>, <code>disable_&lt;lobe&gt;_&lt;node&gt;</code> in <code>flow_lobe_weights</code>. See the Lobes panel for activation reasons.</p>

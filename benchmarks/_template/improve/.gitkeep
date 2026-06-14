@@ -1,0 +1,2 @@
+# the moving-baseline ratchet lives here (best.json, journal.md, history.jsonl, wave-NNN/).
+# These ARE committed — they are the trend. Only run artifacts under results/ are ignored.

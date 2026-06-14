@@ -1,0 +1,2 @@
+{"id": "loop-weather-01", "category": "tool_loop", "query": "What is the weather in Hanoi right now?", "expect": {"tool_called": "get_weather", "status": "ok"}}
+{"id": "loop-order-01", "category": "tool_loop", "query": "What's the shipping status of order A1?", "expect": {"tool_called": "order_status_local", "status": "ok"}}

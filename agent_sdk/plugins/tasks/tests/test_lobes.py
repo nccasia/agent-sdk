@@ -21,15 +21,19 @@ def _ctx(data):
 
 
 def test_renders_rail_with_done_status_and_deps():
-    ctx = _ctx({
-        "todos": [{"id": "t0", "input": "fetch revenue"},
-                  {"id": "t1", "input": "compute profit", "deps": ["t0"]}],
-        "todos_results": [{"label": "t0", "result": "200"}],
-    })
+    ctx = _ctx(
+        {
+            "todos": [
+                {"id": "t0", "input": "fetch revenue"},
+                {"id": "t1", "input": "compute profit", "deps": ["t0"]},
+            ],
+            "todos_results": [{"label": "t0", "result": "200"}],
+        }
+    )
     out = TaskRailLobe().prompt(ctx)
     assert len(out) == 1
     text = out[0].text
-    assert "[x] t0: fetch revenue" in text          # done (has a result)
+    assert "[x] t0: fetch revenue" in text  # done (has a result)
     assert "[ ] t1: compute profit (needs t0)" in text  # open + dependency shown
 
 

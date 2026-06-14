@@ -5,7 +5,7 @@ density recall is the one the model never has to ask for: a scope-ordered index
 of the relevant facts, already in the prompt. This hook loads the store at turn
 start into ``TurnContext.memory_items`` so the ``memory_recall`` lobe renders
 those facts as context nodes — most recalls then cost zero tool calls
-(``docs/concepts/context-memory.md``).
+(``docs/concepts/06-universal-memory.md``).
 
 Scope order is broad → specific (``bot → user → channel → conversation``) so the
 attention builder's per-scope boosts let the most specific fact win on conflict.
@@ -61,11 +61,13 @@ def memory_prefetch_hook(
             except Exception:
                 continue
             for it in found:
-                items.append({
-                    "scope": getattr(it, "scope", scope),
-                    "key": getattr(it, "key", ""),
-                    "value": getattr(it, "value", ""),
-                })
+                items.append(
+                    {
+                        "scope": getattr(it, "scope", scope),
+                        "key": getattr(it, "key", ""),
+                        "value": getattr(it, "value", ""),
+                    }
+                )
         # Inline values under the budget; degrade the overflow to hint-only so a
         # long fact is discoverable (Tier 2) without flooding the prompt.
         used = 0

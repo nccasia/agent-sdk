@@ -106,6 +106,13 @@ class FlowStep:
     # Empty/missing list ⇒ degrades to a single agentic run (never loses the
     # turn). Ignored unless ``loop == "map"``.
     fanout_key: str = ""
+    # Fan-out shape (``loop="map"`` only). Defaults reproduce today's behavior:
+    # sequential state-carry over a shared evidence pool. ``fanout_parallel`` runs
+    # workers concurrently (gather, bounded by ``fanout_max``); ``fanout_isolated``
+    # gives each worker a fresh evidence pool (only its memo returns). See doc 12.
+    fanout_parallel: bool = False
+    fanout_max: int = 40
+    fanout_isolated: bool = False
 
     # ── RFC 0017: first-class signal (the merged FlowStepNode common case) ────
     # A step's own activation signal — same shape as a lobe's. The default
@@ -127,6 +134,12 @@ class FlowStep:
     max_tokens: int | None = None
     hops: int | None = None
     system_prompt: str | None = None
+    # The SUBJECT this state instance works on (a sub-question / aspect / target).
+    # Generalizes the per-map-item subject (``_compose_map_item``) to ANY state, so the
+    # same building block (``act``, ``explore``, …) can be instantiated against a specific
+    # subject — the dynamic state plan (Layer 1) sets it per expanded state. ``None`` ⇒
+    # the state works on the whole turn (today's behavior; byte-identical).
+    subject: str | None = None
 
     def __post_init__(self) -> None:
         if self.loop not in {"none", "single", "agentic", "map"}:

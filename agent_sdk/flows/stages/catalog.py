@@ -15,8 +15,7 @@ from __future__ import annotations
 from agent_sdk.flows.stages.cite import ResearchCite
 from agent_sdk.flows.stages.common import Stage
 from agent_sdk.flows.stages.filter import ResearchFilter
-from agent_sdk.flows.stages.plan import ResearchPlan
-from agent_sdk.flows.stages.research import KbResearch
+from agent_sdk.flows.stages.research import ResearchInvestigate
 from agent_sdk.flows.stages.synthesize import (
     ClarifySynthesize,
     FallbackSynthesize,
@@ -31,8 +30,7 @@ from agent_sdk.flows.stages.synthesize import (
 _STAGE_CLASSES: tuple[type[Stage], ...] = (
     QnaSynthesize,
     FallbackSynthesize,
-    ResearchPlan,
-    KbResearch,
+    ResearchInvestigate,
     ResearchSynthesize,
     ResearchCite,
     ResearchFilter,

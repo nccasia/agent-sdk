@@ -10,13 +10,22 @@ removed; stub-driven coverage lives in ``tests/`` and the example test suites.)
 
 from benchmarks._shared.embed import CONCEPTS, concept_embed, concept_of
 from benchmarks._shared.provider import load_provider
-from benchmarks._shared.report import render_consolidated, write_consolidated
+from benchmarks._shared.report import (
+    emit_report,
+    render_consolidated,
+    render_report_md,
+    write_consolidated,
+    write_report_md,
+)
 from benchmarks._shared.verdict import compose_verdict
 
 __all__ = [
     "compose_verdict",
     "render_consolidated",
     "write_consolidated",
+    "render_report_md",
+    "write_report_md",
+    "emit_report",
     "load_provider",
     "concept_embed",
     "concept_of",

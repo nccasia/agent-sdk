@@ -1,6 +1,6 @@
 """Densification — turn a full body into a dense digest (the gist), not a truncation.
 
-Two summarizers fill one role (see ``docs/concepts/universal-memory.md`` ·
+Two summarizers fill one role (see ``docs/concepts/06-universal-memory.md`` ·
 ``tool-use-at-scale.md``):
 
 * :func:`deterministic_digest` — free, synchronous, structured-extract. Preserves the
@@ -18,7 +18,8 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from agent_sdk.skills import est_tokens
 

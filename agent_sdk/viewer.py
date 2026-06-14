@@ -57,6 +57,7 @@ def _flow_steps(p: ProbeRecord) -> list[dict]:
             "node_count": len(s.get("lobes", [])),
             "system_prompt": s.get("system_prompt", ""),  # composed prompt (Prompt panel)
             "system_segments": s.get("system_segments", []),  # provenance: colour by lobe/section
+            "subagents": s.get("subagents", []),  # per-todo fan-out sub-traces (Subagents panel)
             "metadata": meta,
             "funnel_obs_chars": meta.get("funnel_obs_chars", []),
             "attention": s.get("attention", {"nodes": [], "tiers": []}),
@@ -100,6 +101,7 @@ def to_viewer_record(p: ProbeRecord) -> dict:
         "meta": (p.meta_actions[-1] if p.meta_actions else {}),
         "attention": p.attention or {"nodes": [], "tiers": []},
         "context_funnel": _context_funnel(p),
+        "blackboard": getattr(p, "blackboard", {}) or {},  # turn scratchpad (plan_structure, results)
         "skills": [],
     }
     # Optional task surface for the Tasks panel: a bench/agent may attach
@@ -123,23 +125,46 @@ def to_viewer_record(p: ProbeRecord) -> dict:
     }
 
 
-def render_viewer_html(records: list[ProbeRecord], *, label: str = "") -> str:
-    """Inject the probe records into the viewer template (one self-contained HTML)."""
+def render_viewer_html(
+    records: list[ProbeRecord],
+    *,
+    label: str = "",
+    verdict: dict | None = None,
+    modes: dict | None = None,
+) -> str:
+    """Inject the probe records into the viewer template (one self-contained HTML).
+
+    ``verdict`` (``{status, reasons, metrics}``) + ``modes`` (``{group: {checks,
+    n, pass, all_pass}}``), when given, render a benchmark OVERVIEW banner above
+    the per-turn panels — so one file carries the readiness verdict AND the full
+    per-turn trace detail. A plain trace dump omits both and shows traces only."""
     template = _VIEWER.read_text(encoding="utf-8")
-    payload = json.dumps(
-        {"label": label, "records": [to_viewer_record(r) for r in records]},
-        ensure_ascii=False, default=str,
-    )
+    data: dict[str, Any] = {"label": label, "records": [to_viewer_record(r) for r in records]}
+    if verdict is not None:
+        data["verdict"] = verdict
+    if modes is not None:
+        data["modes"] = modes
+    payload = json.dumps(data, ensure_ascii=False, default=str)
     payload = payload.replace("</", "<\\/")  # never close the embedded block early
     block = f'<script id="trace-data" type="application/json">{payload}</script>'
     return template.replace("<!--TRACE_DATA-->", block)
 
 
-def write_viewer(path: str | Path, records: list[ProbeRecord], *, label: str = "") -> Path:
+def write_viewer(
+    path: str | Path,
+    records: list[ProbeRecord],
+    *,
+    label: str = "",
+    verdict: dict | None = None,
+    modes: dict | None = None,
+) -> Path:
     """Write the rich viewer HTML to ``path`` (creating parent dirs). Returns it."""
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(render_viewer_html(records, label=label), encoding="utf-8")
+    out.write_text(
+        render_viewer_html(records, label=label, verdict=verdict, modes=modes),
+        encoding="utf-8",
+    )
     return out
 
 

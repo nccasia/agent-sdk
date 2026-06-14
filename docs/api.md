@@ -78,7 +78,9 @@ agent = PreactAgent(
 (`<instructions>`, `<conversation>`, `<memory>`, `<tools>`, `<skills>`, `<notes>`, `<env>`, …) —
 Claude (and Claude Code) parse XML-delimited context far more reliably than flat markdown, so this
 lifts comprehension and accuracy at a negligible token cost. Provenance is preserved (the viewer
-still colours by source). Pass `prompt_format="markdown"` for the older flat layout.
+still colours by source). Pass `prompt_format="markdown"` for the older flat layout. See
+[concepts/14-prompt-engineering.md](./concepts/14-prompt-engineering.md) for how to write the text
+*inside* each tag.
 
 ### Methods
 
@@ -206,8 +208,8 @@ async def greet(ctx) -> LobeResult: ...  # decorator form for simple lobes
 Lobes.default()                          # the built-in B2–B5 set; compose or extend your own
 ```
 
-`cite` and `filter` are **pinned** (`pinned=True`) — the activation network can never deactivate
-them (ground-or-refuse). See `PINNED_LOBES`.
+`filter` (output safety, default-on `SafetyPlugin`) and `cite` (grounding, opt-in `RagPlugin`) are
+**pinned** *when present* — the activation network can never deactivate them. See `PINNED_LOBES`.
 
 ### Stages (execution units — first-class, reusable, `Activable`)
 
@@ -239,10 +241,14 @@ stages = [
 ]
 ```
 
-`loop` ∈ `none` (pure prompt) · `single` (one LLM call) · `agentic` (a ReAct `tool_loop`) ·
-`map` (fan-out over a scratchpad key). Per-stage overrides: `model`, `temperature`, `max_tokens`,
-`hops`, `system_prompt`. Because the Stage's `signal` is part of the `Activable` contract, a flow
-can list a stage that only fires under its own condition — same gating rule as lobes and skills.
+`loop` ∈ `none` (pure prompt) · `single` (one LLM call) · `agentic` (a ReAct `tool_loop`). Per-stage
+overrides: `model`, `temperature`, `max_tokens`, `hops`, `system_prompt`. Because the Stage's
+`signal` is part of the `Activable` contract, a flow can list a stage that only fires under its own
+condition — same gating rule as lobes and skills.
+
+Multi-step work is done by an `agentic` stage looping with a plan tool (`TodoWrite`), not an engine
+fan-out — there is no `map` loop. See **Planning** below and
+[`concepts/08-reasoning-as-a-tool.md`](concepts/08-reasoning-as-a-tool.md).
 
 #### How an `agentic` loop ends
 
@@ -306,6 +312,50 @@ Skill(
 )
 ```
 
+Skills are Standard Operating Procedures the agent runs: the `SKILL.md` standard, the
+folder/section/ToC chunking, the activation strategies, the skill lobe state machine, and
+how a skill's content is injected back into context — full reference in
+[`concepts/09-skills.md`](concepts/09-skills.md).
+
+**Loading from disk.** A `SKILL.md` folder (YAML frontmatter + markdown body + sibling text
+reference files) loads into a `SkillPack` via the loader — the code-first source-of-truth path that
+complements `SkillRegistry.from_rows` (the DB/override path):
+
+```python
+from agent_sdk.skills import load_skill_pack, load_skill_packs, parse_skill_md
+
+pack  = load_skill_pack("skills/code_review")    # one <dir>/SKILL.md bundle → SkillPack
+packs = load_skill_packs("skills")               # every immediate-subdir bundle under a root
+front, body = parse_skill_md(text)               # low-level: (frontmatter dict, body)
+```
+
+The loader records `SkillPack.source_dir` (so the compiled-surface cache can persist a sidecar),
+parses nested `checklist` / `context_vars` from YAML, and raises `SkillLoadError` on a malformed
+bundle (no frontmatter, missing `name`/`description`, no `SKILL.md`).
+
+### Planning (multi-step work — the `TodoWrite` tool)
+
+Multi-step work is handled by **plan-driven fan-out**: the agent writes a todo list with
+**`TodoWrite`** (Claude Code's shape — `content` / `status` / `activeForm`, extended with per-todo
+`prompt` / `tools` / `deps`), a supervisor picks the execution structure, and the engine runs **one
+subagent per todo** before a fan-in aggregates. `PlanningPlugin` exposes the tool + the planning lobes
+(reason → write → enact) and registers a `plan` flow that complex, multi-part queries route to:
+
+```python
+from agent_sdk import PreactAgent
+from agent_sdk.plugins.planning import PlanningPlugin
+
+agent = PreactAgent(client=…, instructions="…",
+                    plugins=[PlanningPlugin()])                 # adds TodoWrite + lobes + plan flow
+# plugins=[PlanningPlugin(worker_tools=["search"])]            # tools each per-todo subagent may use
+```
+
+A deterministic complexity signal routes a multi-faceted query to the `plan` flow (`plan` →
+`supervise` → `execute` (map, one subagent per todo) → `fanin`, grounded by the pinned
+`cite`/`filter`); a simple query stays single-shot. Full model:
+[`sdk/planning.md`](sdk/planning.md) · [`concepts/08-reasoning-as-a-tool.md`](concepts/08-reasoning-as-a-tool.md)
+· [`concepts/12-subagent-fanout.md`](concepts/12-subagent-fanout.md).
+
 ### Tools — the `@tool` decorator
 
 Turn a typed function into a tool; the SDK introspects the signature/types/docstring into an
@@ -338,13 +388,16 @@ It may contribute the **full capacity surface** — lobes, stages, paths/flows, 
 — plus event hooks, guardrails, and seam bindings (like a filesystem). It's the single,
 composable extension mechanism: `plugins=[…]`. Enabled (present in the list) ⇒ its capabilities
 are registered/resolvable; absent or `enabled = False` ⇒ not. See the deep-dive at
-[`concepts/plugins.md`](concepts/plugins.md).
+[`concepts/10-plugins.md`](concepts/10-plugins.md).
 
 The **core** network (cognition, tools, skills, task, memory, reply) lives in `agent_sdk/lobes/`
 and is not a plugin. Plugins are the *extension* layer: two default-on but toggleable ones
-(`SafetyPlugin` — `cite`/`filter` grounding; `FormatPlugin` — output styling) plus opt-in
-integrations. Manage them with a `PluginRegistry` (register / override / enable / disable),
-which `PreactAgent(plugins=…)` accepts in place of a list.
+(`SafetyPlugin` — the `filter` output-safety lobe; `FormatPlugin` — output styling) plus opt-in
+integrations — including **`RagPlugin`** (`cite` + the citation contract), which is **opt-in**:
+most agents have no retrieval, so grounding is not default; plug it in or set
+`require_citations=True` (auto-enables it). **Safety ≠ RAG** — a non-RAG agent keeps `filter` but
+has no `cite`. Manage them with a `PluginRegistry` (register / override / enable / disable), which
+`PreactAgent(plugins=…)` accepts in place of a list.
 
 ```python
 @runtime_checkable
@@ -356,11 +409,12 @@ class Plugin(Protocol):
 `AgentSetup` is the builder a plugin fills — the full surface plus removals:
 
 ```python
-setup.add_lobe(lobe)      setup.add_stage(stage)    setup.add_flow(flow)
-setup.add_path(path)      setup.add_skill(skill)    setup.add_tool(tool)
-setup.on_event(hook)      setup.add_pre_check(fn)   setup.add_post_check(fn)
-setup.add_tool_filter(f)  setup.add_prefetch_hook(h) setup.bind_workspace(ws)
-# subtract a builtin this plugin owns/overrides (pinned cite/filter/synthesize always survive):
+setup.add_lobe(lobe)        setup.add_stage(stage)     setup.add_flow(flow)
+setup.add_path(path)        setup.add_skill(skill)     setup.add_tool(tool)
+setup.on_event(hook)        setup.add_pre_check(fn)    setup.add_post_check(fn)
+setup.add_tool_filter(f)    setup.add_prefetch_hook(h) setup.bind_workspace(ws)
+setup.add_finalize_hook(fn) setup.add_tool_result_hook(fn)   # grounding/citation seams (RagPlugin)
+# subtract a builtin this plugin owns/overrides (pinned filter/synthesize, + cite when RagPlugin is on, survive):
 setup.remove_lobe(id)     setup.remove_path(name)   setup.remove_flow(name)   setup.remove_skill(slug)
 ```
 
@@ -368,13 +422,22 @@ Built-in plugins:
 
 ```python
 from agent_sdk.plugins import (
-    SafetyPlugin, FormatPlugin,                 # default-on, toggleable (grounding / styling)
+    SafetyPlugin, FormatPlugin,                 # default-on, toggleable (output safety / styling)
+    RagPlugin,                                  # OPT-IN: cite + citation contract (grounding)
+    TaskPlugin, MetacognitionPlugin,            # opt-in capability plugins
     PluginWorkspace, PluginMCP, PluginOTel, PluginGuardrails, PluginSupportTriage,
     PluginRegistry, builtin_registry,
 )
 
-SafetyPlugin()                                 # cite/filter grounding (default-on; disable for non-RAG)
+SafetyPlugin()                                 # `filter` output-safety lobe (default-on; every agent)
 FormatPlugin()                                 # channel/language/tone styling (default-on)
+RagPlugin()                                     # cite + extraction/backfill/strip/ground-or-refuse (opt-in)
+TaskPlugin()                                   # todo-driven task execution (plan→execute→deliver)
+MetacognitionPlugin()                          # think-about-thinking: meta_context + nav_brief lobes +
+                                               #   meta_reflect stage + meta_control tool (pick skills /
+                                               #   bias flow / trim-skip / navigate phases); the Navigator
+                                               #   (advance/redo/goto + brief next) needs apply_actions
+                                               #   ⊇ {redo_phase, goto_phase}; opt-in, cite/filter pinned
 PluginWorkspace(driver="virtual")              # a virtual FS + fs.* tools (read/write/list/edit)
 PluginWorkspace(driver="local", root="/data/agent-fs")    # persisted to disk
 PluginWorkspace(driver="s3", bucket="…")
@@ -385,6 +448,79 @@ PluginOTel()                                   # OpenTelemetry traces/metrics vi
 PluginGuardrails(pre=[…], post=[…])            # pre/post turn checks
 PluginSupportTriage()                          # worked example: lobe+stage+flow+skill+tool at once
 ```
+
+`PluginGuardrails` is the seam (a check raises to block); the SDK ships a built-in deterministic
+answer-leak post-check via `make_answer_leak_check`:
+
+```python
+from agent_sdk.plugins.guardrails import PluginGuardrails, make_answer_leak_check
+
+guard = make_answer_leak_check(forbidden=["internal-only"], impossible_actions=["delete account"])
+PluginGuardrails(post=[guard])   # blocks secrets / bulk-PII / forbidden substrings / impossible commitments
+```
+
+The detectors are pure functions in `agent_sdk.guards` (`answer_leak_violation`, `secret_violation`,
+`bulk_pii_violation`, `forbidden_violation`, `commitment_violation`, `has_refusal_marker`).
+Secret/email/phone detection is locale-neutral; the commitment/refusal lexicons default to English
+and are fully injectable (pass `commitment_cues=` / `negation_cues=` / `markers=` for another
+language) — the leaf carries no host copy.
+
+`PluginMCP` never crashes a turn on a bad server (graceful degrade); the runtime classifies *why*
+via `MCPToolRuntime.status` (a `ConnectionStatus`: `connected` · `unauthorized` · `unreachable` ·
+`timeout` · `bad_response` · `unconfigured`), so a host can surface it in a "test connection" UI or
+record it in `trace.degraded`.
+
+**Conditional capabilities.** When a host installs several servers but wants only a subset live per
+turn (by channel / deployment / a context flag), `agent_sdk.plugins.mcp.select_active` filters items
+by a declarative `activation` dict against an opaque per-turn context bag:
+
+```python
+from agent_sdk.plugins.mcp import select_active
+
+active = select_active(installations, {"channel_id": "c1", "onboarding": True})
+# activation keys: channel_ids / deployment_ids / context_flags
+# pass flag_check=(flag, ctx)->bool for custom flag semantics (e.g. is_dm) — kept out of the leaf
+```
+
+### Pre-turn gate — refusal rules + golden known-answers
+
+`PreactAgent(pre_turn_gate=…)` runs a `(query, state) -> AgentResult | None` before any reasoning:
+a non-None result ends the turn (a refusal, or an approved known-answer). The SDK ships a built-in
+gate builder in `agent_sdk.guards`:
+
+```python
+from agent_sdk.guards import make_pre_turn_gate, make_semantic_refusal
+from agent_sdk.memory import GoldenHead, GoldenItem
+
+head = GoldenHead.from_raw(rows, embed_fn=embed_batch, embedding_model_id="bge-small")
+gate = make_pre_turn_gate(
+    refusal_rules=[{"rule_type": "keyword", "pattern": "secret|password", "reason": "blocked"}],
+    golden_head=head,                 # near-duplicate of an approved Q → its answer, cited golden://
+    embed=embed_one,                  # query → vector (injected)
+    semantic_refusal=make_semantic_refusal(rules, embed_one),
+)
+agent = PreactAgent(client=…, pre_turn_gate=gate)
+```
+
+Order: keyword/topic/regex refusal → embed once → golden hit (before semantic refusal, so an
+approved answer beats a fuzzy guess) → semantic refusal. Everything is dependency-injected (rules
+as data, the embedder + `GoldenHead` from the host) — no ACL/tenant type enters the leaf.
+`GoldenHead` is a curated cosine known-answer index (distinct from `SemanticCache`, which keys
+exact query-embedding → cached result).
+
+**Anti-hedge retry.** When a grounded one-shot answer *finds* the material but opens with an apology
+(reading as a refusal, dropping the citation), the engine retries it once with a forced-answer
+directive. `agent_sdk.react.make_hedge_retry()` builds the `(answer) -> directive | None` callable
+the engine's `_answer_retry` seam consumes (English defaults; pass `markers=` / `directive=` for
+another language) — the engine owns the retry loop, the host owns what counts as a hedge.
+
+**Per-stage overrides.** A host tunes the built-in network per stage from config (no re-authoring in
+code): `apply_stage_overrides(stages, overrides)` (in `agent_sdk.stage_overrides`) patches each
+production `Stage` from a `{stage_name: {system_prompt?, temperature?, max_tokens?, loop?,
+budget:{hops?}}}` dict — matched by exact id or bare-suffix (`qna:synthesize` ← `"synthesize"`),
+cloning every other field. `assert_grounded_stages_zero_temp(stages)` enforces the SDK invariant
+(`synthesize`/`cite`/`filter` at `temperature == 0`) and is re-asserted after patching, so an
+override can never break grounding.
 
 `PluginWorkspace` gives the agent a persistent, sandboxed file tree for artifacts and working
 documents and wires the `fs.read`/`fs.write`/`fs.list`/`fs.edit` tools + the heavy-document path
@@ -504,7 +640,9 @@ from agent_sdk import Metacognition
 
 agent = PreactAgent(..., metacognition=Metacognition(
     mode="apply",                        # "observe" (monitor+trace only) | "apply"
-    apply_actions={"adjust_lobe_slice"}, # allow-list (also: skip_step, retry_step)
+    apply_actions={"adjust_lobe_slice"}, # allow-list (also: skip_step, retry_step,
+                                         #   redo_phase, goto_phase — the Navigator's
+                                         #   phase moves, off by default for parity)
 ))
 
 class DomainMeta(Metacognition):
@@ -537,6 +675,10 @@ snap.to_json()
 ```python
 t = result.trace
 t.path; t.lobes; t.flow_stages; t.blackboard; t.usage
+# t.blackboard carries the turn scratchpad snapshot (e.g. plan_structure, todos_results).
+# A loop="map" stage records per-worker sub-traces on its flow_stages entry:
+#   t.flow_stages[i]["subagents"] = [{label, status, system_prompt, steps, llm_calls, tokens_used}]
+# (one per fanned-out todo — each with its own isolated prompt + timeline).
 t.timeline()     # ReAct sub-steps (thinking / tool_use / tool_result / answer)
 t.to_json()
 ```

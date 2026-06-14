@@ -22,7 +22,9 @@ def test_semantic_recall_finds_lexically_disjoint_match():
     store = MemoryStore(embed=concept_embed)
     target = _seed(store)
     top = store.recall(query="when will the launch happen", k=1)
-    assert top and top[0].handle == target  # "launch" ~ "rollout/scheduled" via the schedule concept
+    assert (
+        top and top[0].handle == target
+    )  # "launch" ~ "rollout/scheduled" via the schedule concept
 
 
 def test_lexical_only_misses_the_synonym_target():

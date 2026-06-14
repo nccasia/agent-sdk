@@ -28,10 +28,22 @@ _CAP_LIST = 64  # items appended to a single list key
 _MISSING = object()  # sentinel for delete()
 
 
+def _over(value: Any) -> bool:
+    try:
+        return len(json.dumps(value, ensure_ascii=False, default=str)) > _CAP_VALUE_CHARS
+    except Exception:
+        return True
+
+
 def _cap_value(value: Any) -> Any:
-    """Keep values JSON-serializable and bounded. Oversized strings are
-    head/tail-elided (never silently dropped); non-serializable values fall
-    back to their ``str``."""
+    """Keep values JSON-serializable and bounded — **preserving container type**.
+
+    Oversized strings are head/tail-elided. An oversized **list stays a list** (each item
+    capped; tail items dropped with an ``{"_elided": n}`` marker) and an oversized **dict
+    stays a dict** — never collapsed into a sentinel object. This matters because consumers
+    read these back via ``as_list`` + ``isinstance(item, dict)`` (e.g. fan-out
+    ``todos_results``): collapsing a list into a dict silently read as *zero* items and
+    sank wide fan-outs. Nothing is lost-silent; the shape survives."""
     try:
         encoded = json.dumps(value, ensure_ascii=False, default=str)
     except Exception:
@@ -42,7 +54,21 @@ def _cap_value(value: Any) -> Any:
     if isinstance(value, str):
         keep = _CAP_VALUE_CHARS
         return f"{value[: keep * 3 // 4]}\n…[+{len(value) - keep} chars elided]…\n{value[-keep // 4 :]}"
-    # Structured-but-huge: store the truncated JSON text so nothing is lost-silent.
+    if isinstance(value, list):
+        capped = [_cap_value(v) for v in value]
+        while len(capped) > 1 and _over(capped):
+            capped.pop()
+        dropped = len(value) - len(capped)
+        if dropped:
+            capped.append({"_elided": dropped})  # marker; consumers skip non-data items
+        return capped
+    if isinstance(value, dict):
+        capped = {k: _cap_value(v) for k, v in value.items()}
+        order = list(capped.keys())
+        while order and _over(capped):
+            capped.pop(order.pop())
+        capped["_truncated"] = True
+        return capped
     return {"_truncated": True, "preview": encoded[:_CAP_VALUE_CHARS]}
 
 

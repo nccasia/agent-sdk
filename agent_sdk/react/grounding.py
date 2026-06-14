@@ -29,8 +29,22 @@ __all__ = ["DocGroundingGuard"]
 # Path-ish tokens: a dotted code/file path, optionally with directories.
 _PATH_RE = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_./-]*\.[A-Za-z0-9]{1,6}")
 _CODE_SUFFIXES = (
-    ".py", ".js", ".ts", ".tsx", ".go", ".rs", ".java", ".rb", ".md", ".toml",
-    ".json", ".yaml", ".yml", ".cfg", ".ini", ".sh",
+    ".py",
+    ".js",
+    ".ts",
+    ".tsx",
+    ".go",
+    ".rs",
+    ".java",
+    ".rb",
+    ".md",
+    ".toml",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".cfg",
+    ".ini",
+    ".sh",
 )
 
 
@@ -88,14 +102,20 @@ class DocGroundingGuard:
         if not missing:
             return None
         self.events.append(
-            {"stage": stage_id, "path": path, "action": "ungrounded_refs",
-             "missing": missing[: self.max_report]}
+            {
+                "stage": stage_id,
+                "path": path,
+                "action": "ungrounded_refs",
+                "missing": missing[: self.max_report],
+            }
         )
         self._refusals[path] = self._refusals.get(path, 0) + 1
         if self.record_only or self._refusals[path] > self.max_refusals:
             return None  # bounded — don't deadlock the stage; a gate still records it
         shown = ", ".join(missing[: self.max_report])
-        more = "" if len(missing) <= self.max_report else f" (+{len(missing) - self.max_report} more)"
+        more = (
+            "" if len(missing) <= self.max_report else f" (+{len(missing) - self.max_report} more)"
+        )
         return (
             f"Refused: {path!r} references paths that do not exist: {shown}{more}. "
             "Correct them to real paths from the repository map / the files you've read "

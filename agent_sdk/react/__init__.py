@@ -11,5 +11,16 @@ hook); the macro PreAct architecture decides which steps run and what they see.
 """
 
 from agent_sdk.react.funnel import compact_observations, tier_observations
+from agent_sdk.react.hedge import (
+    DEFAULT_HEDGE_DIRECTIVE,
+    DEFAULT_HEDGE_MARKERS,
+    make_hedge_retry,
+)
 
-__all__ = ["compact_observations", "tier_observations"]
+__all__ = [
+    "compact_observations",
+    "tier_observations",
+    "make_hedge_retry",
+    "DEFAULT_HEDGE_MARKERS",
+    "DEFAULT_HEDGE_DIRECTIVE",
+]

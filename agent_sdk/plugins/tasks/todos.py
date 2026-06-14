@@ -40,9 +40,16 @@ class Todo:
     spec: dict[str, Any] | None = None
 
     def to_json(self) -> dict:
-        return {"id": self.id, "title": self.title, "status": self.status,
-                "deps": list(self.deps), "result": self.result, "error": self.error,
-                "tool_hint": self.tool_hint, "spec": self.spec}
+        return {
+            "id": self.id,
+            "title": self.title,
+            "status": self.status,
+            "deps": list(self.deps),
+            "result": self.result,
+            "error": self.error,
+            "tool_hint": self.tool_hint,
+            "spec": self.spec,
+        }
 
 
 @dataclass
@@ -53,8 +60,13 @@ class TodoRail:
 
     # ── build ──────────────────────────────────────────────────────────────
     def add(self, title: str, *, deps=(), tool_hint: str = "", spec: dict | None = None) -> Todo:
-        t = Todo(id=f"t{len(self.todos)}", title=title, deps=tuple(deps or ()),
-                 tool_hint=tool_hint, spec=(spec or None))
+        t = Todo(
+            id=f"t{len(self.todos)}",
+            title=title,
+            deps=tuple(deps or ()),
+            tool_hint=tool_hint,
+            spec=(spec or None),
+        )
         self.todos.append(t)
         return t
 
@@ -129,42 +141,47 @@ class TodosToolRuntime:
         """Publish the rail to the turn scratchpad as the generic map work-list. The engine
         owns the turn; this tool opts into it via ``current_turn()`` — no engine task logic."""
         from agent_sdk.engine import current_turn
+
         turn = current_turn()
         sp = getattr(turn, "scratchpad", None)
         if sp is not None:
             sp.set(self.fanout_key, self.rail.as_items())
 
     def get_tool_specs(self) -> list[dict]:
-        return [{
-            "name": "todos",
-            "description": (
-                "Manage the task's checklist (the execution rail). One tool, choose `action`:\n"
-                "- add: append one step {title, deps?: [ids], tool_hint?}\n"
-                "- add_many: append several at once {steps: [{title, deps?, tool_hint?}]}\n"
-                "- list: show the current checklist (open items + statuses)\n"
-                "- done: mark a step finished {id?, result} (id defaults to the next open step)\n"
-                "- block: mark a step blocked {id?, reason}\n"
-                "- request_human: escalate a blocked step {id?, question}\n"
-                "Build the rail first (add/add_many), then advance it (done/block) until empty."
-            ),
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "action": {"type": "string", "enum": list(_ACTIONS)},
-                    "title": {"type": "string"},
-                    "steps": {"type": "array", "items": {"type": "object"}},
-                    "deps": {"type": "array", "items": {"type": "string"}},
-                    "tool_hint": {"type": "string"},
-                    "id": {"type": "string"},
-                    "result": {"type": "string"},
-                    "reason": {"type": "string"},
-                    "question": {"type": "string"},
+        return [
+            {
+                "name": "todos",
+                "description": (
+                    "Manage the task's checklist (the execution rail). One tool, choose `action`:\n"
+                    "- add: append one step {title, deps?: [ids], tool_hint?}\n"
+                    "- add_many: append several at once {steps: [{title, deps?, tool_hint?}]}\n"
+                    "- list: show the current checklist (open items + statuses)\n"
+                    "- done: mark a step finished {id?, result} (id defaults to the next open step)\n"
+                    "- block: mark a step blocked {id?, reason}\n"
+                    "- request_human: escalate a blocked step {id?, question}\n"
+                    "Build the rail first (add/add_many), then advance it (done/block) until empty."
+                ),
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "action": {"type": "string", "enum": list(_ACTIONS)},
+                        "title": {"type": "string"},
+                        "steps": {"type": "array", "items": {"type": "object"}},
+                        "deps": {"type": "array", "items": {"type": "string"}},
+                        "tool_hint": {"type": "string"},
+                        "id": {"type": "string"},
+                        "result": {"type": "string"},
+                        "reason": {"type": "string"},
+                        "question": {"type": "string"},
+                    },
+                    "required": ["action"],
                 },
-                "required": ["action"],
-            },
-        }]
+            }
+        ]
 
-    async def call_tool(self, name: str, inp: dict, retrieved_chunks=None, already_read=None) -> str:
+    async def call_tool(
+        self, name: str, inp: dict, retrieved_chunks=None, already_read=None
+    ) -> str:
         if name != "todos":
             return f"Error: unknown tool {name!r}."
         action = str(inp.get("action") or "").lower()
@@ -182,8 +199,12 @@ class TodosToolRuntime:
     def _add(self, inp: dict) -> str:
         if not inp.get("title"):
             return "Error: add requires a 'title'."
-        t = self.rail.add(inp["title"], deps=inp.get("deps") or (),
-                          tool_hint=inp.get("tool_hint", ""), spec=_spec_from(inp))
+        t = self.rail.add(
+            inp["title"],
+            deps=inp.get("deps") or (),
+            tool_hint=inp.get("tool_hint", ""),
+            spec=_spec_from(inp),
+        )
         self.events.append({"action": "add", "id": t.id})
         self._sync()
         return f"Added {t.id}: {t.title}.\n{self._checklist()}"
@@ -192,8 +213,12 @@ class TodosToolRuntime:
         ids = []
         for s in inp.get("steps") or []:
             if isinstance(s, dict) and s.get("title"):
-                t = self.rail.add(s["title"], deps=s.get("deps") or (), tool_hint=s.get("tool_hint", ""),
-                                  spec=_spec_from(s))
+                t = self.rail.add(
+                    s["title"],
+                    deps=s.get("deps") or (),
+                    tool_hint=s.get("tool_hint", ""),
+                    spec=_spec_from(s),
+                )
                 ids.append(t.id)
         if not ids:
             return "Error: add_many requires 'steps': [{title, deps?}]."
@@ -234,8 +259,11 @@ class TodosToolRuntime:
         ready = {t.id for t in self.rail.ready()}
         lines = [
             f"  {t.id}: [{t.status}] {t.title}"
-            + (f" (needs {', '.join(self.rail._deps_unmet(t))})" if self.rail._deps_unmet(t)
-               else (" ← do this next" if t.id in ready else ""))
+            + (
+                f" (needs {', '.join(self.rail._deps_unmet(t))})"
+                if self.rail._deps_unmet(t)
+                else (" ← do this next" if t.id in ready else "")
+            )
             for t in items
         ]
         return "Checklist:\n" + "\n".join(lines)

@@ -26,8 +26,14 @@ __all__ = ["TaskPlugin", "Todo", "TodoRail", "TodosToolRuntime"]
 
 
 def task_flow():
-    return flow("task", use_when="accomplish a multi-step task / run a checklist to completion",
-                stages=["plan", "execute", "deliver"], grounds=False, threshold=0.5, signal=recognize)
+    return flow(
+        "task",
+        use_when="accomplish a multi-step task / run a checklist to completion",
+        stages=["plan", "execute", "deliver"],
+        grounds=False,
+        threshold=0.5,
+        signal=recognize,
+    )
 
 
 class TaskPlugin:

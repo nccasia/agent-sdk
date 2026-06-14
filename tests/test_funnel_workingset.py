@@ -19,26 +19,34 @@ from agent_sdk.react.funnel import (
 )
 
 
-def _obs(tid: str, text: str, *, name: str = "f", inp: dict | None = None,
-         is_error: bool = False) -> list[dict]:
+def _obs(
+    tid: str, text: str, *, name: str = "f", inp: dict | None = None, is_error: bool = False
+) -> list[dict]:
     """One think→act→observe exchange (assistant tool_use + user tool_result)."""
     tr = {"type": "tool_result", "tool_use_id": tid, "content": text}
     if is_error:
         tr["is_error"] = True
     return [
-        {"role": "assistant",
-         "content": [{"type": "tool_use", "id": tid, "name": name, "input": inp or {}}]},
+        {
+            "role": "assistant",
+            "content": [{"type": "tool_use", "id": tid, "name": name, "input": inp or {}}],
+        },
         {"role": "user", "content": [tr]},
     ]
 
 
 def test_score_observations_value_beats_recency():
     """An old on-goal observation outranks a newer off-goal one."""
-    msgs = (
-        _obs("t1", "deployment release production rollout steps are prepared",
-             name="search", inp={"q": "deploy release production"})
-        + _obs("t2", "sunny twenty five degrees clear sky weather forecast today",
-               name="weather", inp={"q": "weather"})
+    msgs = _obs(
+        "t1",
+        "deployment release production rollout steps are prepared",
+        name="search",
+        inp={"q": "deploy release production"},
+    ) + _obs(
+        "t2",
+        "sunny twenty five degrees clear sky weather forecast today",
+        name="weather",
+        inp={"q": "weather"},
     )
     keep = score_observations(msgs, goal="deploy the release to production", keep_top=1)
     assert keep == {"t1"}  # value (on-goal) beat recency (the newer weather obs)
@@ -51,21 +59,36 @@ def test_score_observations_keep_top_zero():
 
 def test_pinned_observation_stays_full_against_recency():
     """A value-pinned old observation survives even as newer ones arrive."""
-    msgs = _obs("old", "CRITICAL the database password rotates at midnight UTC") + \
-        _obs("a", "x" * 50) + _obs("b", "y" * 50) + _obs("c", "z" * 50)
+    msgs = (
+        _obs("old", "CRITICAL the database password rotates at midnight UTC")
+        + _obs("a", "x" * 50)
+        + _obs("b", "y" * 50)
+        + _obs("c", "z" * 50)
+    )
     out = tier_observations(msgs, hop=4, keep_last_full=1, keep_full_ids={"old"})
     # the pinned observation keeps its full body; un-pinned older ones are hints
-    old_tr = next(b for m in out for b in m.get("content", [])
-                  if isinstance(b, dict) and b.get("tool_use_id") == "old")
+    old_tr = next(
+        b
+        for m in out
+        for b in m.get("content", [])
+        if isinstance(b, dict) and b.get("tool_use_id") == "old"
+    )
     assert "CRITICAL the database password" in old_tr["content"]
 
 
 def test_error_observation_stays_full():
-    msgs = _obs("err", "Traceback: ConnectionRefused on port 5432", is_error=True) + \
-        _obs("a", "x" * 80) + _obs("b", "y" * 80)
+    msgs = (
+        _obs("err", "Traceback: ConnectionRefused on port 5432", is_error=True)
+        + _obs("a", "x" * 80)
+        + _obs("b", "y" * 80)
+    )
     out = tier_observations(msgs, hop=3, keep_last_full=1, keep_errors_full=True)
-    err_tr = next(b for m in out for b in m.get("content", [])
-                  if isinstance(b, dict) and b.get("tool_use_id") == "err")
+    err_tr = next(
+        b
+        for m in out
+        for b in m.get("content", [])
+        if isinstance(b, dict) and b.get("tool_use_id") == "err"
+    )
     assert "Traceback" in err_tr["content"]  # error body survived the funnel
 
 
@@ -113,7 +136,9 @@ async def test_working_set_budget_bounds_engine_tail():
     default = await probe(_looping_agent(budget=None), "explore everything", label="d")
 
     def peak(rec):
-        series = [c for s in rec.stages for c in (s.get("metadata") or {}).get("funnel_obs_chars", [])]
+        series = [
+            c for s in rec.stages for c in (s.get("metadata") or {}).get("funnel_obs_chars", [])
+        ]
         return max(series) if series else 0
 
     assert peak(bounded) > 0 and peak(default) > 0

@@ -10,8 +10,13 @@ def test_fired_prompt_is_certain():
 
 
 def test_analytical_cues_score_above_qna():
-    for q in ["compute the total revenue", "what are the top 3 products", "how many orders shipped",
-              "list customers by spend", "average order value per region"]:
+    for q in [
+        "compute the total revenue",
+        "what are the top 3 products",
+        "how many orders shipped",
+        "list customers by spend",
+        "average order value per region",
+    ]:
         assert recognize({"query": q}) == 0.9, q
 
 

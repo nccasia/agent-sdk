@@ -119,8 +119,13 @@ def select_and_render(
     producer = {id(n): lobe for lobe, n in producer_nodes}
 
     selected, attn_trace = build_attention(
-        nodes, q_text, q_vec, weights=w, budget_tokens=budget_tokens,
-        min_activation=min_activation, embed_batch=embed_batch,
+        nodes,
+        q_text,
+        q_vec,
+        weights=w,
+        budget_tokens=budget_tokens,
+        min_activation=min_activation,
+        embed_batch=embed_batch,
     )
     _, tier_trace = route_tiers(selected, weights=w, budget_tokens=budget_tokens)
     if trace_out is not None:
@@ -141,9 +146,11 @@ def select_and_render(
     hints = [_node_menu_hint(n) for n in ordered if n.tier == TIER_HINT]
     hints = [h for h in hints if h]
     if hints:
-        parts.append((
-            "hints",
-            "References (recall to read with the memory/read tools):\n" + "\n".join(hints),
-            "turn",
-        ))
+        parts.append(
+            (
+                "hints",
+                "References (recall to read with the memory/read tools):\n" + "\n".join(hints),
+                "turn",
+            )
+        )
     return parts

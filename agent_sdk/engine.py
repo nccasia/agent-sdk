@@ -11,9 +11,10 @@ and tool calls — exactly the split that makes the core portable (docs/porting.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import contextvars
-import json
+import inspect
 import re
 import uuid
 from collections.abc import AsyncIterator
@@ -36,8 +37,16 @@ from agent_sdk.events import (
     stamp,
 )
 from agent_sdk.flow_def import Flow
+from agent_sdk.inspection import (
+    EngineSnapshot,
+    FlowAxisSnapshot,
+    FlowStepInspection,
+    LobeAxisSnapshot,
+    LobeInspection,
+)
 from agent_sdk.lobes.runtime import Lobe, datetime_block
-from agent_sdk.metacognition_facade import Metacognition
+from agent_sdk.metacognition.regulator import _TRIMMABLE_LOBES
+from agent_sdk.metacognition_facade import PINNED_UNSKIPPABLE, Metacognition
 from agent_sdk.network.activation import merge_lobe_weights, propagate, validate_network
 from agent_sdk.result import AgentResult, MemoryUpdate, Refusal, Trace, Usage
 from agent_sdk.session import SessionState
@@ -50,6 +59,41 @@ from agent_sdk.stages import Stage, StageRegistry
 _XML_TAG_MAP = {"datetime": "env", "memory_index": "memory", "session": "conversation"}
 _LEAD_BRACKET_RE = re.compile(r"^\[[^\]]*\]\n")  # drop a redundant "[Header]\n" line under a tag
 
+# Canonical prompt-layer order (docs/concepts/14-prompt-engineering.md). Best-practice
+# composition: a STABLE, cacheable instruction prefix leads; the VOLATILE per-turn tail trails
+# into the message hops (the conversation + query already own recency there). Segments sort by
+# (stability tier, layer band, authored order), so the turn-volatile sections always form a
+# contiguous suffix — the future cache-prefix boundary — and identity is never buried mid-prompt.
+# An unmapped source falls in the TASK band; stability is the primary key, so a per-turn section
+# stays in the tail regardless of band. New capability = a registry row, never an order branch.
+(_LAYER_IDENTITY, _LAYER_DIRECTIVES, _LAYER_CAPABILITIES, _LAYER_TASK,
+ _LAYER_CONTRACT, _LAYER_SAFETY, _LAYER_CONTEXT, _LAYER_ENV) = range(8)
+_PROMPT_LAYERS = {
+    "instructions": _LAYER_IDENTITY,
+    "memory_directive": _LAYER_DIRECTIVES,
+    "tools": _LAYER_CAPABILITIES, "skills": _LAYER_CAPABILITIES,
+    "skill_select": _LAYER_CAPABILITIES, "skill_active": _LAYER_CAPABILITIES,
+    "stage_prompt": _LAYER_TASK, "subject": _LAYER_TASK, "synthesize": _LAYER_TASK,
+    "plan": _LAYER_TASK, "research": _LAYER_TASK, "condense": _LAYER_TASK,
+    "classify": _LAYER_TASK, "scope_check": _LAYER_TASK, "respond": _LAYER_TASK,
+    "todo_list": _LAYER_TASK, "plan_supervise": _LAYER_TASK,
+    "understand": _LAYER_TASK, "explore": _LAYER_TASK, "act": _LAYER_TASK,
+    "grounding": _LAYER_CONTRACT, "cite": _LAYER_CONTRACT, "format": _LAYER_CONTRACT,
+    "filter": _LAYER_SAFETY,
+    "memory_recall": _LAYER_CONTEXT, "session_recall": _LAYER_CONTEXT,
+    "ctxvar_resolve": _LAYER_CONTEXT, "retrieved_context": _LAYER_CONTEXT,
+    "memory_index": _LAYER_CONTEXT, "session": _LAYER_CONTEXT, "context": _LAYER_CONTEXT,
+    "notes": _LAYER_CONTEXT, "datetime": _LAYER_ENV,
+}
+_STAB_RANK = {"stable": 0, "slow": 1, "turn": 2, "volatile": 3}
+
+
+def _layer_key(part: tuple[str, str, str], idx: int) -> tuple[int, int, int]:
+    """Sort key for one ``(source, text, stability)`` segment: stability tier first (so the
+    volatile tail is contiguous), then the canonical layer band, then authored order."""
+    source, _text, stability = part
+    return (_STAB_RANK.get(stability, 1), _PROMPT_LAYERS.get(source, _LAYER_TASK), idx)
+
 # Generic default prompt for a `loop="map"` sub-task (an item may override it via
 # `system_prompt`). Domain-free: the engine knows "sub-tasks", not "todos".
 _MAP_ITEM_PROMPT = (
@@ -57,6 +101,18 @@ _MAP_ITEM_PROMPT = (
     "concisely. Prior sub-task results are in the notes — build on them; do not redo "
     "them or start others."
 )
+
+# Per-result text kept in the turn scratchpad's fan-out results (the fan-in lobe + telemetry read
+# this; the full result rides ``holder``/the answer). Small enough that a wide fan-out's results list
+# stays under the scratchpad value cap — so every subagent's result survives (no zero-collapse).
+_FANOUT_RESULT_CHARS = 700
+
+# Conservative default concurrency for parallel fan-out. ``fanout_max`` caps the number of
+# work-items (≤ 40); this caps how many run AT ONCE. Bursting many simultaneous provider
+# calls trips rate/concurrency limits on most endpoints (observed: a wide fan-out of 7-8
+# workers all failing at once), so the semaphore stays small and the rest queue. A worker
+# that still fails after a serial retry is recorded ``status="failed"`` + a degraded marker.
+_FANOUT_CONCURRENCY = 5
 
 # Per-turn context for tools/runtimes that need turn state (e.g. a tool that reads or
 # writes the turn scratchpad). A generic seam — the engine owns the turn; a tool opts in
@@ -81,7 +137,12 @@ _WH = ("what", "why", "how", "when", "where", "who", "which", "can ", "is ", "do
 
 
 def _block_to_dict(block: Any) -> dict:
-    """Normalize a provider content block (dataclass or anthropic obj) to a dict."""
+    """Normalize a provider content block (dataclass or anthropic obj) to a dict.
+
+    A *thinking* block is surfaced as ``type:"thinking"`` carrying its reasoning text —
+    never stringified to a ``str(block)`` Python repr. The old repr fallback both leaked
+    a ``ThinkingBlock(...)`` repr into the answer (via ``_text_of`` on an echoed history)
+    and corrupted replayed history (MiniMax then parrots the repr back as text)."""
     t = getattr(block, "type", None)
     if t == "text":
         return {"type": "text", "text": getattr(block, "text", "")}
@@ -92,11 +153,24 @@ def _block_to_dict(block: Any) -> dict:
             "name": getattr(block, "name", ""),
             "input": getattr(block, "input", {}) or {},
         }
-    return {"type": "text", "text": str(getattr(block, "text", block))}
+    if t in ("thinking", "redacted_thinking"):
+        return {"type": "thinking", "text": getattr(block, "thinking", "") or ""}
+    # Unknown block: keep only a genuine string ``.text``; never a repr.
+    txt = getattr(block, "text", None)
+    return {"type": "text", "text": txt if isinstance(txt, str) else ""}
 
 
 def _assistant_content(msg: Any) -> list[dict]:
-    return [_block_to_dict(b) for b in getattr(msg, "content", []) or []]
+    """Assistant content for REPLAY into the running history. Thinking blocks are
+    dropped — the provider does not need its own prior reasoning replayed, and
+    serializing it (especially as a repr) corrupts the next hop."""
+    out: list[dict] = []
+    for b in getattr(msg, "content", []) or []:
+        d = _block_to_dict(b)
+        if d.get("type") == "thinking":
+            continue
+        out.append(d)
+    return out
 
 
 def _text_of(msg: Any) -> str:
@@ -240,7 +314,7 @@ class Engine:
         # pins it onto the terminal stage so that stage becomes the response stage — it renders
         # the next conversation message from the gathered notes. No extra LLM call.
         if not any(lb.id == "respond" for lb in self.lobes):
-            from agent_sdk.lobes.expression.respond import LOBE as _respond_lobe
+            from agent_sdk.expression.lobes.respond import LOBE as _respond_lobe
 
             self.lobes.append(_respond_lobe)
         # Weave lobes into canonical (layer, order) position so extension-plugin lobes land
@@ -256,6 +330,39 @@ class Engine:
         self.skill_packs = [s.to_pack() for s in (skills or [])]
         self.skill_registry = SkillRegistry(self.skill_packs)
         self.tools = tools
+        # On-demand skills need a way for the model to LOAD them: the skill-activation
+        # tools (ActivateSkill / skill.read / skill.search). Compose them in whenever an
+        # on-demand skill is declared so the directive in the prompt is actually callable.
+        # Eager skills inline their body and need no tool.
+        on_demand_slugs = [
+            p.id for p in self.skill_packs if getattr(p, "injection", "") == "on_demand"
+        ]
+        self._skill_runtime = None
+        self._skill_tool_names: set[str] = set()
+        if on_demand_slugs:
+            from agent_sdk.contracts.tools import CompositeToolRuntime
+            from agent_sdk.skills import ACTIVATE, READ, SEARCH, SkillToolRuntime
+            from agent_sdk.skills.cache import SurfaceCache
+
+            # Lazy compile-on-activate: the runtime builds each skill's budget surface
+            # with the engine's client the first time it's activated, and caches it.
+            _b = budgets or {}
+            self._skill_runtime = SkillToolRuntime(
+                self.skill_registry, on_demand_slugs,
+                llm=self.client,
+                cache=SurfaceCache(persist=bool(_b.get("skill_surface_persist", True))),
+                budget_tokens=int(_b.get("skill_surface_budget", 600)),
+                # Default per the skillbench A/B (benchmarks/skillbench/compare.py): the
+                # deterministic chunk-index surface is the most compact activation at
+                # equal accuracy and zero compile cost — it dominates both "off" (raw
+                # body) and "llm" (compile cost, no accuracy gain). "llm" stays opt-in.
+                surface_mode=str(_b.get("skill_surface_mode", "deterministic")),
+            )
+            self._skill_tool_names = {ACTIVATE, READ, SEARCH}
+            runtimes = [self._skill_runtime]
+            if self.tools is not None:
+                runtimes.append(self.tools)
+            self.tools = CompositeToolRuntime(runtimes)
         self.instructions = instructions
         # An SDK-injected system directive (e.g. the memory directive) — part of the composed prompt
         # but NOT part of `instructions` (so the spec / with_() keep the user's original).
@@ -271,6 +378,9 @@ class Engine:
         self._prefetch_hooks: list[Any] = []
         self._tool_filters: list[Any] = []
         self._turn_hooks: list[Any] = []
+        # Grounding/citation seams owned by a plugin (RagPlugin), not the core.
+        self._finalize_hooks: list[Any] = []
+        self._tool_result_hooks: list[Any] = []
         self.require_citations = require_citations
         self.share_history = share_history
         self.tools_in_prompt = tools_in_prompt
@@ -311,13 +421,28 @@ class Engine:
     def build_context(self, query: str, state: SessionState) -> dict:
         q = query.strip()
         low = q.lower()
-        return {
+        ctx = {
             "query": query,
             "is_question": q.endswith("?") or low.startswith(_WH),
             "word_count": len(q.split()),
             "has_history": bool(state.history),
             "ambiguous": False,
         }
+        # Fold the host's per-turn recognition FLAGS into the ctx so domain path
+        # recognizers can read them (e.g. ``config_mode``/``relearn_active`` for the
+        # admin steward paths). Only scalar top-level keys the host set on the
+        # context bag — the engine moves opaque values, no domain knowledge.
+        if isinstance(self.context, dict):
+            for k, v in self.context.items():
+                if k not in ctx and isinstance(v, (bool, int, float, str)):
+                    ctx[k] = v
+        # Fold a metacognition flow bias the meta_control tool recorded on a PRIOR turn
+        # into the recognition ctx as a deterministic flag (``meta_flow_bias_<path>``) a
+        # plugin path recognizer can read. No-op when unset ⇒ default routing unchanged.
+        bias = getattr(state, "meta_flow_bias", "")
+        if bias:
+            ctx[f"meta_flow_bias_{bias}"] = True
+        return ctx
 
     def _policy(self) -> dict:
         return {
@@ -329,6 +454,19 @@ class Engine:
     # bypass the per-stage allowlist (and the adaptive drop) in every agentic stage.
     _MEMORY_ESSENTIALS = ("recall", "note")
 
+    def _skill_tools_live(self, stage: Stage) -> bool:
+        """Whether the skill-activation tools should be exposed on this stage: only
+        when an on-demand skill is declared FOR this stage, or one is already in use
+        (so grounding/format/other stages with no skill don't carry ~155 tok of
+        unused skill tool specs)."""
+        if not self._skill_tool_names:
+            return False
+        in_use = list((getattr(current_turn(), "lobe_outputs", {}) or {}).get("skills_in_use") or [])
+        if in_use:
+            return True
+        declared = self.skill_registry.active_for_stage(self._policy(), stage.id)
+        return any(getattr(p, "injection", "") == "on_demand" for p in declared)
+
     def _tool_specs(self, stage: Stage) -> list[dict]:
         if self.tools is None:
             return []
@@ -337,6 +475,10 @@ class Engine:
             allow = set(stage.tools)
             if self.memory_store is not None:
                 allow |= set(self._MEMORY_ESSENTIALS)
+            # Skill-activation tools bypass the per-stage allowlist, but only when a
+            # skill is actually loadable/active here (mirrors the memory essentials).
+            if self._skill_tools_live(stage):
+                allow |= self._skill_tool_names
             specs = [s for s in specs if s.get("name") in allow]
         return specs
 
@@ -437,6 +579,17 @@ class Engine:
         # todo's tailored instruction). Lobe contributions still append below.
         if getattr(stage, "system_prompt", None):
             parts.append(("stage_prompt", stage.system_prompt.strip(), "stable"))
+        # The state's subject — the specific sub-question/aspect this instance works on (set by
+        # the dynamic state plan when a state is expanded over subjects; None ⇒ whole turn).
+        _subj = getattr(stage, "subject", None)
+        if _subj:
+            parts.append(("subject", f"Work on this specifically:\n{str(_subj).strip()}", "stable"))
+        # KB prefetch context (host-rendered): the strong-retrieval chunks seeded
+        # before reasoning, surfaced so a grounding stage answers from them. Opaque
+        # to the engine; rendered by the host plugin (kept domain-free here).
+        _pf = getattr(turn_ctx, "prefetch_context", "") if turn_ctx is not None else ""
+        if _pf:
+            parts.append(("retrieved_context", _pf.strip(), "turn"))
         # Always-on memory index: the agent SEES what it has stored each turn (the Tier-2 menu over
         # universal memory), so it answers from memory and knows what to recall — instead of saying
         # "I don't have that". Query-scored, capped, newest-first; empty store ⇒ nothing added.
@@ -476,12 +629,17 @@ class Engine:
             tools_block = self._tools_prompt_block(stage, tool_specs)
             if tools_block:
                 parts.append(("tools", tools_block, "slow"))
-        skill_block = build_skill_prompt_block(
-            self.skill_registry, self._policy(), stage.id, query=ctx.get("query"),
-            ranking_out=skill_sel_out,
-        )
-        if skill_block:
-            parts.append(("skills", skill_block, "slow"))
+        # The skill_select lobe owns the index (state-aware) when it's in the stage;
+        # only fall back to the direct block on stages that don't include it — so
+        # there's never a duplicate, and a custom stage without the lobe still lists.
+        if "skill_select" not in stage.lobes:
+            in_use = list((getattr(turn_ctx, "lobe_outputs", {}) or {}).get("skills_in_use") or [])
+            skill_block = build_skill_prompt_block(
+                self.skill_registry, self._policy(), stage.id, query=ctx.get("query"),
+                ranking_out=skill_sel_out, skills_in_use=in_use,
+            )
+            if skill_block:
+                parts.append(("skills", skill_block, "slow"))
         # Dynamic lobe context (Phase 0): the stage's lobes emit ContextNodes
         # (memory/skill/task recall, …); pool → attention → tier → render. No-op
         # for prompt-only lobes (build_context returns []).
@@ -520,6 +678,11 @@ class Engine:
             if sp:
                 parts.append(("respond", sp.strip(), "stable"))
         parts.append(("datetime", datetime_block(self.tz, self.lang), "turn"))
+
+        # Canonical layer order: a stable instruction prefix leads; the turn-volatile tail trails
+        # into the message hops (which own recency). Stable-sorted, so authored order holds within
+        # a band and the volatile sections are always a contiguous suffix. See _PROMPT_LAYERS.
+        parts = [p for _, p in sorted(enumerate(parts), key=lambda ip: _layer_key(ip[1], ip[0]))]
 
         sep = "\n\n"
         xml = self.prompt_format == "xml"
@@ -584,7 +747,20 @@ class Engine:
         from agent_sdk.memory.scratchpad import Scratchpad
 
         scratchpad = Scratchpad()
-        snapshot = await self._prefetch(query, state)
+        snapshot = await self._prefetch(query, state, path=path.get("name"))
+        # Retrieval-gated refusal: a prefetch hook may decide (with retrieval in
+        # hand) that the turn is out-of-scope and request a refusal via
+        # ``_refuse`` — so an in-domain question with strong retrieval is NEVER
+        # refused, while an off-topic one that retrieves nothing relevant is.
+        # Domain-free: the engine just honors the opaque reason string.
+        if isinstance(snapshot, dict) and snapshot.get("_refuse"):
+            _reason = str(snapshot["_refuse"])
+            _res = AgentResult(
+                text=_reason, status="refused",
+                refusal=Refusal(reason="policy_violation", message=_reason),
+            )
+            yield stamp(Final(result=_res), trace_id)
+            return
         # Fold the static host context bag in as the base (identity/channel/…); a
         # prefetch hook that set the same key wins (host can override per turn).
         if self.context:
@@ -596,6 +772,20 @@ class Engine:
             query, state, scratchpad=scratchpad, snapshot=snapshot,
             path=path.get("name"), active_lobes=tuple(resolution.activated),
             policy=self._policy(),
+            # Seed the skills the conversation already activated so the skill_active
+            # lobe keeps driving a loaded SOP this turn (RFC 0013 lifecycle). The
+            # ActivateSkill tool appends to this list mid-turn; it is persisted back
+            # to the session at the end of the turn.
+            # Seed the registry too, so skill_select/skill_active actually FIRE
+            # (without it active_skill_packs() is empty and they stay dormant). They
+            # own the state-aware skill prompts: skill_select renders the index when
+            # selecting, skill_active the drive-guide + pinned context_vars when driving.
+            lobe_outputs={
+                "skills_in_use": list(getattr(state, "skills_in_use", []) or []),
+                "skill_registry": self.skill_registry,
+            }
+            if self.skill_packs
+            else None,
         )
         # Expose the turn to tools/runtimes that opt into turn state (generic seam).
         _TURN.set(turn_ctx)
@@ -611,6 +801,23 @@ class Engine:
         # Turn-level infra-degradation markers a host tool appends via current_turn().
         degraded: list[str] = []
         turn_ctx.degraded = degraded
+        # KB prefetch grounding seed: a prefetch hook (host plugin) may have run a
+        # strong deterministic retrieval on the standalone query and returned the
+        # chunks (``_prefetch_chunks``) + a host-rendered prompt block
+        # (``_prefetch_block``) in the snapshot. Seed the chunks into the evidence
+        # channel (so citation grounding resolves) and stash the rendered block on
+        # the turn so the answer stage SEES them — a single-hop qna is then grounded
+        # by construction even when the model's own searches are weak. Domain-free:
+        # the engine moves opaque chunk dicts + an opaque string, no KB logic.
+        if isinstance(snapshot, dict) and snapshot.get("_prefetch_chunks"):
+            for _ch in snapshot["_prefetch_chunks"]:
+                _cid = str(_ch.get("chunk_id") or "")
+                if _cid and _cid not in already_read:
+                    already_read.add(_cid)
+                    retrieved_chunks.append(_ch)
+            _blk = snapshot.get("_prefetch_block")
+            if _blk:
+                turn_ctx.prefetch_context = str(_blk)
 
         base_msgs = state.messages() + [{"role": "user", "content": query}]
         # ``share_history`` threads the running message + tool history across
@@ -620,13 +827,48 @@ class Engine:
         running_msgs = list(base_msgs)
         notes: list[str] = []
         citations: list[Citation] = []
+        emitted_cite_ids: set[str] = set()  # CitationFound already streamed (avoid dup post-finalize)
         flow_stages_trace: list[dict] = []
         meta_actions: list[dict] = []
         llm_calls: list[dict] = []
         answer = ""
 
-        for stage_index, stage in enumerate(stages):
+        # ── Metacognition: the OX/OY snapshots the kernel monitor reads ──────────
+        # Previously the controller ran blind (snapshots=None). Build the lobe-axis +
+        # engine snapshots once per turn from already-resolved state (pure reads); the
+        # per-stage flow-axis is built inside the loop. Default mode is ``observe`` —
+        # nothing is applied — so a no-plugin agent stays byte-identical (parity).
+        meta_lobe_axis = LobeAxisSnapshot(
+            lobes=[
+                LobeInspection(id=e["id"], layer=e["layer"], activated=bool(e["activated"]))
+                for e in resolution.lobes
+            ],
+            activated=list(resolution.activated),
+        )
+        meta_engine_snap = EngineSnapshot(
+            path=path,
+            flow={"name": flow.id},
+            lobes=[{"id": e["id"]} for e in resolution.lobes],
+        )
+
+        # ── Phase cursor (Navigator layer) ──────────────────────────────────────
+        # The cursor is a MOVABLE index, not a for-loop: a post-stage Navigator may
+        # advance (default), redo a phase (bounded), or goto another phase. With no
+        # navigation it walks 0..N-1 exactly like the old linear loop (parity), since
+        # the nav moves are apply-gated and off by default.
+        REDO_BUDGET = 1
+        TOTAL_CAP = 2 * len(stages) + 2
+        runs: dict[str, int] = {}  # phase id → times executed (redo budget)
+        phase_ckpt: dict[str, tuple[int, int, int]] = {}  # id → (msgs,notes,cites) before 1st run
+        total_runs = 0
+        i = 0
+        while 0 <= i < len(stages) and total_runs < TOTAL_CAP:
+            stage_index, stage = i, stages[i]
             is_last_stage = stage_index == len(stages) - 1
+            # Checkpoint conversational state before a phase's FIRST run so a later
+            # redo / backward-goto can rewind to it (no duplicated history or notes).
+            if stage.id not in phase_ckpt:
+                phase_ckpt[stage.id] = (len(running_msgs), len(notes), len(citations))
             yield stamp(StageStart(flow=flow.id, stage=stage.id), trace_id)
             if self.share_history and stage_index > 0:
                 # Keep user/assistant alternation across stage boundaries.
@@ -634,18 +876,90 @@ class Engine:
                     {"role": "user", "content": f"Next step ({stage.id}): "
                      f"{stage.description or stage.id}"}
                 )
-            decision = self.metacognition.plan_next(target_flow=flow.id, target_step=stage.id)
+            # The current step as a flow-axis snapshot (scoped to this stage so the
+            # monitor's observations + the regulator's decision target THIS step).
+            flow_axis = FlowAxisSnapshot(
+                flow=flow.id,
+                disabled=False,
+                steps=[
+                    FlowStepInspection(
+                        flow=flow.id, step=stage.id, loop=stage.loop,
+                        tools=list(stage.tools), lobes=list(stage.lobes),
+                    )
+                ],
+            )
+            decision = self.metacognition.plan_next(
+                lobe_axis=meta_lobe_axis, flow_axis=flow_axis, engine=meta_engine_snap,
+                target_flow=flow.id, target_step=stage.id, current_lobes=tuple(stage.lobes),
+            )
+            # The mirror: surface the kernel's observations to the meta-context lobe
+            # (harmless when the MetacognitionPlugin is not installed — nothing reads it).
+            turn_ctx.lobe_outputs["meta_observations"] = [
+                o.to_payload() for o in decision.observations
+            ]
             if decision.action != "continue":
                 meta_actions.append(
                     {"action": decision.action, "reason": decision.reason, "stage": stage.id}
                 )
                 yield stamp(MetaAction(action=decision.action, reason=decision.reason), trace_id)
-                if decision.action == "skip_step" and self.metacognition.should_apply("skip_step"):
+                if (
+                    decision.action == "skip_step"
+                    and self.metacognition.should_apply("skip_step")
+                    and not self._stage_carries_pinned(stage)
+                ):
                     flow_stages_trace.append(
                         {"flow": flow.id, "stage": stage.id, "skipped": True, "steps": []}
                     )
                     yield stamp(StageEnd(flow=flow.id, stage=stage.id), trace_id)
+                    i += 1  # cursor: a skipped phase advances (never redone)
+                    total_runs += 1
                     continue
+                if (
+                    decision.action == "adjust_lobe_slice"
+                    and decision.target_lobes
+                    and self.metacognition.should_apply("adjust_lobe_slice")
+                ):
+                    # Trim the consulted lobe slice for this step (the regulator never
+                    # trims cite/filter). Run the step against the narrowed slice.
+                    stage = self._scoped_stage(stage, lobes=list(decision.target_lobes))
+
+            # The meta-control tool (run on an earlier reflect step) may have requested
+            # trim/skip on this step; honor it — apply-gated, pin-guarded, one-shot.
+            if (
+                getattr(turn_ctx, "scratchpad", None) is not None
+                and (req := turn_ctx.scratchpad.get("meta_regulate_request"))
+                and isinstance(req, dict)
+                and req.get("step") in (None, stage.id)
+            ):
+                kind = req.get("request")
+                turn_ctx.scratchpad.set("meta_regulate_request", None)  # one-shot
+                if (
+                    kind == "skip"
+                    and self.metacognition.should_apply("skip_step")
+                    and not self._stage_carries_pinned(stage)
+                ):
+                    meta_actions.append(
+                        {"action": "skip_step", "reason": "meta_control regulate request",
+                         "stage": stage.id}
+                    )
+                    yield stamp(
+                        MetaAction(action="skip_step", reason="meta_control request"), trace_id
+                    )
+                    flow_stages_trace.append(
+                        {"flow": flow.id, "stage": stage.id, "skipped": True, "steps": []}
+                    )
+                    yield stamp(StageEnd(flow=flow.id, stage=stage.id), trace_id)
+                    i += 1  # cursor: a skipped phase advances (never redone)
+                    total_runs += 1
+                    continue
+                if kind == "trim" and self.metacognition.should_apply("adjust_lobe_slice"):
+                    narrowed = [lb for lb in stage.lobes if lb not in _TRIMMABLE_LOBES]
+                    if narrowed and len(narrowed) != len(stage.lobes):
+                        meta_actions.append(
+                            {"action": "adjust_lobe_slice",
+                             "reason": "meta_control regulate request", "stage": stage.id}
+                        )
+                        stage = self._scoped_stage(stage, lobes=narrowed)
 
             # Adaptive tool exposure (Phase 4): choose the stage's tool subset once
             # (cache-stable across hops); default is the full static set.
@@ -656,6 +970,11 @@ class Engine:
                 stage, ctx, state, notes, turn_ctx, attn_out=attn_trace,
                 tool_specs=sel_specs, skill_sel_out=skill_sel, is_last=is_last_stage,
             )
+            # When the skill_select lobe owns the index, it records the ranking on
+            # the turn (skill_ranking); use that for the inspector. Else the direct
+            # fallback filled skill_sel.
+            if "skill_select" in stage.lobes:
+                skill_sel = list(turn_ctx.lobe_outputs.get("skill_ranking") or [])
             steps: list[dict] = []
             stage_text = ""
             calls_before = len(llm_calls)
@@ -668,7 +987,38 @@ class Engine:
             elif stage.loop in ("single",):
                 resp = await self._call(stage, system, stage_msgs)
                 stage_text = _text_of(resp)
+                # Hedge retry (opt-in, host-driven): if the one-shot answer hedges
+                # despite a seeded evidence channel, retry ONCE with a host-provided
+                # forced-answer directive. The host owns the hedge detection +
+                # directive text (domain); the engine just re-calls and keeps the
+                # new answer only if it stops hedging. Default off ⇒ no-op.
+                _retry = getattr(self, "_answer_retry", None)
+                if _retry is not None and retrieved_chunks and stage_text:
+                    _dir = _retry(stage_text)
+                    if _dir:
+                        resp2 = await self._call(
+                            stage, system + "\n\n" + str(_dir), stage_msgs)
+                        _t2 = _text_of(resp2)
+                        if _t2 and not _retry(_t2):
+                            stage_text, resp = _t2, resp2
+                        elif is_last_stage:
+                            # Still hedging after the forced-answer retry on the
+                            # final grounding stage ⇒ the evidence has no real
+                            # answer. Emit a clean REFUSAL instead of a kind=answer
+                            # hedge (which scores as a false answer / FP on an
+                            # unanswerable turn). Domain-free: host decided "hedge".
+                            _res = AgentResult(
+                                text=stage_text, status="refused",
+                                refusal=Refusal(reason="no_grounding",
+                                                message=stage_text),
+                            )
+                            yield stamp(Final(result=_res), trace_id)
+                            return
                 steps.append({"kind": "answer", "text": stage_text})
+                # One-shot grounding (resolving [chunk_id] mentions against the
+                # prefetch-seeded evidence channel) is the RagPlugin's job now — it
+                # runs in the finalize hook over the final answer, so a single-loop
+                # stage carries no citation logic in the engine core.
                 llm_calls.append({
                     "stage": stage.id, "hop": 0,
                     "stop_reason": getattr(resp, "stop_reason", "end_turn"),
@@ -709,8 +1059,10 @@ class Engine:
                     # _agentic mutated stage_msgs (== running_msgs) with the
                     # tool exchanges; record the stage's final answer turn too.
                     running_msgs.append({"role": "assistant", "content": stage_text})
+                # Tool-emitted citations (collected by a plugin's tool-result hook).
                 for c in holder["citations"]:
                     citations.append(c)
+                    emitted_cite_ids.add(getattr(c, "chunk_id", ""))
                     yield stamp(CitationFound(citation=c), trace_id)
                 if stage_text:
                     yield stamp(TextDelta(text=stage_text), trace_id)
@@ -732,6 +1084,9 @@ class Engine:
                     "loop": stage.loop,
                     "lobes": list(stage.lobes),
                     "steps": steps,
+                    # Per-subagent sub-traces (one per fanned-out todo: own prompt + timeline) —
+                    # empty unless this stage ran loop="map". The viewer's Subagents panel reads it.
+                    "subagents": list((stage_holder or {}).get("subagents", [])),
                     "system_prompt": system,  # the composed system text (Prompt panel)
                     "system_segments": system_segments,  # provenance: colour by lobe/section
                     # Context telemetry (Phase 1): per-hop funnel tail + per-stage
@@ -751,7 +1106,43 @@ class Engine:
             )
             yield stamp(StageEnd(flow=flow.id, stage=stage.id), trace_id)
 
-        result = self._finalize(
+            # ── Navigator hook (post-stage): are we good to go? what runs next? ──
+            # The pure ``_next_phase`` reads a model directive (scratchpad["nav_request"])
+            # or the deterministic DoD check, and returns the next cursor index (advance /
+            # redo / goto / done) — apply-gated + budgeted, pinned cite/filter always run.
+            total_runs += 1
+            runs[stage.id] = runs.get(stage.id, 0) + 1
+            nxt, rewind_to, nav_action, nav_reason = self._next_phase(
+                i, stages, turn_ctx, stage, stage_text, runs, redo_budget=REDO_BUDGET,
+            )
+            if nav_action != "advance":
+                meta_actions.append(
+                    {"action": nav_action, "reason": nav_reason, "stage": stage.id}
+                )
+                yield stamp(MetaAction(action=nav_action, reason=nav_reason), trace_id)
+            if rewind_to is not None and rewind_to in phase_ckpt:
+                m, nt, ct = phase_ckpt[rewind_to]
+                del running_msgs[m:]
+                del notes[nt:]
+                del citations[ct:]
+            i = nxt
+
+        # Persist activated skills onto the session so a loaded SOP keeps driving
+        # across turns (the ActivateSkill tool appended to this list mid-turn).
+        if self._skill_runtime is not None and hasattr(state, "skills_in_use"):
+            state.skills_in_use = list(turn_ctx.lobe_outputs.get("skills_in_use", []) or [])
+
+        # Persist a metacognition flow bias (the meta_control tool recorded it this turn).
+        # Flow is resolved once at turn start, so the bias takes effect NEXT turn: a path
+        # recognizer reads it via build_context (a deterministic signal, not an LLM judge).
+        if hasattr(state, "meta_flow_bias"):
+            _bias = turn_ctx.lobe_outputs.get("meta_flow_bias")
+            if isinstance(_bias, str) and _bias:
+                state.meta_flow_bias = _bias
+
+        # Citation extraction/backfill + ground-or-refuse run in the finalize hook
+        # (RagPlugin), not here — the engine core carries no citation logic.
+        result = await self._finalize(
             trace_id,
             answer,
             citations,
@@ -763,7 +1154,16 @@ class Engine:
             usage_before,
             llm_calls,
             degraded,
+            scratchpad=(turn_ctx.scratchpad.snapshot() if getattr(turn_ctx, "scratchpad", None) else None),
+            retrieved_chunks=retrieved_chunks,
         )
+        # Stream CitationFound for any citation a finalize hook added (one-shot text
+        # extraction + backfill) that wasn't already emitted during the loop.
+        for c in result.citations:
+            cid = getattr(c, "chunk_id", "")
+            if cid not in emitted_cite_ids:
+                emitted_cite_ids.add(cid)
+                yield stamp(CitationFound(citation=c), trace_id)
         yield stamp(Final(result=result), trace_id)
 
     def _select_flow(self, path: dict) -> Flow:
@@ -774,7 +1174,134 @@ class Engine:
         for fb in ("fallback", "qna"):
             if fb in self.flow_by_id:
                 return self.flow_by_id[fb]
-        return self.flows[0] if self.flows else Flow("qna", stages=["synthesize"])
+        return self.flows[0] if self.flows else Flow("qna", steps=())
+
+    @staticmethod
+    def _scoped_stage(stage: Stage, *, lobes: list[str]) -> Stage:
+        """A copy of ``stage`` with a narrowed lobe slice (metacognition trim). Preserves
+        loop/tools/overrides so only the consulted lobes change for this step."""
+        return Stage(
+            stage.id, lobes=lobes, loop=stage.loop, tools=list(stage.tools),
+            fanout_key=stage.fanout_key, fanout_parallel=stage.fanout_parallel,
+            fanout_max=stage.fanout_max, fanout_isolated=stage.fanout_isolated,
+            threshold=stage.threshold,
+            model=stage.model, temperature=stage.temperature,
+            max_tokens=stage.max_tokens, hops=stage.hops, system_prompt=stage.system_prompt,
+        )
+
+    @staticmethod
+    def _fanout_with_structure(stage: Stage, sp: Any) -> Stage:
+        """Apply a supervisor's per-turn structure choice to a ``loop="map"`` stage.
+
+        The supervisor (a planning ``supervise`` step) writes ``scratchpad["plan_structure"]``
+        — ``"fanout"`` (independent steps → parallel + isolated subagent per item) or
+        ``"sequential"`` (dependent steps → state-carry, in order); a dict
+        ``{parallel, isolated}`` is also honored. Returns a stage scoped to the chosen
+        flags, or ``stage`` unchanged when no choice was written (default-network parity)."""
+        struct = sp.get("plan_structure") if sp is not None else None
+        if not struct:
+            return stage
+        parallel, isolated = stage.fanout_parallel, stage.fanout_isolated
+        if isinstance(struct, str):
+            s = struct.lower()
+            if s in ("fanout", "parallel"):
+                parallel, isolated = True, True
+            elif s in ("sequential", "serial"):
+                parallel = False
+        elif isinstance(struct, dict):
+            parallel = bool(struct.get("parallel", parallel))
+            isolated = bool(struct.get("isolated", isolated))
+        if parallel == stage.fanout_parallel and isolated == stage.fanout_isolated:
+            return stage
+        return Stage(
+            stage.id, lobes=list(stage.lobes), loop="map", tools=list(stage.tools),
+            fanout_key=stage.fanout_key, fanout_parallel=parallel,
+            fanout_max=stage.fanout_max, fanout_isolated=isolated,
+            threshold=stage.threshold, model=stage.model, temperature=stage.temperature,
+            max_tokens=stage.max_tokens, hops=stage.hops, system_prompt=stage.system_prompt,
+        )
+
+    @staticmethod
+    def _stage_carries_pinned(stage: Stage) -> bool:
+        """A step consulting a pinned lobe (cite/filter) is never skippable — the
+        ground-or-refuse contract is not a meta decision (citations-mandatory)."""
+        return bool(set(stage.lobes) & PINNED_UNSKIPPABLE)
+
+    def _dod_check(
+        self, stage: Stage, stage_text: str, runs: dict[str, int], *, redo_budget: int
+    ) -> tuple[str, str | None, str] | None:
+        """Deterministic "are we good to go?" — the free half of the Navigator.
+
+        Returns a ``(action, target, reason)`` nav directive, or ``None`` (good_to_go →
+        advance). Today it redoes a phase that clearly missed its definition of done —
+        an active phase (single/agentic/map) that produced no output at all — bounded by
+        the redo budget. Pinned (cite/filter) phases and pure-prompt (``none``) phases are
+        never redone. Richer DoD criteria (the ``stage.dod`` tokens) are judged by the
+        model Navigator, which sees the brief. Pure function of (stage, output, runs)."""
+        if self._stage_carries_pinned(stage) or stage.loop == "none":
+            return None
+        if runs.get(stage.id, 0) > redo_budget:
+            return None  # out of redo budget — move on
+        if not str(stage_text or "").strip():
+            return ("redo_phase", stage.id, "phase produced no output (definition of done unmet)")
+        return None
+
+    def _next_phase(
+        self, i: int, stages: list[Stage], turn_ctx: Any, stage: Stage, stage_text: str,
+        runs: dict[str, int], *, redo_budget: int,
+    ) -> tuple[int, str | None, str, str]:
+        """The Navigator enactor — pure function of (cursor, written directive, budgets).
+
+        Resolves the next cursor index from a model directive (``scratchpad["nav_request"]``,
+        one-shot) else the deterministic DoD check, then enacts it: ``advance`` (i+1),
+        ``redo_phase`` (re-run, rewind), ``goto_phase`` (jump, rewind if backward), or ``done``.
+        Apply-gated (off ⇒ advance) and budgeted; a jump/finish that would leave an un-run
+        pinned phase (cite/filter) ahead is redirected to that phase so grounding always runs.
+        Returns ``(next_index, rewind_to_id|None, action, reason)``."""
+        n = len(stages)
+        by_id = {s.id: k for k, s in enumerate(stages)}
+        sp = getattr(turn_ctx, "scratchpad", None)
+        action, target, reason = "advance", None, ""
+
+        req = sp.get("nav_request") if sp is not None else None
+        if isinstance(req, dict) and req.get("to"):
+            sp.set("nav_request", None)  # one-shot
+            to = str(req["to"]).lower()
+            reason = str(req.get("reason") or "meta_control navigate")
+            if to == "redo":
+                action, target = "redo_phase", stage.id
+            elif to == "done":
+                action = "done"
+            elif to in ("next", "advance"):
+                action = "advance"
+            elif to in by_id:
+                action, target = "goto_phase", to
+        else:
+            nav = self._dod_check(stage, stage_text, runs, redo_budget=redo_budget)
+            if nav is not None:
+                action, target, reason = nav
+
+        # Apply-gate the phase moves — off by default ⇒ the cursor advances (parity).
+        if action in ("redo_phase", "goto_phase") and not self.metacognition.should_apply(action):
+            action, target, reason = "advance", None, ""
+
+        rewind: str | None = None
+        if action == "redo_phase" and target in by_id and runs.get(target, 0) <= redo_budget:
+            nxt, rewind = by_id[target], target
+        elif action == "goto_phase" and target in by_id:
+            nxt = by_id[target]
+            rewind = target if nxt <= i else None
+        elif action == "done":
+            nxt = n
+        else:  # advance (or a non-enactable directive)
+            nxt, action = i + 1, "advance"
+
+        # Pin safety: never exit with an un-run pinned phase still ahead.
+        if nxt >= n:
+            for k, s in enumerate(stages):
+                if self._stage_carries_pinned(s) and runs.get(s.id, 0) == 0:
+                    return k, None, "advance", "run pinned grounding step before finishing"
+        return nxt, rewind, action, reason
 
     def _model_label(self, stage: Stage) -> str:
         return stage.model or getattr(self.client, "model", "") or ""
@@ -798,12 +1325,19 @@ class Engine:
 
         return _one
 
-    async def _prefetch(self, query: str, state: SessionState) -> dict:
-        """Run plugin prefetch hooks → a snapshot merged into the TurnContext."""
+    async def _prefetch(self, query: str, state: SessionState, path: str | None = None) -> dict:
+        """Run plugin prefetch hooks → a snapshot merged into the TurnContext.
+
+        The resolved intent ``path`` is offered to each hook (so e.g. a KB-grounding
+        hook can skip retrieval on a ``relational`` greeting turn). Hooks that don't
+        accept it keep the legacy 2-arg signature — tried back-compatibly."""
         snapshot: dict = {}
         for hook in self._prefetch_hooks:
             try:
-                data = hook(query, state)
+                try:
+                    data = hook(query, state, path)
+                except TypeError:
+                    data = hook(query, state)
                 if hasattr(data, "__await__"):
                     data = await data
                 if isinstance(data, dict):
@@ -948,7 +1482,12 @@ class Engine:
                     steps.append({"kind": "tool_result", "name": name, "output": out})
                     yield stamp(ToolResult(id=tid, name=name, output=out), trace_id)
                     holder["tool_calls"].append({"name": name, "input": inp, "output": out})
-                    self._extract_citations(out, holder["citations"])
+                    # Citations a tool emits ({"citations": [...]}) are pulled by a
+                    # plugin's tool-result hook (RagPlugin) — not engine core logic.
+                    for _trh in self._tool_result_hooks:
+                        _cits = _trh(name, out)
+                        if _cits:
+                            holder["citations"].extend(_cits)
                     results.append({"type": "tool_result", "tool_use_id": tid, "content": out})
                     call["tool_results"].append({"tool_use_id": tid, "name": name, "output": out})
                 msgs.append({"role": "user", "content": results})
@@ -1053,6 +1592,96 @@ class Engine:
                 return
         # Final hop without an end_turn — use whatever text we have.
         holder["text"] = holder["text"] or think
+        if not holder["text"]:
+            # The loop hit the hop cap without ever producing prose — e.g. the model
+            # kept emitting tool calls (incl. recovered markup) to the very last,
+            # tool-free hop. Force ONE tool-free answer hop so the turn always surfaces
+            # a reply (a grounded refusal, here) instead of ending silent.
+            final_mt = stage.max_tokens or self.default_max_tokens
+            resp = await self._call(stage, system, msgs, [], max_tokens=final_mt)
+            holder["text"] = _text_of(resp)
+            steps.append({"kind": "answer", "text": holder["text"]})
+            holder["llm_calls"].append({
+                "stage": stage.id, "hop": max_hops,
+                "stop_reason": getattr(resp, "stop_reason", "end_turn"),
+                "usage": _call_usage(resp), "response": _response_blocks(resp),
+                "tool_results": [], "system": system, "messages": list(msgs),
+                "model": self._model_label(stage),
+                "temperature": stage.temperature if stage.temperature is not None else 0.0,
+                "max_tokens": final_mt, "tool_count": 0, "tools": [],
+            })
+
+    @staticmethod
+    def _new_th() -> dict[str, Any]:
+        return {"text": "", "tool_calls": [], "citations": [], "llm_calls": [],
+                "funnel_obs_chars": []}
+
+    @staticmethod
+    def _merge_th(holder: dict, th: dict) -> None:
+        """Roll one worker's metrics up into the parent holder (order-stable)."""
+        holder["llm_calls"].extend(th.get("llm_calls", []))
+        holder["tool_calls"].extend(th.get("tool_calls", []))
+        holder["citations"].extend(th.get("citations", []))
+        holder.setdefault("meta_actions", []).extend(th.get("meta_actions", []))
+        holder["funnel_obs_chars"].extend(th.get("funnel_obs_chars", []))
+
+    @staticmethod
+    def _th_out_tokens(th: dict) -> int:
+        """Best-effort output-token count for one worker (the memo's cost)."""
+        total = 0
+        for c in th.get("llm_calls", []):
+            u = c.get("usage") or {}
+            with contextlib.suppress(TypeError, ValueError):
+                total += int(u.get("output_tokens") or 0)
+        return total
+
+    def _compose_map_item(
+        self, stage: Stage, item: dict, label: str, msgs: list[dict], *,
+        ctx: dict, state: SessionState, carried: list[str], turn_ctx: Any, sel: list[dict],
+    ) -> tuple[Stage, str, list[dict], list[dict]]:
+        """Build the scoped Stage + system + messages + tool-specs for one work-item.
+
+        Shared by the sequential and parallel paths so a subagent's spec (its own
+        ``system_prompt`` / ``tools`` / ``lobes`` / ``model`` / ``max_tokens`` / ``hops``)
+        is applied identically. ``carried`` is the prior-results note slice (empty in the
+        parallel path — independent workers do not carry state)."""
+        # Work-item shape is generic: a plain ``{input}`` item OR a plan todo
+        # (``{content, prompt, tools, deps}``) — ``prompt``/``content`` are the todo
+        # aliases for ``system_prompt``/``input`` so a TodoWrite plan fans out directly.
+        scoped = Stage(
+            stage.id, lobes=list(item.get("lobes") or stage.lobes), loop="agentic",
+            tools=list(item.get("tools") or stage.tools),
+            system_prompt=(
+                item.get("system_prompt") or item.get("prompt")
+                or stage.system_prompt or _MAP_ITEM_PROMPT
+            ),
+            model=item.get("model") or stage.model,
+            max_tokens=item.get("max_tokens") or stage.max_tokens,
+            hops=int(item.get("hops") or stage.hops or 12),
+        )
+        item_specs = sel
+        if item.get("tools"):
+            keep = set(item["tools"])
+            item_specs = [s for s in sel if s.get("name") in keep]
+        isys, _seg = self._compose_system_segmented(
+            scoped, ctx, state, carried, turn_ctx, tool_specs=item_specs,
+        )
+        task = item.get("input") or item.get("content") or label
+        imsgs = list(msgs) + [{"role": "user", "content": f"Sub-task ({label}): {task}"}]
+        return scoped, isys, imsgs, item_specs
+
+    @staticmethod
+    def _map_item_pool(
+        stage: Stage, retrieved_chunks: list[dict] | None, already_read: set[str] | None,
+    ) -> tuple[list[dict] | None, set[str] | None]:
+        """The evidence channel a worker runs against.
+
+        Default: the shared turn pool (today's behavior — output boundary already clean via
+        the Blackboard raw-chunk rejection). ``fanout_isolated``: a FRESH pool per worker so
+        worker A's chunks never enter worker B's window — only its memo returns (doc 12)."""
+        if stage.fanout_isolated:
+            return [], set()
+        return retrieved_chunks, already_read
 
     async def _map_stage(
         self, stage: Stage, system: str, msgs: list[dict], trace_id: str,
@@ -1064,13 +1693,26 @@ class Engine:
         """Generic fan-out (``loop="map"``): run one bounded, SCOPED ``_agentic``
         sub-execution per work-item in ``scratchpad[fanout_key]`` (a list the producing
         stage/plugin filled), each item optionally overriding ``system_prompt`` / ``tools``
-        / ``lobes`` / ``model`` / ``max_tokens`` / ``hops``; prior results carry forward as
-        notes (state carry). Results are written back to ``scratchpad[fanout_key + "_results"]``.
-        Domain-free — the engine knows "sub-tasks", not what they mean. Empty list ⇒ degrade
-        to a single agentic run (parity)."""
+        / ``lobes`` / ``model`` / ``max_tokens`` / ``hops``. Two shapes (doc 12), by
+        ``stage.fanout_parallel``: **sequential** (default) carries prior results forward as
+        notes (state carry — the tasks rail relies on it); **parallel** runs workers
+        concurrently (``asyncio.gather``, bounded by ``fanout_max``), independent, no carry.
+        Either shape is bounded-failure: a worker that raises/times out is recorded
+        ``status="failed"``, never dropped, never sinks the turn. Results →
+        ``scratchpad[fanout_key + "_results"]``. Domain-free. Empty list ⇒ degrade to a
+        single agentic run (parity)."""
         sp = getattr(turn_ctx, "scratchpad", None)
         items = sp.as_list(stage.fanout_key) if (sp is not None and stage.fanout_key) else []
-        if not items:
+        # Supervision seam (reason → write → enact): a supervisor step may write
+        # ``scratchpad["plan_structure"]`` to choose HOW the plan runs — ``"inline"`` (the main
+        # agent works the list itself in THIS stage, no spawn), ``"fanout"`` (parallel + isolated
+        # subagent per item), or ``"sequential"`` (subagent per item, state-carry). Pure data; the
+        # engine just enacts it. Absent ⇒ the stage's own flags stand (parity).
+        structure = sp.get("plan_structure") if sp is not None else None
+        if not items or structure == "inline":
+            # No work-list, or the supervisor chose inline: the main agent solves every planned
+            # piece itself in one agentic loop (the todo_list lobe keeps the plan in view). The
+            # plan is still handled — just by the main stage, not by spawned subagents.
             async for ev in self._agentic(
                 stage, system, msgs, trace_id, steps, holder, specs=sel_specs,
                 retrieved_chunks=retrieved_chunks, already_read=already_read,
@@ -1078,61 +1720,162 @@ class Engine:
                 yield ev
             return
 
-        carried = list(notes)
-        results: list[dict] = []
+        stage = self._fanout_with_structure(stage, sp)
+        cap = max(1, min(40, int(stage.fanout_max or 40)))
+        work = [(i, raw if isinstance(raw, dict) else {"input": str(raw)})
+                for i, raw in enumerate(items[:cap])]
         sel = sel_specs or []
-        for i, raw in enumerate(items[:40]):
-            item = raw if isinstance(raw, dict) else {"input": str(raw)}
-            label = str(item.get("label") or item.get("id") or f"item{i}")
-            scoped = Stage(
-                stage.id, lobes=list(item.get("lobes") or stage.lobes), loop="agentic",
-                tools=list(item.get("tools") or stage.tools),
-                system_prompt=item.get("system_prompt") or stage.system_prompt or _MAP_ITEM_PROMPT,
-                model=item.get("model") or stage.model,
-                max_tokens=item.get("max_tokens") or stage.max_tokens,
-                hops=int(item.get("hops") or stage.hops or 12),
-            )
-            item_specs = sel
-            if item.get("tools"):
-                keep = set(item["tools"])
-                item_specs = [s for s in sel if s.get("name") in keep]
-            isys, _seg = self._compose_system_segmented(
-                scoped, ctx, state, carried, turn_ctx, tool_specs=item_specs,
-            )
-            imsgs = list(msgs) + [{"role": "user",
-                                   "content": f"Sub-task ({label}): {item.get('input') or label}"}]
-            th: dict[str, Any] = {"text": "", "tool_calls": [], "citations": [],
-                                  "llm_calls": [], "funnel_obs_chars": []}
-            async for ev in self._agentic(
-                scoped, isys, imsgs, trace_id, steps, th, specs=item_specs,
+
+        subagents: list[dict] = []  # per-worker sub-trace (own prompt + timeline) for the viewer
+        if stage.fanout_parallel:
+            results = []
+            async for ev in self._map_parallel(
+                stage, msgs, trace_id, steps, holder, ctx=ctx, state=state, notes=notes,
+                turn_ctx=turn_ctx, sel=sel, work=work, results=results, subagents=subagents,
                 retrieved_chunks=retrieved_chunks, already_read=already_read,
             ):
                 yield ev
-            res = th.get("text", "")
-            results.append({"label": label, "result": res})
-            carried.append(f"[{label}] {res}")
-            holder["llm_calls"].extend(th["llm_calls"])
-            holder["tool_calls"].extend(th.get("tool_calls", []))
-            holder["citations"].extend(th["citations"])
-            holder.setdefault("meta_actions", []).extend(th.get("meta_actions", []))
-            holder["funnel_obs_chars"].extend(th.get("funnel_obs_chars", []))
-        if sp is not None:
-            sp.set(stage.fanout_key + "_results", results)
-        holder["text"] = "\n".join(f"{r['label']}: {r['result']}".strip() for r in results)
-
-    @staticmethod
-    def _extract_citations(tool_output: str, out: list[Citation]) -> None:
-        """A KB-style tool may surface citations as JSON ``{"citations": [...]}``."""
-        try:
-            data = json.loads(tool_output)
-        except (json.JSONDecodeError, TypeError):
-            return
-        if isinstance(data, dict):
-            for c in data.get("citations", []) or []:
+        else:
+            results = []
+            carried = list(notes)
+            for i, item in work:
+                label = str(item.get("label") or item.get("id") or item.get("content") or f"item{i}")
+                scoped, isys, imsgs, item_specs = self._compose_map_item(
+                    stage, item, label, msgs, ctx=ctx, state=state, carried=carried,
+                    turn_ctx=turn_ctx, sel=sel,
+                )
+                rc, ar = self._map_item_pool(stage, retrieved_chunks, already_read)
+                th = self._new_th()
+                wsteps: list[dict] = []
+                status, err = "ok", None
                 try:
-                    out.append(Citation(**c) if isinstance(c, dict) else c)
-                except Exception:
-                    continue
+                    async for ev in self._agentic(
+                        scoped, isys, imsgs, trace_id, wsteps, th, specs=item_specs,
+                        retrieved_chunks=rc, already_read=ar,
+                    ):
+                        yield ev
+                except Exception as exc:  # bounded failure: degrade, never lose the turn
+                    status, err = "failed", str(exc)[:200]
+                steps.extend(wsteps)
+                res = th.get("text", "")
+                results.append({"label": label, "result": res, "status": status,
+                                "tokens_used": self._th_out_tokens(th), "error": err})
+                subagents.append({"label": label, "status": status, "system_prompt": isys,
+                                  "steps": wsteps, "llm_calls": list(th.get("llm_calls", [])),
+                                  "tokens_used": self._th_out_tokens(th)})
+                carried.append(f"[{label}] {res}")
+                self._merge_th(holder, th)
+
+        holder["subagents"] = subagents
+        if sp is not None:
+            # Store a COMPACT copy: the scratchpad is turn flash-memory (8k/value cap), so a wide
+            # fan-out's full result texts would overflow it. Trim each result for the fan-in lobe /
+            # telemetry; the FULL text is already in ``holder``/the answer path. Keeps the list a
+            # list under the cap so every subagent survives (no zero-results collapse).
+            compact = [
+                {**r, "result": (str(r.get("result") or "")[:_FANOUT_RESULT_CHARS])}
+                for r in results
+            ]
+            sp.set(stage.fanout_key + "_results", compact)
+        holder["text"] = "\n".join(
+            f"{r['label']}: {r['result']}".strip() for r in results if r.get("status") != "failed"
+        )
+
+    async def _map_parallel(
+        self, stage: Stage, msgs: list[dict], trace_id: str, steps: list[dict], holder: dict,
+        *, ctx: dict, state: SessionState, notes: list[str], turn_ctx: Any, sel: list[dict],
+        work: list[tuple[int, dict]], results: list[dict], subagents: list[dict],
+        retrieved_chunks: list[dict] | None, already_read: set[str] | None,
+    ) -> AsyncIterator[Any]:
+        """Parallel fan-out: workers run concurrently (semaphore-bounded by ``_FANOUT_CONCURRENCY``
+        — a conservative cap so a wide fan-out does not burst past the provider's rate/concurrency
+        limit), each into its OWN holder / steps / evidence pool; events are buffered and flushed in
+        item order (deterministic). The WHOLE worker body (compose + run) is failure-isolated, so a
+        worker is always recorded (``status="ok"|"failed"``), never silently dropped. A failed
+        worker is retried ONCE serially (recovers transient concurrency rejections); a worker that
+        still fails leaves a ``degraded`` marker on the turn. ``results`` is filled in place."""
+        cap = max(1, min(len(work), int(stage.fanout_max or 40), _FANOUT_CONCURRENCY))
+        sem = asyncio.Semaphore(cap)
+
+        async def worker(idx: int, item: dict) -> dict:
+            label = str(item.get("label") or item.get("id") or item.get("content") or f"item{idx}")
+            th = self._new_th()
+            wsteps: list[dict] = []
+            buf: list[Any] = []
+            captured: dict[str, Any] = {"isys": ""}
+            status, err = "ok", None
+
+            async def run() -> None:
+                # Compose INSIDE the guarded body so a failure here is a recorded worker
+                # failure (status="failed"), not a BaseException that gather silently drops.
+                scoped, isys, imsgs, item_specs = self._compose_map_item(
+                    stage, item, label, msgs, ctx=ctx, state=state, carried=list(notes),
+                    turn_ctx=turn_ctx, sel=sel,
+                )
+                captured["isys"] = isys
+                rc, ar = self._map_item_pool(stage, retrieved_chunks, already_read)
+                async for ev in self._agentic(
+                    scoped, isys, imsgs, trace_id, wsteps, th, specs=item_specs,
+                    retrieved_chunks=rc, already_read=ar,
+                ):
+                    buf.append(ev)
+
+            timeout = item.get("timeout")
+            async with sem:
+                try:
+                    if timeout:
+                        await asyncio.wait_for(run(), float(timeout))
+                    else:
+                        await run()
+                except Exception as exc:  # bounded failure (TimeoutError included)
+                    status, err = "failed", str(exc)[:200] or "timeout"
+            return {"label": label, "th": th, "steps": wsteps, "buf": buf,
+                    "system_prompt": captured["isys"], "status": status, "err": err,
+                    "_item": (idx, item)}
+
+        gathered = await asyncio.gather(
+            *(worker(i, item) for i, item in work), return_exceptions=True
+        )
+        # Normalize: a BaseException escaping gather (shouldn't happen now) becomes a failed stub.
+        norm: list[dict] = []
+        for (idx, item), res in zip(work, gathered, strict=False):
+            if isinstance(res, BaseException):
+                label = str(item.get("label") or item.get("id") or item.get("content") or f"item{idx}")
+                norm.append({"label": label, "th": self._new_th(), "steps": [], "buf": [],
+                             "system_prompt": "", "status": "failed", "err": str(res)[:200],
+                             "_item": (idx, item)})
+            else:
+                norm.append(res)
+        # Serial retry of failed workers ONCE — re-run one at a time, which avoids the concurrent
+        # burst that usually caused the failure (rate/concurrency limit). Replace on success.
+        for k, r in enumerate(norm):
+            if r["status"] == "failed":
+                idx, item = r["_item"]
+                retry = await worker(idx, item)
+                if retry["status"] == "ok":
+                    norm[k] = retry
+
+        # Flush in submission order — deterministic regardless of completion order.
+        failed_n = 0
+        for res in norm:
+            steps.extend(res["steps"])
+            for ev in res["buf"]:
+                yield ev
+            th = res["th"]
+            if res["status"] == "failed":
+                failed_n += 1
+            results.append({"label": res["label"], "result": th.get("text", ""),
+                            "status": res["status"], "tokens_used": self._th_out_tokens(th),
+                            "error": res["err"]})
+            subagents.append({"label": res["label"], "status": res["status"],
+                              "system_prompt": res["system_prompt"], "steps": res["steps"],
+                              "llm_calls": list(th.get("llm_calls", [])),
+                              "tokens_used": self._th_out_tokens(th)})
+            self._merge_th(holder, th)
+        if failed_n:
+            dg = getattr(turn_ctx, "degraded", None)
+            if isinstance(dg, list):
+                dg.append(f"fanout:{failed_n}_failed")
 
     # ── finalize ─────────────────────────────────────────────────────────────
     def _usage_snapshot(self) -> ProviderUsage:
@@ -1148,7 +1891,7 @@ class Engine:
         updates.clear()
         return out
 
-    def _finalize(
+    async def _finalize(
         self,
         trace_id,
         answer,
@@ -1161,7 +1904,24 @@ class Engine:
         usage_before,
         llm_calls,
         degraded=None,
+        scratchpad=None,
+        retrieved_chunks=None,
     ) -> AgentResult:
+        # Plugin finalize hooks own the grounding/citation contract (extraction,
+        # backfill, marker-strip, ground-or-refuse) — the engine carries none of it.
+        # Each hook may rewrite the answer, replace citations, or force a refusal.
+        refusal_reason: str | None = None
+        for hook in self._finalize_hooks:
+            res = hook(
+                answer, citations, list(retrieved_chunks or []), flow.grounds, self.require_citations
+            )
+            if inspect.isawaitable(res):
+                res = await res
+            if res is None:
+                continue
+            answer, citations, refusal_reason = res
+            if refusal_reason:
+                break
         after = self._usage_snapshot()
         diff = ProviderUsage(
             input_tokens=after.input_tokens - usage_before.input_tokens,
@@ -1187,7 +1947,7 @@ class Engine:
             path=path,
             lobes=resolution.lobes,
             flow_stages=flow_stages_trace,
-            blackboard={"activated": resolution.activated},
+            blackboard={"activated": resolution.activated, **(scratchpad or {})},
             usage=usage,
             meta_actions=meta_actions,
             llm_calls=llm_calls,
@@ -1196,12 +1956,17 @@ class Engine:
             skill_selection=skill_selection,
             degraded=list(degraded or []),
         )
-        # Ground-or-refuse: a grounding flow with citations required but none found.
-        if self.require_citations and flow.grounds and not citations:
+        # Ground-or-refuse is the RagPlugin's contract: a finalize hook returns a
+        # refusal_reason when a grounding turn requires citations but found none.
+        # The engine core has no citation gate of its own.
+        if refusal_reason:
             return AgentResult(
                 text="I cannot confirm that from the available sources.",
                 status="refused",
-                refusal=Refusal(reason="no_citations", message="No supporting sources were found."),
+                refusal=Refusal(
+                    reason=refusal_reason,
+                    message="No supporting sources were found.",
+                ),
                 usage=usage,
                 trace=trace,
             )

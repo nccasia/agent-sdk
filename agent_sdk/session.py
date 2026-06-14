@@ -49,6 +49,16 @@ class SessionState:
     summary: str = ""
     facts: list[str] = field(default_factory=list)
     context: list[str] = field(default_factory=list)
+    # Skills the model has activated in this conversation (RFC 0013). Persisted so
+    # the skill_active lobe keeps driving a loaded SOP across turns (set by the
+    # engine from the turn's ``skills_in_use`` at the ActivateSkill moment).
+    skills_in_use: list[str] = field(default_factory=list)
+    # Flow/path bias the metacognition meta-control tool recorded last turn. Flow
+    # is resolved once at turn start (a pure function of (spec, context)), so a
+    # mid-turn meta decision cannot retarget the current turn — it is persisted
+    # here and folded into the next turn's recognition context as a deterministic
+    # signal (the MetacognitionPlugin's path recognizer reads it). Empty ⇒ no bias.
+    meta_flow_bias: str = ""
 
     def messages(
         self, *, first_n: int = 1, last_m: int = 6, max_turn_chars: int = 2000
@@ -75,11 +85,13 @@ class SessionState:
         if len(h) > last_m:
             older = h[:-last_m]
             tail = h[-last_m:]
-            first = older[:max(0, first_n)]
+            first = older[: max(0, first_n)]
             if first:
                 blocks.append(
-                    "\n".join(f"{'U' if t.role == 'user' else 'A'}: "
-                              f"{_clip(t.content, max_turn_chars)}" for t in first)
+                    "\n".join(
+                        f"{'U' if t.role == 'user' else 'A'}: {_clip(t.content, max_turn_chars)}"
+                        for t in first
+                    )
                 )
             elided = len(older) - len(first)
             if elided > 0:
@@ -88,9 +100,7 @@ class SessionState:
             tail = h
         if blocks:
             out.append({"role": "user", "content": "[Conversation so far]\n" + "\n".join(blocks)})
-        out.extend(
-            {"role": t.role, "content": _clip(t.content, max_turn_chars)} for t in tail
-        )
+        out.extend({"role": t.role, "content": _clip(t.content, max_turn_chars)} for t in tail)
         return out
 
     def transcript(self, *, first_n: int = 1, last_m: int = 6, max_turn_chars: int = 2000) -> str:
@@ -111,6 +121,8 @@ class SessionState:
             "summary": self.summary,
             "facts": self.facts,
             "context": self.context,
+            "skills_in_use": self.skills_in_use,
+            "meta_flow_bias": self.meta_flow_bias,
         }
 
     @classmethod
@@ -121,6 +133,8 @@ class SessionState:
             summary=d.get("summary", ""),
             facts=list(d.get("facts", [])),
             context=list(d.get("context", [])),
+            skills_in_use=list(d.get("skills_in_use", [])),
+            meta_flow_bias=str(d.get("meta_flow_bias", "")),
         )
 
 
