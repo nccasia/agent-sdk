@@ -122,6 +122,27 @@ even its own **MCP servers** (discovered at turn start, then registered like any
 with a `PluginRegistry` (register / override / enable / disable); an agent with no extra plugins is
 **byte-identical** to the default network. See [`docs/concepts/10-plugins.md`](./docs/concepts/10-plugins.md).
 
+### Built-in plugins
+
+All live under `agent_sdk/plugins/`, one folder each:
+
+| Plugin | Capability | Default |
+|---|---|---|
+| `SafetyPlugin` | output-safety `filter` lobe — every agent wants it | **on** (toggleable) |
+| `FormatPlugin` | answer styling — channel / language / tone | **on** (toggleable) |
+| `RagPlugin` | retrieval grounding — `cite` + the citation contract (extract / backfill / strip / ground-or-refuse) | opt-in (auto-enabled by `require_citations=True`) |
+| `PlanningPlugin` | the `TodoWrite` tool + a plan-driven fan-out flow | opt-in |
+| `TaskPlugin` | todo-driven task execution (long-running work) | opt-in |
+| `MetacognitionPlugin` | think-about-thinking — `monitor → regulate` + the `meta_control` tool | opt-in |
+| `PluginMCP` | mount an MCP server's tools | opt-in (configured) |
+| `PluginWorkspace` | a sandboxed file tree + `fs.*` tools | opt-in (configured) |
+| `PluginGuardrails` | pre/post-turn checks (a guardrail raises to block) | builtin (no-op until configured) |
+| `PluginOTel` | OpenTelemetry-style observability via event hooks | builtin (no-op until configured) |
+| `PluginSupportTriage` | a worked full-surface example plugin | opt-in (example) |
+
+`safety ≠ rag`: a non-retrieval agent keeps `filter` (safety) but has **no** `cite`/citation logic.
+`builtin_registry()` pre-loads the no-config builtins (`PluginOTel`, `PluginGuardrails`).
+
 ```python
 from agent_sdk import PreactAgent
 from agent_sdk.plugins import PluginRegistry, builtin_registry, PluginWorkspace
