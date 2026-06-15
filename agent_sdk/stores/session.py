@@ -28,6 +28,10 @@ class SessionStore(Protocol):
     async def load(self, id: str) -> SessionState: ...
     async def append(self, id: str, turn: Turn) -> None: ...
     async def compact(self, id: str, summarizer: Summarizer, *, keep_last: int = 6) -> None: ...
+    # Optional: persist the WHOLE state atomically (history + memory + skills_in_use + …) so a
+    # snapshot survives a stateless hop. Stores that implement it get full-state persistence;
+    # ``Session.save`` no-ops (returns False) on stores that don't.
+    async def save(self, id: str, state: SessionState) -> None: ...
 
 
 async def _do_compact(state: SessionState, summarizer: Summarizer, keep_last: int) -> None:
@@ -50,6 +54,9 @@ class SessionStoreInMemory:
 
     async def append(self, id: str, turn: Turn) -> None:
         self._data.setdefault(id, SessionState()).history.append(turn)
+
+    async def save(self, id: str, state: SessionState) -> None:
+        self._data[id] = state
 
     async def compact(self, id: str, summarizer: Summarizer, *, keep_last: int = 6) -> None:
         state = self._data.setdefault(id, SessionState())
@@ -86,6 +93,9 @@ class SessionStoreRedis:
 
     async def _save(self, id: str, state: SessionState) -> None:
         await self._conn().set(self._key(id), json.dumps(state.to_json()))
+
+    async def save(self, id: str, state: SessionState) -> None:
+        await self._save(id, state)
 
     async def append(self, id: str, turn: Turn) -> None:
         state = await self.load(id)
@@ -134,6 +144,9 @@ class SessionStoreSQL:
             self._conn.commit()
 
         await self._exec(_w)
+
+    async def save(self, id: str, state: SessionState) -> None:
+        await self._save(id, state)
 
     async def append(self, id: str, turn: Turn) -> None:
         state = await self.load(id)

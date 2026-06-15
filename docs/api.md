@@ -581,9 +581,45 @@ agent = PreactAgent(client=…, session=Session(id="conv-42", store=SessionStore
 class SessionStore(Protocol):            # the pluggable backend
     async def load(self, id) -> SessionState                  # history + summary + facts + context
     async def append(self, id, turn: Turn) -> None
+    async def save(self, id, state: SessionState) -> None     # OPTIONAL — persist the WHOLE state
     async def compact(self, id, summarizer) -> None           # roll old turns into a summary
 # built-ins: SessionStoreInMemory() · SessionStoreRedis(url) · SessionStoreSQL(dsn)
 ```
+
+### Stateless serving — one JSON snapshot, snap/restore, queue worker
+
+`SessionState.to_json()` is **the** per-session snapshot: history + summary + facts + context +
+`skills_in_use` + `meta_flow_bias` + universal `memory`, stamped with `SNAPSHOT_VERSION`. It is the
+complete state needed to reconstruct a session — so a process holds only the (immutable) agent
+config and carries everything per-session in this one JSON. The schema is **extensible**:
+`from_json` ignores unknown keys and defaults missing ones (branch on `v` for a future migration).
+
+```python
+# Easy stateless turn — no Session/store wiring. Persist the dict anywhere, hand it back next turn.
+result, snapshot = await agent.run_snapshot("What changed in v2?", snapshot=prev_snapshot)
+# snapshot == SessionState.to_json(): { "v", history, summary, facts, skills_in_use, memory, … }
+```
+
+Or let a `SessionStore` round-trip it (any built-in store persists the whole snapshot, memory
+included). For serving at scale, an `AgentWorker` is the queue loop *request → find session id →
+load → turn → respond → offload*:
+
+```python
+from agent_sdk.serve import AgentWorker, RedisQueue, RedisEventSink, RedisLock
+from agent_sdk.stores import SessionStoreRedis
+
+worker = AgentWorker(
+    agent_factory=lambda: PreactAgent(client=…),   # a pool — one agent per in-flight turn
+    queue=RedisQueue(url), sink=RedisEventSink(url),
+    store=SessionStoreRedis(url),                   # the ONE store; jobs carry only a session_id
+    session_lock=RedisLock(url), concurrency=16,
+)
+await worker.serve()   # each turn loads the snapshot by id, runs, and offloads it back — no bleed
+```
+
+Concurrency note: one agent runs one turn at a time (it rebinds its working memory to the snapshot
+per turn). The pool (`agent_factory`) gives each in-flight turn its own agent, so concurrent
+sessions never interleave on a shared memory store. Proven by `benchmarks/statelessbench`.
 
 ### Memory — durable agent memory (the `memory` tool)
 

@@ -149,3 +149,24 @@ class DocWorkspace:
         via ``written_parts`` vs ``total_parts``)."""
         doc = self.docs[doc_id]
         return "\n\n".join(doc.parts[s.id] for s in doc.sections if s.id in doc.parts)
+
+    # ── snapshot / restore (Redis offloading) ─────────────────────────────────
+    def to_json(self) -> dict[str, Any]:
+        """Loss-free snapshot. Only ``text`` + ``parts`` persist — ``sections`` is a
+        pure function of ``text`` (re-derived by :func:`parse_sections` on restore)."""
+        return {
+            doc_id: {"text": doc.text, "parts": dict(doc.parts)}
+            for doc_id, doc in self.docs.items()
+        }
+
+    @classmethod
+    def from_json(cls, data: dict | None) -> DocWorkspace:
+        ws = cls()
+        for doc_id, d in (data or {}).items():
+            text = d.get("text", "")
+            ws.docs[doc_id] = _Doc(
+                text=text,
+                sections=parse_sections(text),
+                parts=dict(d.get("parts") or {}),
+            )
+        return ws

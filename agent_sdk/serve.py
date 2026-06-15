@@ -39,6 +39,10 @@ _DONE = object()
 class Job:
     input: str
     session: Session | None = None
+    # The conversation id the worker resolves against its ONE store (queue → session_id → load →
+    # turn → save). Carried over the wire (a Session object isn't serializable); the worker binds
+    # it to its store. ``session`` (a ready handle) takes precedence when both are set.
+    session_id: str | None = None
     trace_id: str = field(default_factory=lambda: uuid.uuid4().hex[:16])
 
 
@@ -122,7 +126,8 @@ class RedisQueue:
             {
                 "input": job.input,
                 "trace_id": job.trace_id,
-                "session_id": job.session.id if job.session else None,
+                # Only the id crosses the wire — the worker binds it to its ONE store on consume.
+                "session_id": job.session_id or (job.session.id if job.session else None),
             }
         )
         await self._conn().rpush(self._key, payload)
@@ -132,8 +137,8 @@ class RedisQueue:
         while True:
             _, raw = await self._conn().blpop(self._key)
             data = json.loads(raw)
-            sess = Session(data["session_id"]) if data.get("session_id") else None
-            yield Job(input=data["input"], session=sess, trace_id=data["trace_id"])
+            yield Job(input=data["input"], session_id=data.get("session_id"),
+                      trace_id=data["trace_id"])
 
 
 class RedisEventSink:
@@ -214,30 +219,79 @@ class RedisLock:
 
 # ── the worker pool ──────────────────────────────────────────────────────────
 class AgentWorker:
+    """An effective queue worker: ``request → find session id → load → turn → respond → offload``.
+
+    Holds ONE ``store`` and the (immutable) agent config; everything per-session lives in the
+    store as one JSON snapshot (``SessionState.to_json`` — conversation + universal memory). Each
+    job names a ``session_id``; the worker binds it to the store, the turn loads/runs/saves that
+    one blob natively (no separate memory write). So the process is stateless across sessions —
+    any replica serves any session and a restart loses nothing.
+
+    Concurrency: pass ``agent_factory`` to build a pool of ``concurrency`` agents — each in-flight
+    turn checks one out exclusively, so two sessions never interleave on a shared working-memory
+    store. A single shared ``agent`` also works (turns serialize through it). A job may instead
+    carry a ready ``Session`` (it wins over ``session_id``), e.g. for the in-process path."""
+
     def __init__(
         self,
-        agent: Any,
+        agent: Any | None = None,
         *,
+        agent_factory: Any | None = None,
         queue: Queue,
         sink: EventSink,
+        store: Any | None = None,
         concurrency: int = 8,
         session_lock: Any | None = None,
     ):
+        if agent is None and agent_factory is None:
+            raise ValueError("AgentWorker needs an agent or an agent_factory")
         self.agent = agent
+        self._factory = agent_factory
         self.queue = queue
         self.sink = sink
+        self.store = store
         self.concurrency = concurrency
         self.session_lock = session_lock or InProcessLock()
+        self._pool: asyncio.Queue | None = None
+
+    def _session_for(self, job: Job) -> Session | None:
+        """Resolve the job's session: a ready handle wins; else bind its id to the one store."""
+        if job.session is not None:
+            return job.session
+        if job.session_id is not None and self.store is not None:
+            return Session(job.session_id, self.store)
+        if job.session_id is not None:
+            return Session(job.session_id)  # zero-infra default store
+        return None
+
+    def _ensure_pool(self) -> asyncio.Queue:
+        if self._pool is None:
+            self._pool = asyncio.Queue()
+            if self._factory is not None:
+                for _ in range(max(1, self.concurrency)):
+                    self._pool.put_nowait(self._factory())
+            else:
+                # One shared agent → checkout serializes turns through it (no memory race).
+                self._pool.put_nowait(self.agent)
+        return self._pool
 
     def _lock_for(self, key: str):
         lock = self.session_lock(key) if callable(self.session_lock) else self.session_lock
         return lock
 
     async def _run_job(self, job: Job) -> None:
-        key = job.session.id if job.session is not None else job.trace_id
-        async with self._lock_for(key):
-            async for ev in self.agent._run_stream(job.input, job.session):
-                await self.sink.publish(job.trace_id, ev)
+        pool = self._ensure_pool()
+        session = self._session_for(job)  # find session id → load from the one store
+        key = session.id if session is not None else job.trace_id
+        async with self._lock_for(key):  # one in-flight turn per conversation
+            agent = await pool.get()  # exclusive for this turn → no cross-session memory race
+            try:
+                # _run_stream loads the snapshot, runs the turn, and offloads (saves the whole
+                # state back to the store) — the native load→turn→save cycle, no extra write.
+                async for ev in agent._run_stream(job.input, session):
+                    await self.sink.publish(job.trace_id, ev)
+            finally:
+                pool.put_nowait(agent)
         await self.sink.close(job.trace_id)
 
     async def serve(self, *, max_jobs: int | None = None) -> None:
