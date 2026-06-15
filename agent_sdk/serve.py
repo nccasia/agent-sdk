@@ -286,6 +286,16 @@ class AgentWorker:
         async with self._lock_for(key):  # one in-flight turn per conversation
             agent = await pool.get()  # exclusive for this turn → no cross-session memory race
             try:
+                # A pooled agent is reused across sessions (and thus across bots/tenants). When a
+                # session IS present, _run_stream resets+restores its working memory from that
+                # session's snapshot — so it can never carry another session's memory. A
+                # SESSIONLESS job has no snapshot to restore, so reset explicitly here: a pooled
+                # agent must never inherit the previous job's memory. (The in-process query() path
+                # has no pool and intentionally keeps accumulating.)
+                if session is None:
+                    mem = getattr(agent, "_memory_store", None)
+                    if mem is not None:
+                        mem.reset()
                 # _run_stream loads the snapshot, runs the turn, and offloads (saves the whole
                 # state back to the store) — the native load→turn→save cycle, no extra write.
                 async for ev in agent._run_stream(job.input, session):
