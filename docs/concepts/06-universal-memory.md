@@ -328,3 +328,5 @@ and pulls the detail back exactly when a step needs it.
 * [Tool Use at Scale](./05-tool-use-at-scale.md) — the `tool_result` application (built first).
 * [Shared Context](./07-shared-context.md) — one handle every component uses to reach these scopes.
 * [Task Execution Mode](./13-task-execution-mode.md) — long-rail work that produces many entries.
+* [Stateless Serving](./16-stateless-serving.md) — `to_json` / `restore` ride the long-term tier in a
+  session snapshot, so working memory survives a restart / moves between replicas.

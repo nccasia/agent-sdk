@@ -421,6 +421,11 @@ class PreactAgent:
             check(input)  # a guardrail raises to block the turn
         sess = session or self.session
         state = await sess.load() if sess is not None else SessionState()
+        # Stateless seam: rebind the (per-agent) universal memory store to THIS session's snapshot
+        # carried on the state, so a turn never sees another session's memory. Only when a session
+        # is in play — the sessionless in-process path keeps accumulating on the agent as before.
+        if self._memory_store is not None and sess is not None:
+            self._memory_store.restore(state.memory)
         last_result: AgentResult | None = None
         async for ev in self.engine.stream(input, state):
             for hook in self._event_hooks:
@@ -443,8 +448,19 @@ class PreactAgent:
                         "fact", fact, scope="conversation", key=fact_key(fact), source="establish"
                     )
             if sess is not None:
-                await sess.append(Turn("user", input))
-                await sess.append(Turn("assistant", last_result.text))
+                # Persist the WHOLE state when the store supports it (history + memory +
+                # skills_in_use + meta_flow_bias, atomically) — branch FIRST so we only mutate
+                # state.history on the save path. Stores that only ``append`` (host-owned
+                # durability, e.g. the Mezon worker) take the legacy two-append path untouched.
+                if getattr(sess.store, "save", None) is not None:
+                    state.history.append(Turn("user", input))
+                    state.history.append(Turn("assistant", last_result.text))
+                    if self._memory_store is not None:
+                        state.memory = self._memory_store.to_json()
+                    await sess.save(state)
+                else:
+                    await sess.append(Turn("user", input))
+                    await sess.append(Turn("assistant", last_result.text))
 
     # ── public API ───────────────────────────────────────────────────────────
     async def query(self, input: str, *, session: Session | None = None) -> AgentResult:
@@ -457,6 +473,41 @@ class PreactAgent:
 
     def act(self, input: str, *, session: Session | None = None) -> AgentStream:
         return AgentStream(self._run_stream(input, session))
+
+    async def run_snapshot(
+        self, input: str, snapshot: dict | None = None
+    ) -> tuple[AgentResult, dict]:
+        """Run one turn STATELESSLY: restore from a plain-JSON ``snapshot``, run, and return
+        ``(result, next_snapshot)``. No ``Session``/store wiring — persist the returned dict
+        wherever you like (Redis, a DB, a file) and hand it back next turn.
+
+        This is the easy path for stateless serving: a process holds only the (immutable) agent
+        config and carries ALL per-session state in the snapshot, so any worker/replica can serve
+        any session and a restart loses nothing. The snapshot is ``SessionState.to_json()`` — a
+        versioned, forward/backward-tolerant schema (see ``SNAPSHOT_VERSION``).
+
+        Concurrency note: one agent instance runs one turn at a time (it rebinds its working memory
+        to the snapshot per call). To serve sessions concurrently, give each in-flight turn its own
+        agent — e.g. ``AgentWorker(agent_factory=…)`` — so snapshots never interleave on a shared
+        store.
+        """
+        from agent_sdk.session import Session, SessionState
+
+        class _SnapshotStore:
+            """Holds one state in memory for the duration of a single stateless turn."""
+
+            def __init__(self, state: SessionState) -> None:
+                self._state = state
+
+            async def load(self, id: str) -> SessionState:  # noqa: A002 - protocol name
+                return self._state
+
+            async def save(self, id: str, state: SessionState) -> None:  # noqa: A002
+                self._state = state
+
+        store = _SnapshotStore(SessionState.from_json(snapshot or {}))
+        result = await self.query(input, session=Session("snapshot", store))
+        return result, (await store.load("snapshot")).to_json()
 
     def inspect(self, input: str) -> ActivationSnapshot:
         return self.engine.inspect(input)

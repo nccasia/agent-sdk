@@ -48,6 +48,12 @@ cross-links its neighbours; the number is just the suggested path through them. 
 |---|---|---|
 | 14 | [Prompt Engineering](./14-prompt-engineering.md) | Writing the words inside each prompt contribution — techniques mapped to the compose-and-tag seam, with worked before/afters. |
 
+## 6 · Serving & operations
+
+| # | Doc | What it covers |
+|---|---|---|
+| 16 | [Stateless Serving](./16-stateless-serving.md) | Split config from state; one JSON snapshot holds the whole session (incl. universal memory); `run_snapshot` / `SessionStore.save` / the `AgentWorker` queue pool — load → turn → offload, no per-session process state. |
+
 ## Assets & notes
 
 - `*.svg` (`overview`, `the-model`, `turn-pipeline`, `core-and-extensions`) are rendered diagrams, not

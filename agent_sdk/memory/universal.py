@@ -48,6 +48,12 @@ KIND_UTILITY: dict[str, float] = {
 # Bodies at or above this size offload to DocWorkspace (sliceable by grep/read_section).
 _LARGE_BODY_CHARS = 2000
 
+# Snapshot bounds (Redis offloading): a session's durable memory blob is capped so per-session
+# Redis growth stays bounded. Pinned entries always survive; the rest are kept highest-CDS-then-
+# newest-first until either cap is hit (lowest-value oldest entries are dropped = forgotten).
+_SNAPSHOT_MAX_ENTRIES = 256
+_SNAPSHOT_MAX_TOKENS = 16_000
+
 
 @dataclass
 class MemoryEntry:
@@ -87,6 +93,50 @@ class MemoryEntry:
             "meta": self.meta,
             "offloaded": self.offloaded,
         }
+
+    def snapshot(self) -> dict:
+        """Loss-free serialization for Redis offloading (carries ``body``/``recency``/
+        ``created_seq`` that the prompt-facing :meth:`to_json` drops). Round-trips via
+        :meth:`restore`."""
+        return {
+            "handle": self.handle,
+            "kind": self.kind,
+            "scope": self.scope,
+            "digest": self.digest,
+            "body": self.body,
+            "utility": self.utility,
+            "relevance": self.relevance,
+            "cds": self.cds,
+            "tier": self.tier,
+            "pinned": self.pinned,
+            "recency": self.recency,
+            "tokens": self.tokens,
+            "source": self.source,
+            "meta": dict(self.meta),
+            "created_seq": self.created_seq,
+            "offloaded": self.offloaded,
+        }
+
+    @classmethod
+    def restore(cls, d: dict) -> MemoryEntry:
+        return cls(
+            handle=d["handle"],
+            kind=d["kind"],
+            scope=d["scope"],
+            digest=d.get("digest", ""),
+            body=d.get("body", ""),
+            utility=d.get("utility", 1.0),
+            relevance=d.get("relevance", 0.0),
+            cds=d.get("cds", 0.0),
+            tier=d.get("tier", 0),
+            pinned=d.get("pinned", False),
+            recency=d.get("recency", 0.0),
+            tokens=d.get("tokens", 0),
+            source=d.get("source", ""),
+            meta=dict(d.get("meta") or {}),
+            created_seq=d.get("created_seq", 0),
+            offloaded=d.get("offloaded", False),
+        )
 
 
 def _stringify(content: Any) -> str:
@@ -308,6 +358,83 @@ class MemoryStore:
     def reset_flash(self) -> None:
         """Drop the turn's working memory (tool results, reasoning temps). Long-term persists."""
         self._flash.clear()
+
+    def reset(self) -> None:
+        """Drop ALL state (flash + long-term + offloaded bodies). Used when rebinding a shared
+        store to a fresh session before :meth:`load_long` / :meth:`from_json`."""
+        self._flash.clear()
+        self._long.clear()
+        self._docs = DocWorkspace()
+        self._seq = 0
+
+    # ── snapshot / restore (Redis offloading) ───────────────────────────────────
+    def dump_long(
+        self,
+        *,
+        max_entries: int = _SNAPSHOT_MAX_ENTRIES,
+        max_tokens: int = _SNAPSHOT_MAX_TOKENS,
+    ) -> list[dict]:
+        """The durable tier as a bounded list of loss-free entry snapshots. Flash is NOT
+        included — it is turn-scratch (cleared each turn), so it never persists and there is no
+        cross-turn race. Pinned entries always survive; the rest are kept highest-CDS-then-newest
+        until a cap is hit."""
+        pinned = [e for e in self._long.values() if e.pinned]
+        rest = sorted(
+            (e for e in self._long.values() if not e.pinned),
+            key=lambda e: (-e.cds, -e.recency),
+        )
+        out: list[dict] = []
+        used = sum(e.tokens for e in pinned)
+        for e in pinned:
+            out.append(e.snapshot())
+        for e in rest:
+            if len(out) >= max_entries:
+                break
+            if used + e.tokens > max_tokens:
+                continue
+            out.append(e.snapshot())
+            used += e.tokens
+        return out
+
+    def load_long(self, entries: list[dict] | None) -> None:
+        """Restore durable entries (replacing by handle), advancing the seq counter so new
+        writes never collide with restored ones."""
+        for d in entries or []:
+            e = MemoryEntry.restore(d)
+            self._long[e.handle] = e
+            if e.created_seq > self._seq:
+                self._seq = e.created_seq
+
+    def to_json(
+        self,
+        *,
+        max_entries: int = _SNAPSHOT_MAX_ENTRIES,
+        max_tokens: int = _SNAPSHOT_MAX_TOKENS,
+    ) -> dict:
+        """Full session snapshot: durable tier + the offloaded bodies it references. Flash is
+        dropped (turn-scratch). Pair with :meth:`from_json`."""
+        long = self.dump_long(max_entries=max_entries, max_tokens=max_tokens)
+        kept_offloaded = {e["handle"] for e in long if e.get("offloaded")}
+        docs = {h: v for h, v in self._docs.to_json().items() if h in kept_offloaded}
+        return {"seq": self._seq, "long": long, "docs": docs}
+
+    @classmethod
+    def from_json(cls, data: dict | None, *, embed: Any = None, **kwargs: Any) -> MemoryStore:
+        """Rebuild a store from :meth:`to_json`. Flash starts empty; long-term + offloaded bodies
+        are restored. ``embed`` and other ctor kwargs configure the fresh store."""
+        store = cls(embed=embed, **kwargs)
+        store.restore(data)
+        return store
+
+    def restore(self, data: dict | None) -> None:
+        """Reset this store IN PLACE and load a snapshot (pairs with :meth:`to_json`). In-place so
+        a long-lived store the engine already references is re-bound to a new session's memory
+        without reconstructing it — the stateless-serving seam."""
+        self.reset()
+        data = data or {}
+        self._docs = DocWorkspace.from_json(data.get("docs"))
+        self.load_long(data.get("long"))
+        self._seq = max(self._seq, int(data.get("seq", 0)))
 
     def promote(
         self, handle: str, *, scope: str = "conversation", key: str | None = None

@@ -13,6 +13,9 @@ run() { "$@" || { echo "GATE FAILED: $*" >&2; FAIL=1; }; }
 echo "── unit: agent-sdk ───────────────────────────────────────────"
 run uv --directory "$SDK" run python -m pytest -q
 
+echo "── statelessbench (free): snapshot/restore + pooled queue serving ──"
+run uv --directory "$SDK" run python benchmarks/statelessbench/run.py --label ci
+
 if [[ "$FAIL" -ne 0 ]]; then
   echo; echo "CI: FAILED" >&2; exit 1
 fi

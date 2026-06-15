@@ -13,7 +13,13 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-__all__ = ["Turn", "SessionState", "Session"]
+__all__ = ["Turn", "SessionState", "Session", "SNAPSHOT_VERSION"]
+
+# Snapshot schema version (the stateless-serving contract). Bumped only on a
+# breaking change to ``SessionState.to_json``. ``from_json`` is forward/backward
+# tolerant — unknown keys are ignored, missing keys default — so most additive
+# extensions need no bump; this stamp is the explicit hook for a future migration.
+SNAPSHOT_VERSION = 1
 
 
 def _clip(text: str, limit: int) -> str:
@@ -59,6 +65,12 @@ class SessionState:
     # here and folded into the next turn's recognition context as a deterministic
     # signal (the MetacognitionPlugin's path recognizer reads it). Empty ⇒ no bias.
     meta_flow_bias: str = ""
+    # Universal-memory snapshot (``MemoryStore.to_json()`` — the durable ``_long`` tier + offloaded
+    # bodies). Carried here so a Session is the COMPLETE per-session state: persist/restore it and
+    # the agent's working memory survives a stateless hop (new process / different replica). Empty
+    # ⇒ no memory (or universal memory disabled). The agent restores it on load and captures it on
+    # finalize; opaque to the Session itself.
+    memory: dict = field(default_factory=dict)
 
     def messages(
         self, *, first_n: int = 1, last_m: int = 6, max_turn_chars: int = 2000
@@ -116,17 +128,25 @@ class SessionState:
         return "\n".join(lines)
 
     def to_json(self) -> dict:
+        """The full per-session snapshot (the stateless-serving contract). JSON-only — persist it
+        in any ``SessionStore`` (Redis/SQL/…) or hand it straight to ``PreactAgent.run_snapshot``.
+        ``v`` stamps the schema version for future migrations; new fields are additive."""
         return {
+            "v": SNAPSHOT_VERSION,
             "history": [t.to_json() for t in self.history],
             "summary": self.summary,
             "facts": self.facts,
             "context": self.context,
             "skills_in_use": self.skills_in_use,
             "meta_flow_bias": self.meta_flow_bias,
+            "memory": self.memory,
         }
 
     @classmethod
     def from_json(cls, d: dict | None) -> SessionState:
+        """Rebuild from :meth:`to_json`. Tolerant by design (the extensibility seam): unknown keys
+        ignored, missing keys defaulted — so an older snapshot loads into a newer SDK and vice
+        versa. Branch on ``d.get("v")`` here if a future version needs an explicit migration."""
         d = d or {}
         return cls(
             history=[Turn.from_json(t) for t in d.get("history", [])],
@@ -135,6 +155,7 @@ class SessionState:
             context=list(d.get("context", [])),
             skills_in_use=list(d.get("skills_in_use", [])),
             meta_flow_bias=str(d.get("meta_flow_bias", "")),
+            memory=dict(d.get("memory") or {}),
         )
 
 
@@ -161,6 +182,17 @@ class Session:
 
     async def append(self, turn: Turn) -> None:
         await self.store.append(self.id, turn)
+
+    async def save(self, state: SessionState) -> bool:
+        """Persist the WHOLE state atomically (history + memory + skills_in_use + meta_flow_bias),
+        if the store supports it. Returns False when the store only does ``append`` (legacy /
+        host-owned durability), so the caller can fall back. This is what lets a snapshot carry
+        more than the transcript across a stateless hop."""
+        saver = getattr(self.store, "save", None)
+        if saver is None:
+            return False
+        await saver(self.id, state)
+        return True
 
     async def compact(self, summarizer: Summarizer, *, keep_last: int = 6) -> None:
         await self.store.compact(self.id, summarizer, keep_last=keep_last)
