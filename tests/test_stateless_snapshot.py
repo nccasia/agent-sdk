@@ -101,3 +101,21 @@ def test_agent_worker_requires_agent_or_factory():
 
     with pytest.raises(ValueError):
         AgentWorker(queue=InProcessQueue(), sink=InProcessEventSink())
+
+
+async def test_pool_resets_memory_across_sessionless_jobs():
+    # A pooled agent reused across SESSIONLESS jobs must not carry the prior job's memory —
+    # otherwise one bot/tenant's working memory could bleed into the next. Hold the one pooled
+    # agent (concurrency=1 forces reuse) and inspect its store directly.
+    agent = _agent()
+    worker = AgentWorker(agent_factory=lambda: agent, queue=InProcessQueue(),
+                         sink=InProcessEventSink(), concurrency=1)
+
+    await worker.queue.enqueue(Job(input="Remember:\n- My name is Alice"))  # no session
+    await worker.serve(max_jobs=1)
+    assert "alice" in _mem_text({"memory": agent._memory_store.to_json()})  # stored on the agent
+
+    await worker.queue.enqueue(Job(input="hello again"))  # no session, reuses the SAME agent
+    await worker.serve(max_jobs=1)
+    # the worker reset the agent on checkout → Alice is gone, no bleed into the next job
+    assert "alice" not in _mem_text({"memory": agent._memory_store.to_json()})
