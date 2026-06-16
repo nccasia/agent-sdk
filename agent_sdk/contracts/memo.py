@@ -1,12 +1,19 @@
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Citation(BaseModel):
     chunk_id: str
     source_ref: str
     supporting_span: tuple[int, int]  # (start, end)
+    # Structural metadata that lets the user-facing citation footer show
+    # "file.pdf, p.5" / "§Điều 3" instead of just "file.pdf". Populated by the
+    # retrieval plumbing from chunk metadata (see arag_core.types for the
+    # LLM-safe whitelist). Optional — older chunks / non-paginated formats
+    # carry None/{}. Leaf-isolated: no SDK-side dependency on arag_core.
+    page_number: int | None = None
+    metadata: dict = Field(default_factory=dict)
 
 
 class Claim(BaseModel):
