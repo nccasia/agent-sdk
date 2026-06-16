@@ -161,7 +161,7 @@ _FAMILY_TOOLS = {
     "tasks": ["tasks.list", "tasks.create", "todos.update"],
     "workspace": ["Glob", "Grep", "Read", "Write"],
     "admin": ["admin.overview", "admin.connect_mello"],
-    "kb": ["retrieve_kb", "semantic_search", "keyword_search"],
+    "kb": ["kg.schema", "kg.query", "kg.read"],
 }
 
 

@@ -122,7 +122,7 @@ class OnboardingSynthesize(Stage):
 
     Grounded in tool results, not retrieval — with one carve-out: the
     ``standard_answer_update`` (relearn) skill needs to re-derive a corrected
-    answer, so read-only KB retrieval (``kb.retrieve``/``kb.read_chunk``) and
+    answer, so read-only knowledge-graph retrieval (``kg.query``/``kg.read``) and
     ``search_golden`` are available. They're inert on a normal config turn (the
     steward never calls them) and only fire while the relearn skill drives.
     ``memory_recall`` here is the SCOPED-MEMORY index (the per-turn ``## Memory``
@@ -157,8 +157,8 @@ class OnboardingSynthesize(Stage):
         "tasks.cancel",
         "memory",
         # relearn (standard_answer_update) — re-derive a corrected answer:
-        "kb.retrieve",
-        "kb.read_chunk",
+        "kg.query",
+        "kg.read",
         "search_golden",
     )
 
