@@ -14,6 +14,11 @@ _CHUNKS = [
         "score": 0.9,
         "text": "Điều kiện tốt nghiệp chương trình SE2019 yêu cầu hoàn thành đầy đủ các môn "
         "học bắt buộc và tích lũy đủ tín chỉ theo quy định đào tạo.",
+        # Structural metadata rides from the retriever's _hits_result shim →
+        # collect_citations → evidence channel → here. Optional + ignored
+        # when absent (older payloads, non-paginated formats).
+        "page_number": 5,
+        "metadata": {"heading_tree": ["Chương III", "Điều 5"]},
     },
     {
         "chunk_id": "c2",
@@ -72,3 +77,32 @@ def test_backfill_capped():
     answer = "Cần hoàn thành các môn học bắt buộc và tích lũy tín chỉ theo quy định đào tạo."
     out = _backfill_citations(answer, many, existing=[])
     assert len(out) <= 6
+
+
+def test_backfill_propagates_page_number_and_metadata():
+    """The backfill path must surface structural metadata on the Citation
+    it emits, so the user-facing footer can render ', p.5' / '§Điều 5'
+    without a second lookup."""
+    answer = (
+        "Để tốt nghiệp chương trình SE2019 bạn cần hoàn thành đầy đủ các môn học "
+        "bắt buộc và tích lũy đủ tín chỉ theo quy định đào tạo của FUNiX."
+    )
+    out = _backfill_citations(answer, _CHUNKS, existing=[])
+    c1 = next(c for c in out if c.chunk_id == "c1")
+    assert c1.page_number == 5
+    assert c1.metadata == {"heading_tree": ["Chương III", "Điều 5"]}
+
+
+def test_citations_from_text_propagates_page_number_and_metadata():
+    """Marker-driven path (model emitted [c1]) must carry the same
+    structural fields so the engine's finalize step renders them
+    consistently regardless of which extraction branch produced the
+    Citation."""
+    answer = (
+        "Điều kiện tốt nghiệp SE2019: hoàn thành các môn học bắt buộc và tích lũy đủ "
+        "tín chỉ theo quy định đào tạo. [c1]"
+    )
+    out = _citations_from_text(answer, _CHUNKS)
+    assert len(out) == 1
+    assert out[0].page_number == 5
+    assert out[0].metadata == {"heading_tree": ["Chương III", "Điều 5"]}

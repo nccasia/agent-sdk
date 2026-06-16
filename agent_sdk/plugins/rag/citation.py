@@ -66,6 +66,12 @@ def citations_from_text(text: str, chunks: list[dict]) -> list[Citation]:
                 chunk_id=cid,
                 source_ref=str(ch.get("source_ref") or ""),
                 supporting_span=(0, len(text)),
+                # Propagate structural metadata from the evidence channel so the
+                # user-facing citation footer can show ", p.N" / "§heading" when
+                # the LLM or the delivery client renders it. Optional + ignored
+                # when absent (older evidence payloads, non-paginated formats).
+                page_number=ch.get("page_number"),
+                metadata=dict(ch.get("metadata") or {}),
             ))
     return out
 
@@ -118,6 +124,11 @@ def backfill_citations(
                 chunk_id=cid,
                 source_ref=str(ch.get("source_ref") or ""),
                 supporting_span=(0, len(answer)),
+                # Same propagation as citations_from_text — the backfill path
+                # produces user-facing Citations that the delivery client will
+                # render; they need the same structural metadata.
+                page_number=ch.get("page_number"),
+                metadata=dict(ch.get("metadata") or {}),
             ))
             if len(out) >= _BACKFILL_MAX_ADD:
                 break
