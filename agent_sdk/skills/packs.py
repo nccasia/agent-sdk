@@ -63,13 +63,13 @@ KB_LOOKUP_SKILL = SkillPack(
     name="Information lookup",
     description="Look up facts in the bot's knowledge bases and answer with citations.",
     stages=("simple_answer", "research", "synthesize"),
-    required_tools=("kb.retrieve", "kb.read_chunk"),
-    instructions="""SKILL: KB lookup with citations
-- Use KB retrieval tools for factual knowledge questions.
-- Start broad with kb.retrieve or search tools, then read exact chunks when needed.
+    required_tools=("kg.schema", "kg.query", "kg.read"),
+    instructions="""SKILL: knowledge-graph lookup with citations
+- The knowledge base is a graph; answer factual questions from it.
+- kg.schema once to see what's there, then kg.query for each fact (try several phrasings; filter by attr for exact values), then kg.read the best hits for full context.
 - Prefer a short grounded answer over a broad speculative answer.
-- Every factual claim must be supported by source chunks.
-- If the retrieved context does not answer the question, say you cannot confirm it from the knowledge base.""",
+- Every factual claim must be supported by a graph node (cite its ref).
+- If the graph does not answer the question, say you cannot confirm it from the knowledge base.""",
 )
 
 
