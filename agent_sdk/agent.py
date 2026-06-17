@@ -188,14 +188,15 @@ class PreactAgent:
         # Grounding is opt-in (RagPlugin) — most agents have no retrieval. But
         # ``require_citations=True`` is an explicit grounding intent, so auto-enable
         # the RAG plugin (its finalize hook owns extraction + ground-or-refuse)
-        # unless it is already present or a registry disabled it by name.
-        if require_citations and not any(
-            getattr(p, "name", "") == "rag" for p in active_plugins
-        ):
+        # unless it is already present or a registry disabled it by name. The check is
+        # ``isinstance`` (not name == "rag") so a host SUBCLASS that extends RagPlugin
+        # — e.g. a KB-backed RagPlugin that also mounts retrieval tools — is recognized
+        # and never double-installed (finalize hooks are not deduped).
+        from agent_sdk.plugins.rag import RagPlugin
+
+        if require_citations and not any(isinstance(p, RagPlugin) for p in active_plugins):
             disabled = plugins.is_disabled("rag") if hasattr(plugins, "is_disabled") else False
             if not disabled:
-                from agent_sdk.plugins.rag import RagPlugin
-
                 active_plugins = [*active_plugins, RagPlugin()]
         for plugin in active_plugins:
             if getattr(plugin, "enabled", True) is False:
