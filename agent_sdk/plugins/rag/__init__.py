@@ -5,9 +5,9 @@ Owns everything retrieval-augmented-QA needs and a general agent does not: the
 two engine seams —
 
 - ``add_finalize_hook`` — on every turn, extract ``[chunk_id]`` citations from the
-  answer against the evidence channel, backfill paraphrased uses, strip the inline
-  markers from the user-facing text, and enforce **ground-or-refuse** (a grounding
-  flow that requires citations but found none refuses).
+  answer against the evidence channel, backfill paraphrased uses, renumber the inline
+  markers to ``[N]`` reference numbers aligned with the delivery footer, and enforce
+  **ground-or-refuse** (a grounding flow that requires citations but found none refuses).
 - ``add_tool_result_hook`` — pull citations a tool emits as ``{"citations": [...]}``.
 
 **Opt-in (default-off).** Most agents (coding / chat / task) have no retrieval, so
@@ -27,7 +27,7 @@ from agent_sdk.plugins.rag.citation import (
     backfill_citations,
     citations_from_text,
     extract_tool_citations,
-    strip_citation_markers,
+    renumber_citation_markers,
 )
 from agent_sdk.plugins.rag.lobes import cite as _cite
 
@@ -48,7 +48,9 @@ def _finalize_grounding(answer, citations, chunks, grounds, require_citations):
             seen.add(c.chunk_id)
             out.append(c)
     out.extend(backfill_citations(answer, chunks, out))
-    clean = strip_citation_markers(answer)
+    # Rewrite inline markers to [N] reference numbers aligned with the delivery
+    # footer (the platform standard format), rather than stripping them out.
+    clean = renumber_citation_markers(answer, out)
     refusal = "no_citations" if (require_citations and grounds and not out) else None
     return clean, out, refusal
 

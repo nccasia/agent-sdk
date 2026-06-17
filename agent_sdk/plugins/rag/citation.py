@@ -22,27 +22,88 @@ import unicodedata
 from agent_sdk.contracts.memo import Citation
 
 __all__ = [
+    "renumber_citation_markers",
     "strip_citation_markers",
     "citations_from_text",
     "backfill_citations",
     "extract_tool_citations",
 ]
 
-# Inline grounding markers the model emits — ``[<chunk_id>]``, ``[id1, id2]``
-# (uuid or short-hex), ``[golden:<case>]``. They drive citation EXTRACTION; once
-# citations are on the result they are internal noise in the user-facing text, so
-# they are stripped from the final answer (the citations ride in result.citations /
-# message metadata and are rendered separately by the client).
+# A single inline grounding-marker token the model emits. Three shapes:
+#   • a KG node ref (v3.0.0+ knowledge-graph KB) — ``doc:<slug>#pN``, ``ent:lms``,
+#     ``cell:<slug>#Sheet!B7`` — kind-prefixed, carrying letters / ':' / '#' / '-'.
+#   • a legacy vector chunk id — a uuid or 8+ hex run.
+#   • a golden case ref — ``golden:<case>``.
+# The KG refs are why the old hex-only pattern leaked: ``[doc:…#p173]`` matched
+# neither the uuid nor the hex branch, so raw refs survived into delivered answers.
+_KG_REF = r"(?:doc|ent|cell|sec|para|link|tbl|row|page|sheet|toc|kb|attr|header):[^\]\s,]+"
+_MARKER_TOKEN = rf"(?:golden:[^\],]+|{_KG_REF}|[0-9a-fA-F][0-9a-fA-F-]{{5,}})"
+# A whole marker = one or more tokens in one bracket (``[id]`` or ``[id1, id2]``);
+# group 1 is any leading whitespace so a renumber/strip can rebuild spacing.
 _CITE_MARKER_RE = re.compile(
-    r"\s*\[\s*(?:golden:[^\]]+"
-    r"|[0-9a-fA-F][0-9a-fA-F-]{5,}(?:\s*,\s*[0-9a-fA-F][0-9a-fA-F-]{5,})*)\s*\]"
+    rf"(\s*)\[\s*{_MARKER_TOKEN}(?:\s*,\s*{_MARKER_TOKEN})*\s*\]"
 )
 
 
+def _citation_numbering(citations: list[Citation]) -> dict[str, int]:
+    """Map ``chunk_id`` → 1-based reference number, deduped by DOCUMENT
+    (``source_ref``), in first-appearance order. This is the SAME order the
+    delivery footer numbers its "Nguồn tham khảo" entries, so an inline ``[N]``
+    lines up with footer entry ``N``. Multiple chunks of one document share a
+    number (one footer line per document)."""
+    doc_num: dict[str, int] = {}
+    cid_num: dict[str, int] = {}
+    for c in citations:
+        cid = getattr(c, "chunk_id", "") or ""
+        key = getattr(c, "source_ref", "") or cid
+        if not key:
+            continue
+        if key not in doc_num:
+            doc_num[key] = len(doc_num) + 1
+        if cid:
+            cid_num[cid] = doc_num[key]
+    return cid_num
+
+
+def renumber_citation_markers(text: str, citations: list[Citation]) -> str:
+    """Rewrite inline machine markers into human reference numbers — the platform
+    STANDARD citation format. Each ``[<chunk_id>]`` / ``[doc:…#pN]`` / ``[golden:…]``
+    becomes a ``[N]`` whose number matches the source's position in the delivery
+    footer (``Nguồn tham khảo`` / the portal citation panel), so the reader sees
+    ``… Ask Mentor [1][2].`` and finds ``[1]``/``[2]`` with their links below.
+
+    A marker whose id resolves to no citation is dropped (residual machine noise,
+    never leaked). Ordinary brackets (``[1]``, ``[2025]``, markdown links) are
+    left untouched. Comma-lists (``[id1, id2]``) expand to ``[N1][N2]``."""
+    if not text or "[" not in text:
+        return text
+    cid_num = _citation_numbering(citations)
+
+    def _sub(m: re.Match) -> str:
+        lead = m.group(1)
+        body = m.group(0)[len(lead):].strip()[1:-1]  # drop leading ws + the [ ]
+        nums: list[int] = []
+        for tok in body.split(","):
+            n = cid_num.get(tok.strip())
+            if n is not None and n not in nums:
+                nums.append(n)
+        if not nums:
+            return ""  # unresolved marker → drop, never leak the raw ref
+        return (" " if lead else "") + "".join(f"[{n}]" for n in nums)
+
+    cleaned = _CITE_MARKER_RE.sub(_sub, text)
+    # Collapse adjacent duplicate reference numbers ("[1] [1]" / "[1][1]" → "[1]")
+    # — two markers to the same document in one spot read as one reference.
+    cleaned = re.sub(r"(\[\d+\])(?:\s*\1)+", r"\1", cleaned)
+    return re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+
+
 def strip_citation_markers(text: str) -> str:
-    """Remove inline ``[chunk_id]`` / ``[golden:…]`` grounding markers from the
-    user-facing answer (citations are preserved in the result, rendered separately).
-    Leaves ordinary brackets ([1], [2025], markdown links) untouched."""
+    """Remove inline ``[chunk_id]`` / ``[doc:…#pN]`` / ``[golden:…]`` grounding
+    markers entirely from the user-facing answer. Retained for callers that render
+    citations purely out-of-band (no inline reference numbers); the default
+    grounding contract now uses :func:`renumber_citation_markers`. Leaves ordinary
+    brackets ([1], [2025], markdown links) untouched."""
     if not text or "[" not in text:
         return text
     cleaned = _CITE_MARKER_RE.sub("", text)
