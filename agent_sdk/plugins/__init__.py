@@ -26,6 +26,7 @@ from __future__ import annotations
 
 from agent_sdk.mcp import MCPError, MCPServerSpec, MCPToolRuntime
 from agent_sdk.plugins.base import AgentSetup, Plugin, Workspace
+from agent_sdk.plugins.chat import PluginChat
 from agent_sdk.plugins.format import FormatPlugin
 from agent_sdk.plugins.guardrails import (
     GuardrailError,
@@ -87,6 +88,7 @@ __all__ = [
     "builtin_registry",
     "default_capability_plugins",
     "capability_lobes",
+    "PluginChat",
     "RagPlugin",
     "SafetyPlugin",
     "TaskPlugin",
