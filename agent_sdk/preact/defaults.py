@@ -2,9 +2,11 @@
 
 The builtin default is the **faithfully-ported agent-core production network**
 (18 lobes, 8 paths, the named flows — ``preact/production.py``). Each namespace
-exposes ``.default()`` (the production network) and ``.minimal()`` (the small
-qna/research/clarify network kept for lightweight agents/tests). Compose your own
-by passing explicit lists to ``PreactAgent``.
+exposes ``.default()`` (the production network), ``.minimal()`` (the small
+qna/research/clarify network kept for lightweight agents/tests), and ``.chat()``
+(a single-flow casual-conversation network — ``classify → synthesize`` + safety,
+no retrieval/skills/tasks/memory — for chit-chat / persona bots). Compose your
+own by passing explicit lists to ``PreactAgent``.
 """
 
 from __future__ import annotations
@@ -26,6 +28,14 @@ class Lobes:
     @staticmethod
     def minimal() -> list[Lobe]:
         return default_lobes()
+
+    @staticmethod
+    def chat() -> list[Lobe]:
+        """A casual-conversation lobe set — route, generate, and safety only
+        (no retrieval/skills/tools/tasks/memory lobes). A voice/respond plugin's
+        lobe is added on top when present."""
+        keep = {"classify", "synthesize", "filter"}
+        return [lobe for lobe in default_lobes() if getattr(lobe, "id", "") in keep]
 
 
 class Stages:
@@ -61,6 +71,18 @@ class Stages:
                 use_when="an ambiguous follow-up",
                 description="Ask one clarifying question.",
             ),
+        ]
+
+    @staticmethod
+    def chat() -> list[Stage]:
+        """A single generating stage for casual chat — no plan/research/cite."""
+        return [
+            stage(
+                "synthesize",
+                lobes=["classify", "synthesize", "filter"],
+                loop="single",
+                description="Compose one short, casual reply (no retrieval).",
+            )
         ]
 
 
@@ -99,4 +121,19 @@ class Flows:
                 threshold=0.4,
                 signal={"const": 0.5},
             ),
+        ]
+
+    @staticmethod
+    def chat() -> list[Flow]:
+        """A single casual-conversation flow: every turn goes straight to the
+        generating stage (ungrounded — no sources needed for chit-chat)."""
+        return [
+            flow(
+                "chat",
+                use_when="casual conversation / chit-chat (no sources needed)",
+                stages=["synthesize"],
+                threshold=0.0,
+                grounds=False,
+                signal={"const": 1.0},
+            )
         ]
