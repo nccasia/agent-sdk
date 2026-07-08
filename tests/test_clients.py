@@ -188,6 +188,79 @@ def test_minimax_passthrough_on_native_tool_use():
     assert MiniMaxClient()._postprocess(resp) is resp  # native → unchanged
 
 
+def test_minimax_strips_inlined_think_reasoning():
+    """MiniMax emits its chain-of-thought as a ``<think>…</think>`` text block —
+    it must never reach the user-facing answer."""
+    from types import SimpleNamespace
+
+    from agent_sdk.clients import MiniMaxClient
+
+    text = (
+        "<think>The user said hello. I should greet them warmly and, since I'm in "
+        "steward mode, follow onboarding.</think>\n\nChào bạn! Mình có thể giúp gì?"
+    )
+    resp = SimpleNamespace(
+        stop_reason="end_turn",
+        content=[SimpleNamespace(type="text", text=text)],
+        usage=SimpleNamespace(input_tokens=5, output_tokens=40),
+    )
+    out = MiniMaxClient()._postprocess(resp)
+    assert out.stop_reason == "end_turn"
+    assert out.text == "Chào bạn! Mình có thể giúp gì?"
+    assert "<think>" not in out.text and "steward mode" not in out.text
+
+
+def test_minimax_drops_truncated_think_only():
+    """A think block cut off by max_tokens (no closing tag) is all reasoning → dropped."""
+    from types import SimpleNamespace
+
+    from agent_sdk.clients import MiniMaxClient
+
+    resp = SimpleNamespace(
+        stop_reason="max_tokens",
+        content=[SimpleNamespace(type="text", text="<think>Let me reason about this and")],
+        usage=None,
+    )
+    out = MiniMaxClient()._postprocess(resp)
+    assert out.text == ""  # nothing but reasoning survived
+
+
+def test_minimax_strips_think_before_recovering_markup():
+    """Reasoning and a markup tool call in one response: strip the think, recover the call."""
+    from types import SimpleNamespace
+
+    from agent_sdk.clients import MiniMaxClient
+
+    text = (
+        "<think>I need to read the file first.</think>\n"
+        '<invoke name="read"><parameter name="path">a.md</parameter></invoke>'
+    )
+    resp = SimpleNamespace(
+        stop_reason="end_turn",
+        content=[SimpleNamespace(type="text", text=text)],
+        usage=SimpleNamespace(input_tokens=1, output_tokens=1),
+    )
+    out = MiniMaxClient()._postprocess(resp)
+    assert out.stop_reason == "tool_use"
+    assert out.tool_uses[0].name == "read"
+    assert out.tool_uses[0].input["path"] == "a.md"
+    assert "think" not in out.text and "reason" not in out.text
+
+
+def test_minimax_no_think_is_passthrough():
+    """A plain response (no ``<think>``) is returned unchanged — the object identity is kept."""
+    from types import SimpleNamespace
+
+    from agent_sdk.clients import MiniMaxClient
+
+    resp = SimpleNamespace(
+        stop_reason="end_turn",
+        content=[SimpleNamespace(type="text", text="Just a normal answer.")],
+        usage=None,
+    )
+    assert MiniMaxClient()._postprocess(resp) is resp
+
+
 def test_minimax_recovers_truncated_markup():
     from types import SimpleNamespace
 
