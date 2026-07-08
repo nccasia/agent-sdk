@@ -10,6 +10,7 @@ the optional ``openai`` extra (``pip install agent-sdk[openai]``).
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from agent_sdk.clients.base import BaseClient, _env
@@ -23,6 +24,20 @@ _FINISH_TO_STOP = {
     "function_call": "tool_use",
     "length": "max_tokens",
 }
+
+# Reasoning models behind OpenAI-compatible gateways (MiniMax, DeepSeek-R1, Qwen)
+# emit chain-of-thought inside ``content`` as a ``<think>…</think>`` block instead
+# of a separate field. Left in, it leaks into the user-facing answer. Strip it here.
+# Truncation-tolerant: an unterminated block (``max_tokens`` cut mid-thought) is all
+# reasoning and is matched to the end of the text (``\Z``). Real OpenAI never emits
+# ``<think>``, so this is a no-op there.
+_THINK_RE = re.compile(r"<think>.*?(?:</think>|\Z)", re.DOTALL)
+
+
+def _strip_think(text: str) -> str:
+    if "<think>" not in text:
+        return text
+    return _THINK_RE.sub("", text).strip()
 
 
 class OpenAIClient(BaseClient):
@@ -107,8 +122,9 @@ class OpenAIClient(BaseClient):
         choice = resp.choices[0]
         m = choice.message
         blocks: list[Any] = []
-        if getattr(m, "content", None):
-            blocks.append(TextBlock(text=m.content))
+        content = _strip_think(getattr(m, "content", None) or "")
+        if content:
+            blocks.append(TextBlock(text=content))
         for tc in getattr(m, "tool_calls", None) or []:
             try:
                 args = json.loads(tc.function.arguments or "{}")
