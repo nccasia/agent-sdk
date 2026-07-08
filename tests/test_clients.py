@@ -261,6 +261,40 @@ def test_minimax_no_think_is_passthrough():
     assert MiniMaxClient()._postprocess(resp) is resp
 
 
+def test_openai_adapt_strips_think_reasoning():
+    """MiniMax/DeepSeek/Qwen via an OpenAI-compatible gateway emit <think> in content —
+    OpenAIClient._adapt must strip it so reasoning never reaches the answer."""
+    from types import SimpleNamespace
+
+    from agent_sdk.clients import OpenAIClient
+
+    content = (
+        "<think>The user said hello. Let me check the instructions and greet warmly."
+        "</think>\n\nChào bạn! Mình có thể giúp gì?"
+    )
+    resp = SimpleNamespace(
+        choices=[SimpleNamespace(finish_reason="stop", message=SimpleNamespace(content=content, tool_calls=None))],
+        usage=SimpleNamespace(prompt_tokens=5, completion_tokens=30),
+    )
+    out = OpenAIClient("MiniMax-M2.7")._adapt(resp)
+    assert out.stop_reason == "end_turn"
+    assert out.text == "Chào bạn! Mình có thể giúp gì?"
+    assert "<think>" not in out.text and "instructions" not in out.text
+
+
+def test_openai_adapt_plain_content_passthrough():
+    """Content without <think> (real OpenAI) is unchanged."""
+    from types import SimpleNamespace
+
+    from agent_sdk.clients import OpenAIClient
+
+    resp = SimpleNamespace(
+        choices=[SimpleNamespace(finish_reason="stop", message=SimpleNamespace(content="Just an answer.", tool_calls=None))],
+        usage=None,
+    )
+    assert OpenAIClient()._adapt(resp).text == "Just an answer."
+
+
 def test_minimax_recovers_truncated_markup():
     from types import SimpleNamespace
 
