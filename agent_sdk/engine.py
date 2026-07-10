@@ -297,6 +297,7 @@ class Engine:
         memory_store: Any = None,
         embed: Any = None,
         require_citations: bool = False,
+        refusal_message: str | None = None,
         share_history: bool = False,
         tools_in_prompt: bool = False,
         funnel: bool = False,
@@ -382,6 +383,7 @@ class Engine:
         self._finalize_hooks: list[Any] = []
         self._tool_result_hooks: list[Any] = []
         self.require_citations = require_citations
+        self.refusal_message = refusal_message
         self.share_history = share_history
         self.tools_in_prompt = tools_in_prompt
         self.funnel = funnel
@@ -1960,12 +1962,13 @@ class Engine:
         # refusal_reason when a grounding turn requires citations but found none.
         # The engine core has no citation gate of its own.
         if refusal_reason:
+            msg = self.refusal_message or "No supporting sources were found."
             return AgentResult(
-                text="I cannot confirm that from the available sources.",
+                text=msg,
                 status="refused",
                 refusal=Refusal(
                     reason=refusal_reason,
-                    message="No supporting sources were found.",
+                    message=msg,
                 ),
                 usage=usage,
                 trace=trace,
