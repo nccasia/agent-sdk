@@ -64,6 +64,29 @@ def _strip_think(text: str) -> str:
     return _THINK_RE.sub("", text).strip()
 
 
+# Retry nudge for the empty-answer quirk (see ``MiniMaxClient.__call__``): a
+# reasoning model occasionally spends the whole output on ``<think>`` reasoning and
+# emits no answer text, so ``_strip_reasoning`` leaves empty content. On the retry we
+# tell it to answer directly, without a reasoning block.
+# How many times to re-ask for a text answer when a tool-free hop returns none.
+_ANSWER_RETRIES = 2
+
+_FORCE_ANSWER = (
+    "\n\nIMPORTANT: Provide your final answer as plain text now. Do NOT emit a "
+    "<think>…</think> reasoning block and do NOT call any tools — answer the user "
+    "directly from what you already know."
+)
+
+
+def _augment_system(system: Any, extra: str) -> Any:
+    """Append an instruction to the system prompt (a ``str`` or Anthropic block list)."""
+    if isinstance(system, str):
+        return (system or "") + extra
+    if isinstance(system, list):
+        return [*system, {"type": "text", "text": extra.strip()}]
+    return system
+
+
 def _parse_markup_tool_calls(text: str, start: int = 0) -> list[ToolUseBlock]:
     """Parse ``<invoke name=…>`` markup in a text block into tool_use blocks.
 
@@ -92,6 +115,65 @@ class MiniMaxClient(AnthropicClient):
     def __init__(self, model: str = "MiniMax-M2.7", **kwargs: Any):
         super().__init__(model, **kwargs)
         self._markup_seq = 0  # monotonic id seed for recovered tool calls (unique per conversation)
+
+    @staticmethod
+    def _is_empty_answer(resp: Any) -> bool:
+        """True when a response carries neither answer text nor a tool call.
+
+        This is the residue of the reasoning quirk: MiniMax returned only an inline
+        ``<think>`` block, which :meth:`_strip_reasoning` removed — leaving nothing for
+        the engine to surface, so the turn appears empty (blank answer, or a refusal
+        from a downstream ground-or-refuse gate).
+        """
+        for b in getattr(resp, "content", []) or []:
+            t = getattr(b, "type", None)
+            if t == "tool_use":
+                return False
+            if t == "text" and (getattr(b, "text", "") or "").strip():
+                return False
+        return True
+
+    @staticmethod
+    def _has_answer_text(resp: Any) -> bool:
+        """True when a response carries at least one non-empty answer text block."""
+        return any(
+            getattr(b, "type", None) == "text" and (getattr(b, "text", "") or "").strip()
+            for b in getattr(resp, "content", []) or []
+        )
+
+    async def __call__(
+        self,
+        *,
+        stage: str,
+        system: str | list,
+        messages: list[dict],
+        max_tokens: int,
+        temperature: float | None = None,
+        tools: list[dict] | None = None,
+        count_usage: bool = True,
+    ) -> Any:
+        resp = await super().__call__(
+            stage=stage, system=system, messages=messages, max_tokens=max_tokens,
+            temperature=temperature, tools=tools, count_usage=count_usage,
+        )
+        # Answer-hop repair: on a tool-free (answer-producing) call the model must
+        # return TEXT. It fails to when it either burns the whole response on
+        # ``<think>`` reasoning (→ stripped to empty) or emits a ``kg.read``-style tool
+        # call as ``<invoke>`` markup (recovered into a spurious ``tool_use`` that
+        # leaks as the "answer"). Both leave no answer text. Retry up to
+        # ``_ANSWER_RETRIES`` times, nudging a direct text answer (no thinking, no
+        # tools) with more headroom — a reasoning model is non-deterministic enough
+        # that a persistent thinking-only turn usually recovers within a couple tries.
+        if not tools and not self._has_answer_text(resp):
+            for _ in range(_ANSWER_RETRIES):
+                retry = await super().__call__(
+                    stage=stage, system=_augment_system(system, _FORCE_ANSWER),
+                    messages=messages, max_tokens=max(max_tokens, 4096),
+                    temperature=temperature, tools=None, count_usage=count_usage,
+                )
+                if self._has_answer_text(retry):
+                    return retry
+        return resp
 
     def _strip_reasoning(self, resp: Any) -> Any:
         """Strip inlined ``<think>…</think>`` reasoning from text blocks.

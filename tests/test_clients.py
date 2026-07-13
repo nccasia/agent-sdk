@@ -225,6 +225,109 @@ def test_minimax_drops_truncated_think_only():
     assert out.text == ""  # nothing but reasoning survived
 
 
+def test_minimax_is_empty_answer():
+    """``_is_empty_answer`` flags a response with no answer text and no tool call."""
+    from types import SimpleNamespace
+
+    from agent_sdk.clients import MiniMaxClient
+    from agent_sdk.clients.messages import Message, TextBlock
+
+    c = MiniMaxClient()
+    assert c._is_empty_answer(Message(content=[], stop_reason="end_turn", usage=None)) is True
+    assert c._is_empty_answer(SimpleNamespace(content=[SimpleNamespace(type="text", text="  ")])) is True
+    assert c._is_empty_answer(Message(content=[TextBlock(text="hi")], stop_reason="end_turn", usage=None)) is False
+    assert c._is_empty_answer(SimpleNamespace(content=[SimpleNamespace(type="tool_use")])) is False
+
+
+async def test_minimax_retries_when_reasoning_leaves_empty_answer():
+    """When MiniMax returns only ``<think>`` reasoning (stripped to empty), the client
+    retries once with an answer-now nudge and surfaces the recovered text."""
+    from types import SimpleNamespace
+
+    from agent_sdk.clients import MiniMaxClient
+
+    calls: list[dict] = []
+
+    class _FakeMessages:
+        async def create(self, **kwargs):
+            calls.append(kwargs)
+            if len(calls) == 1:  # first call: only reasoning → stripped to empty
+                return SimpleNamespace(
+                    stop_reason="max_tokens",
+                    content=[SimpleNamespace(type="text", text="<think>still reasoning")],
+                    usage=SimpleNamespace(input_tokens=1, output_tokens=1),
+                )
+            return SimpleNamespace(  # retry: a real answer
+                stop_reason="end_turn",
+                content=[SimpleNamespace(type="text", text="Câu trả lời cuối cùng.")],
+                usage=SimpleNamespace(input_tokens=1, output_tokens=3),
+            )
+
+    c = MiniMaxClient()
+    c._client = SimpleNamespace(messages=_FakeMessages())  # bypass _ensure
+    out = await c(stage="synthesize", system="sys", messages=[{"role": "user", "content": "q"}],
+                  max_tokens=512, tools=None)
+    assert out.content[0].text == "Câu trả lời cuối cùng."
+    assert len(calls) == 2  # retried exactly once
+    assert calls[1].get("tools") is None  # tools disabled on the answer retry
+    assert calls[1]["max_tokens"] >= 4096  # headroom raised
+    assert "final answer" in calls[1]["system"].lower()  # system nudged to answer directly
+
+
+async def test_minimax_no_retry_on_tool_hop():
+    """A tool hop that returns no answer text is NOT retried (a tool_use is valid)."""
+    from types import SimpleNamespace
+
+    from agent_sdk.clients import MiniMaxClient
+
+    calls: list[dict] = []
+
+    class _FakeMessages:
+        async def create(self, **kwargs):
+            calls.append(kwargs)
+            return SimpleNamespace(stop_reason="tool_use",
+                                   content=[SimpleNamespace(type="tool_use")], usage=None)
+
+    c = MiniMaxClient()
+    c._client = SimpleNamespace(messages=_FakeMessages())
+    await c(stage="synthesize", system="sys", messages=[{"role": "user", "content": "q"}],
+            max_tokens=512, tools=[{"name": "kg.query"}])
+    assert len(calls) == 1  # tool hop: no retry
+
+
+async def test_minimax_retries_when_answer_hop_leaks_markup_tool_call():
+    """On a tool-free answer hop, a ``<invoke>`` markup tool call (recovered into a
+    spurious tool_use, no answer text) is retried into a real text answer."""
+    from types import SimpleNamespace
+
+    from agent_sdk.clients import MiniMaxClient
+
+    calls: list[dict] = []
+
+    class _FakeMessages:
+        async def create(self, **kwargs):
+            calls.append(kwargs)
+            if len(calls) == 1:  # markup tool call, no answer text → recovered to tool_use
+                return SimpleNamespace(
+                    stop_reason="end_turn",
+                    content=[SimpleNamespace(type="text",
+                             text='<invoke name="kg.read"><parameter name="id">doc:886#p5</parameter></invoke>')],
+                    usage=SimpleNamespace(input_tokens=1, output_tokens=1),
+                )
+            return SimpleNamespace(  # retry: a real answer
+                stop_reason="end_turn",
+                content=[SimpleNamespace(type="text", text="WFH full tuần.")],
+                usage=SimpleNamespace(input_tokens=1, output_tokens=2),
+            )
+
+    c = MiniMaxClient()
+    c._client = SimpleNamespace(messages=_FakeMessages())
+    out = await c(stage="synthesize", system="sys", messages=[{"role": "user", "content": "q"}],
+                  max_tokens=512, tools=None)
+    assert out.content[0].text == "WFH full tuần."
+    assert len(calls) == 2  # markup-only answer hop was retried
+
+
 def test_minimax_strips_think_before_recovering_markup():
     """Reasoning and a markup tool call in one response: strip the think, recover the call."""
     from types import SimpleNamespace
