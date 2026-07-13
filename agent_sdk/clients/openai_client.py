@@ -18,7 +18,7 @@ from agent_sdk.clients.base import BaseClient, _env
 from agent_sdk.clients.messages import Message, ProviderUsage, TextBlock, ToolUseBlock
 from agent_sdk.clients.openai_tools import openai_tools_payload, restore_tool_name
 
-__all__ = ["OpenAIClient", "ProviderProtocolError"]
+__all__ = ["OpenAIClient", "ProviderProtocolError", "ProviderResponseError"]
 
 _FINISH_TO_STOP = {
     "stop": "end_turn",
@@ -56,6 +56,20 @@ class ProviderProtocolError(Exception):
         super().__init__(f"provider protocol error: {code}")
 
 
+class ProviderResponseError(Exception):
+    """A documented provider failure carried in an HTTP-success envelope.
+
+    The invariant code is deliberately the only detail retained: provider error
+    payloads can contain prompt content or credentials and must not surface in
+    logs or SSE events.
+    """
+
+    def __init__(self, failure_class: str, code: str) -> None:
+        self.provider_failure_class = failure_class
+        self.code = code
+        super().__init__(f"provider response error: {code}")
+
+
 _MISSING = object()
 
 
@@ -69,9 +83,81 @@ def _is_record(value: Any) -> bool:
     return isinstance(value, Mapping) or hasattr(value, "__dict__")
 
 
+_MINIMAX_FAILURES = {
+    1001: ("timeout", "minimax_timeout"),
+    1002: ("rate_limit", "minimax_rate_limit"),
+    1004: ("authentication", "minimax_authentication"),
+    1008: ("insufficient_quota", "minimax_quota"),
+    1024: ("server_error", "minimax_server"),
+    1026: ("content_policy", "minimax_content_policy"),
+    1027: ("content_policy", "minimax_content_policy"),
+    1033: ("server_error", "minimax_server"),
+    1039: ("request_capacity", "minimax_request_capacity"),
+    1041: ("server_error", "minimax_connection"),
+    2013: ("invalid_request", "minimax_invalid_request"),
+    2049: ("authentication", "minimax_authentication"),
+    2056: ("insufficient_quota", "minimax_quota"),
+}
+
+_OPENROUTER_FAILURES = {
+    "rate_limit_exceeded": ("rate_limit", "openrouter_rate_limit"),
+    "provider_overloaded": ("server_error", "openrouter_provider_unavailable"),
+    "provider_unavailable": ("server_error", "openrouter_provider_unavailable"),
+    "server_error": ("server_error", "openrouter_server"),
+    "timeout": ("timeout", "openrouter_timeout"),
+    "payment_required": ("insufficient_quota", "openrouter_quota"),
+    "insufficient_quota": ("insufficient_quota", "openrouter_quota"),
+    "context_length_exceeded": ("request_capacity", "openrouter_request_capacity"),
+    "max_tokens_exceeded": ("request_capacity", "openrouter_request_capacity"),
+    "token_limit_exceeded": ("request_capacity", "openrouter_request_capacity"),
+    "authentication": ("authentication", "openrouter_authentication"),
+    "permission_denied": ("authorization", "openrouter_authorization"),
+    "content_policy_violation": ("content_policy", "openrouter_content_policy"),
+    "refusal": ("content_policy", "openrouter_content_policy"),
+    "invalid_request": ("invalid_request", "openrouter_invalid_request"),
+    "invalid_prompt": ("invalid_request", "openrouter_invalid_request"),
+    "not_found": ("invalid_request", "openrouter_invalid_request"),
+    "unprocessable_entity": ("invalid_request", "openrouter_invalid_request"),
+}
+
+
+def _normalize_provider_error(response: Any, choice: Any | None = None) -> None:
+    """Raise a typed error for documented OpenAI-compatible error envelopes."""
+    base_resp = _field(response, "base_resp")
+    if _is_record(base_resp):
+        try:
+            status_code = int(_field(base_resp, "status_code", 0))
+        except (TypeError, ValueError):
+            raise ProviderProtocolError("invalid_minimax_status") from None
+        if status_code:
+            failure = _MINIMAX_FAILURES.get(status_code)
+            if failure is None:
+                raise ProviderProtocolError("unknown_minimax_status")
+            raise ProviderResponseError(*failure)
+
+    error = _field(response, "error")
+    if error is None and choice is not None and _field(choice, "finish_reason") == "error":
+        error = _field(choice, "error")
+    if error is None:
+        return
+    if not _is_record(error):
+        raise ProviderProtocolError("invalid_openrouter_error")
+    metadata = _field(error, "metadata")
+    error_type = _field(error, "error_type")
+    if error_type is None and _is_record(metadata):
+        error_type = _field(metadata, "error_type")
+    if not isinstance(error_type, str):
+        raise ProviderProtocolError("unknown_openrouter_error")
+    failure = _OPENROUTER_FAILURES.get(error_type.lower())
+    if failure is None:
+        raise ProviderProtocolError("unknown_openrouter_error")
+    raise ProviderResponseError(*failure)
+
+
 def _first_choice(response: Any) -> Any:
     if not _is_record(response):
         raise ProviderProtocolError("invalid_response_type")
+    _normalize_provider_error(response)
     choices = _field(response, "choices", _MISSING)
     if choices is _MISSING:
         raise ProviderProtocolError("missing_choices")
@@ -82,6 +168,7 @@ def _first_choice(response: Any) -> Any:
     choice = choices[0]
     if not _is_record(choice):
         raise ProviderProtocolError("invalid_choice")
+    _normalize_provider_error(response, choice)
     message = _field(choice, "message")
     if not _is_record(message):
         raise ProviderProtocolError("missing_message")
