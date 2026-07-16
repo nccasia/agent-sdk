@@ -112,6 +112,7 @@ class PreactAgent:
         context: Any = None,
         host: Any = None,
         pre_turn_gate: Any = None,
+        max_hops: int | None = None,
     ):
         # Keep the raw config so with_() can produce immutable copies.
         self._config: dict[str, Any] = dict(
@@ -143,6 +144,7 @@ class PreactAgent:
             context=context,
             host=host,
             pre_turn_gate=pre_turn_gate,
+            max_hops=max_hops,
         )
 
         self.client = make_client(client)
@@ -351,6 +353,7 @@ class PreactAgent:
             prompt_format=prompt_format,
             context=context,
             pre_turn_gate=pre_turn_gate,
+            max_hops=max_hops,
         )
         self.engine._prefetch_hooks = prefetch_hooks
         self.engine._tool_filters = list(setup.tool_filters) + list(tool_filters or [])
