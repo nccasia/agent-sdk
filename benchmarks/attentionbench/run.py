@@ -23,6 +23,7 @@ sys.path.insert(0, str(HERE.parents[1]))
 from agent_sdk import Harness, PreactAgent, Scenario  # noqa: E402
 from agent_sdk.clients import FakeClient  # noqa: E402
 from agent_sdk.network.context_builder import DEFAULT_NODE_WEIGHTS, score_relevance  # noqa: E402
+from agent_sdk.plugins.rag import RagPlugin  # noqa: E402
 from agent_sdk.viewer import write_viewer  # noqa: E402
 from benchmarks._shared import compose_verdict  # noqa: E402
 
@@ -50,7 +51,11 @@ def _payload(checks, metrics=None):
 
 
 def _agent():
-    return PreactAgent(client=FakeClient(["ok"]), instructions="You are a research assistant.")
+    return PreactAgent(
+        client=FakeClient(["ok"]),
+        instructions="You are a research assistant.",
+        plugins=[RagPlugin()],
+    )
 
 
 def _active(agent, q) -> set[str]:
