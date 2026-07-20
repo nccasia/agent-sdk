@@ -353,7 +353,9 @@ class PreactAgent:
             prompt_format=prompt_format,
             context=context,
             pre_turn_gate=pre_turn_gate,
-            max_hops=max_hops,
+            # ``Engine`` has a safe default, but forwarding an explicit ``None``
+            # overwrites it and makes agentic stages call ``range(None)``.
+            max_hops=6 if max_hops is None else max_hops,
         )
         self.engine._prefetch_hooks = prefetch_hooks
         self.engine._tool_filters = list(setup.tool_filters) + list(tool_filters or [])

@@ -28,6 +28,11 @@ def _agent(script, **kw):
     return PreactAgent(client=FakeClient(script), instructions="You are helpful.", **kw)
 
 
+def test_default_max_hops_is_finite():
+    agent = _agent(["unused"])
+    assert agent.engine.max_hops == 6
+
+
 async def test_quickstart_one_shot():
     agent = _agent(["v2 added streaming and a new spec."])
     result = await agent.query("What changed in v2?")
