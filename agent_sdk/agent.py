@@ -112,7 +112,7 @@ class PreactAgent:
         context: Any = None,
         host: Any = None,
         pre_turn_gate: Any = None,
-        max_hops: int | None = None,
+        max_hops: int = 6,
     ):
         # Keep the raw config so with_() can produce immutable copies.
         self._config: dict[str, Any] = dict(
