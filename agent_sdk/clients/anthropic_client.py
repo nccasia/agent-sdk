@@ -28,8 +28,11 @@ class AnthropicClient(BaseClient):
         base_url: str | None = None,
         max_retries: int = 2,
         timeout: float = 300.0,
+        default_headers: dict[str, str] | None = None,
     ):
-        super().__init__(model, api_key=api_key, base_url=base_url)
+        super().__init__(
+            model, api_key=api_key, base_url=base_url, default_headers=default_headers
+        )
         self.max_retries = max_retries
         # Per-request timeout (seconds). The anthropic SDK default is 600s, so a
         # stalled provider response blocks ~10 min per call (×retries) — a long
@@ -42,12 +45,17 @@ class AnthropicClient(BaseClient):
         if self._client is None:
             import anthropic
 
-            self._client = anthropic.AsyncAnthropic(
-                api_key=self.api_key or _env("ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY"),
-                base_url=self.base_url or _env("ANTHROPIC_BASE_URL"),
-                max_retries=self.max_retries,
-                timeout=self.timeout,
-            )
+            kwargs: dict[str, Any] = {
+                "api_key": self.api_key or _env("ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY"),
+                "base_url": self.base_url or _env("ANTHROPIC_BASE_URL"),
+                "max_retries": self.max_retries,
+                "timeout": self.timeout,
+            }
+            if self.default_headers:
+                # Per-wire auth header (e.g. ``x-goog-api-key`` for gemini);
+                # existing kinds keep the SDK's default auth unchanged.
+                kwargs["default_headers"] = self.default_headers
+            self._client = anthropic.AsyncAnthropic(**kwargs)
         return self._client
 
     @staticmethod
