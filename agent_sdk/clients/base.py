@@ -25,10 +25,20 @@ class BaseClient:
 
     provider: str = "base"
 
-    def __init__(self, model: str, *, api_key: str | None = None, base_url: str | None = None):
+    def __init__(
+        self,
+        model: str,
+        *,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        default_headers: dict[str, str] | None = None,
+    ):
         self.model = model
         self.api_key = api_key
         self.base_url = base_url
+        # Per-wire auth headers (e.g. ``x-goog-api-key`` for the gemini kind).
+        # ``None`` keeps the provider's default auth path unchanged.
+        self.default_headers = default_headers
         self.total_usage = ProviderUsage()
 
     def model_for(self, stage: str) -> str:  # noqa: ARG002 - overridden by MixedClient
