@@ -10,6 +10,22 @@ active for a turn/stage.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
+
+
+@dataclass(frozen=True)
+class SkillScript:
+    """One runnable script a skill's bundle declares.
+
+    ``name`` and ``language`` are **derived** by the boundary that validates the
+    declaration (``scripts/analyze.py`` → name ``analyze``, language ``python``),
+    never declared — so a pack carries the resolved read shape and the engine
+    re-derives nothing."""
+
+    name: str
+    path: str
+    language: str
+    description: str
 
 
 @dataclass(frozen=True)
@@ -40,6 +56,10 @@ class SkillPack:
     # compiled-surface cache persist a SKILL.compiled.json sidecar next to it. None for
     # code/DB skills (cache stays in-process only).
     source_dir: str | None = None
+    # Scripts the bundle declares as runnable, each pointing at a ``files`` entry.
+    # Data only: this package is leaf-isolated, so *running* one is the host's job
+    # (agent-core). Empty for every skill that declares none — the common case.
+    scripts: tuple[SkillScript, ...] = ()
 
     def all_context_vars(self) -> list[dict]:
         """The skill's context vars, including the legacy ``checklist`` as a
@@ -78,6 +98,25 @@ _BUILTIN_SKILLS = {
 }
 
 
+def _json_column(row: dict, key: str, default: Any) -> Any:
+    """One JSON column of a skill row, tolerating str-JSON and malformed text.
+
+    A raw-SQL row hands JSON columns over as text, an ORM row as the decoded
+    value; both must produce the same pack. Malformed text degrades to ``default``
+    rather than raising — a turn must not fail to start because one column will
+    not parse. Every JSON column goes through here, so no column can quietly get
+    different tolerance from its neighbours."""
+    value = row.get(key) or default
+    if isinstance(value, str):
+        import json
+
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            return default
+    return value
+
+
 class SkillRegistry:
     """Per-turn view of the skills available to a bot.
 
@@ -95,30 +134,10 @@ class SkillRegistry:
         for row in rows or []:
             if not isinstance(row, dict) or not row.get("slug"):
                 continue
-            files = row.get("files") or {}
-            if isinstance(files, str):  # tolerate str-JSON from raw SQL rows
-                import json
-
-                try:
-                    files = json.loads(files)
-                except json.JSONDecodeError:
-                    files = {}
-            checklist = row.get("checklist") or []
-            if isinstance(checklist, str):  # tolerate str-JSON from raw SQL rows
-                import json
-
-                try:
-                    checklist = json.loads(checklist)
-                except json.JSONDecodeError:
-                    checklist = []
-            context_vars = row.get("context_vars") or []
-            if isinstance(context_vars, str):  # tolerate str-JSON from raw SQL rows
-                import json
-
-                try:
-                    context_vars = json.loads(context_vars)
-                except json.JSONDecodeError:
-                    context_vars = []
+            files = _json_column(row, "files", {})
+            checklist = _json_column(row, "checklist", [])
+            context_vars = _json_column(row, "context_vars", [])
+            scripts = _json_column(row, "scripts", [])
             packs.append(
                 SkillPack(
                     id=str(row["slug"]),
@@ -136,6 +155,18 @@ class SkillRegistry:
                     else (),
                     context_vars=tuple(v for v in context_vars if isinstance(v, dict))
                     if isinstance(context_vars, list)
+                    else (),
+                    scripts=tuple(
+                        SkillScript(
+                            name=str(s.get("name") or ""),
+                            path=str(s.get("path") or ""),
+                            language=str(s.get("language") or ""),
+                            description=str(s.get("description") or ""),
+                        )
+                        for s in scripts
+                        if isinstance(s, dict)
+                    )
+                    if isinstance(scripts, list)
                     else (),
                 )
             )

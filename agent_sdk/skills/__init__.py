@@ -40,6 +40,7 @@ from agent_sdk.skills.packs import (
     KB_LOOKUP_SKILL,
     SkillPack,
     SkillRegistry,
+    SkillScript,
     merge_extra_skill_slugs,
     policy_skill_slugs,
     stage_matches,
@@ -63,6 +64,7 @@ from agent_sdk.skills.runtime import ACTIVATE, READ, SEARCH, SkillToolRuntime
 __all__ = [
     # logic
     "SkillPack",
+    "SkillScript",
     "SkillRegistry",
     "policy_skill_slugs",
     "merge_extra_skill_slugs",
