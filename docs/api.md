@@ -333,6 +333,15 @@ The loader records `SkillPack.source_dir` (so the compiled-surface cache can per
 parses nested `checklist` / `context_vars` from YAML, and raises `SkillLoadError` on a malformed
 bundle (no frontmatter, missing `name`/`description`, no `SKILL.md`).
 
+**Declared scripts.** A bundle may declare scripts it carries as runnable, and a DB row's `scripts`
+column maps to the same field — `SkillPack.scripts`, a tuple of `SkillScript`
+(`name` / `path` / `language` / `description`). Each names an entry in `SkillPack.files`, so the
+program text and the declaration travel together. A pack that declares none carries `()`, which is
+every skill that exists today.
+
+The SDK carries the *declaration* only. Running one is host behaviour — it needs an execution
+sandbox and a tenant's endpoint — so it lives outside this leaf package.
+
 ### Planning (multi-step work — the `TodoWrite` tool)
 
 Multi-step work is handled by **plan-driven fan-out**: the agent writes a todo list with
