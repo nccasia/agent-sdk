@@ -36,7 +36,8 @@ __all__ = [
 #   • a golden case ref — ``golden:<case>``.
 # The KG refs are why the old hex-only pattern leaked: ``[doc:…#p173]`` matched
 # neither the uuid nor the hex branch, so raw refs survived into delivered answers.
-_KG_REF = r"(?:doc|ent|cell|sec|para|link|tbl|row|page|sheet|toc|kb|attr|header):[^\]\s,]+"
+# ``wiki:<wiki_id>:<path>`` is a first-class wiki page in the evidence channel.
+_KG_REF = r"(?:doc|ent|cell|sec|para|link|tbl|row|page|sheet|toc|kb|attr|header|wiki):[^\]\s,]+"
 _MARKER_TOKEN = rf"(?:golden:[^\],]+|{_KG_REF}|[0-9a-fA-F][0-9a-fA-F-]{{5,}})"
 # A whole marker = one or more tokens in one bracket (``[id]`` or ``[id1, id2]``);
 # group 1 is any leading whitespace so a renumber/strip can rebuild spacing.
@@ -63,6 +64,23 @@ def _citation_numbering(citations: list[Citation]) -> dict[str, int]:
         if cid:
             cid_num[cid] = doc_num[key]
     return cid_num
+
+
+def _is_source_marker(ref: str) -> bool:
+    """A ``source_ref`` a model may write as a marker: path-like, never a bare
+    number or year (``[1]`` / ``[2026]`` stay ordinary brackets)."""
+    return len(ref) >= 3 and not ref.isdigit() and ("/" in ref or "." in ref or ":" in ref)
+
+
+def _source_ref_numbering(citations: list[Citation], cid_num: dict[str, int]) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for c in citations:
+        ref = getattr(c, "source_ref", "") or ""
+        n = cid_num.get(getattr(c, "chunk_id", "") or "")
+        if n is not None and _is_source_marker(ref):
+            out.setdefault(ref, n)
+    # Longest first, so a path never matches inside a longer one.
+    return dict(sorted(out.items(), key=lambda kv: -len(kv[0])))
 
 
 def renumber_citation_markers(text: str, citations: list[Citation]) -> str:
@@ -92,6 +110,9 @@ def renumber_citation_markers(text: str, citations: list[Citation]) -> str:
         return (" " if lead else "") + "".join(f"[{n}]" for n in nums)
 
     cleaned = _CITE_MARKER_RE.sub(_sub, text)
+    # A marker naming a cited chunk's source (``[policy/06-x.md]``) gets the same number.
+    for ref, n in _source_ref_numbering(citations, cid_num).items():
+        cleaned = cleaned.replace(f"[{ref}]", f"[{n}]")
     # Collapse adjacent duplicate reference numbers ("[1] [1]" / "[1][1]" → "[1]")
     # — two markers to the same document in one spot read as one reference.
     cleaned = re.sub(r"(\[\d+\])(?:\s*\1)+", r"\1", cleaned)
@@ -121,7 +142,10 @@ def citations_from_text(text: str, chunks: list[dict]) -> list[Citation]:
     seen: set[str] = set()
     for ch in chunks:
         cid = str(ch.get("chunk_id") or "")
-        if cid and cid not in seen and f"[{cid}]" in text:
+        ref = str(ch.get("source_ref") or "")
+        # By id, or by the source path the model was shown beside it (``(src=…)``).
+        named = f"[{cid}]" in text or (_is_source_marker(ref) and f"[{ref}]" in text)
+        if cid and cid not in seen and named:
             seen.add(cid)
             out.append(Citation(
                 chunk_id=cid,
