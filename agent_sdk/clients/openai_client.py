@@ -16,7 +16,11 @@ from typing import Any
 
 from agent_sdk.clients.base import BaseClient, _env
 from agent_sdk.clients.messages import Message, ProviderUsage, TextBlock, ToolUseBlock
-from agent_sdk.clients.openai_tools import openai_tools_payload, restore_tool_name
+from agent_sdk.clients.openai_tools import (
+    openai_tools_payload,
+    restore_tool_name,
+    sanitize_openai_tool_name,
+)
 
 __all__ = ["OpenAIClient", "ProviderProtocolError", "ProviderResponseError"]
 
@@ -206,11 +210,28 @@ class OpenAIClient(BaseClient):
         return openai_tools_payload(tools)
 
     @staticmethod
-    def _to_openai_messages(system: str | list, messages: list[dict]) -> list[dict]:
+    def _to_openai_messages(
+        system: str | list,
+        messages: list[dict],
+        wire_to_canonical: dict[str, str] | None = None,
+    ) -> list[dict]:
         sys_text = system if isinstance(system, str) else _flatten_system(system)
         out: list[dict] = [{"role": "system", "content": sys_text}]
+        canonical_to_wire = {c: w for w, c in (wire_to_canonical or {}).items()}
+        open_calls: list[str] = []  # tool_call ids still owed a ``tool`` message
         for m in messages:
-            out.append(_anthropic_msg_to_openai(m))
+            for msg in _anthropic_msg_to_openai(m, canonical_to_wire):
+                if msg["role"] == "tool":
+                    if msg["tool_call_id"] in open_calls:
+                        open_calls.remove(msg["tool_call_id"])
+                        out.append(msg)
+                    else:  # no call to answer: keep the content, as plain user text
+                        out.append({"role": "user", "content": msg["content"]})
+                    continue
+                _close_calls(out, open_calls)
+                out.append(msg)
+                open_calls = [c["id"] for c in msg.get("tool_calls", [])]
+        _close_calls(out, open_calls)
         return out
 
     async def __call__(
@@ -225,13 +246,13 @@ class OpenAIClient(BaseClient):
         count_usage: bool = True,
     ) -> Message:
         client = self._ensure()
+        oai_tools, wire_to_canonical = self._to_openai_tools(tools)
         kwargs: dict[str, Any] = {
             "model": self.model_for(stage),
-            "messages": self._to_openai_messages(system, messages),
+            "messages": self._to_openai_messages(system, messages, wire_to_canonical),
             "max_tokens": max_tokens,
             "temperature": 0.0 if temperature is None else temperature,
         }
-        oai_tools, wire_to_canonical = self._to_openai_tools(tools)
         if oai_tools:
             kwargs["tools"] = oai_tools
         resp = await client.chat.completions.create(**kwargs)
@@ -288,25 +309,68 @@ def _flatten_system(system: list) -> str:
     return "\n".join(parts)
 
 
-def _anthropic_msg_to_openai(m: dict) -> dict:
-    """Convert one Anthropic-style message to OpenAI shape (text content only).
+def _close_calls(out: list[dict], open_calls: list[str]) -> None:
+    """Answer every still-open tool call — OpenAI rejects an unanswered ``tool_calls`` id."""
+    for call_id in open_calls:
+        out.append({"role": "tool", "tool_call_id": call_id, "content": ""})
+    open_calls.clear()
 
-    Tool results inside a user message are flattened to text — sufficient for the
-    single/agentic loops the engine drives.
+
+def _block_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(str(b.get("text", "")) if isinstance(b, dict) else str(b) for b in content)
+    return "" if content is None else str(content)
+
+
+def _anthropic_msg_to_openai(m: dict, canonical_to_wire: dict[str, str]) -> list[dict]:
+    """Convert one Anthropic-style message to OpenAI messages.
+
+    A ``tool_use`` becomes an assistant ``tool_calls`` entry and a ``tool_result`` a
+    ``role: "tool"`` message. Neither is flattened into text: a model shown its own
+    calls as text (``[called x(...)]``) learns to write the next call instead of
+    making it, and the loop ends on that text.
     """
     role = m.get("role", "user")
     content = m.get("content", "")
     if isinstance(content, str):
-        return {"role": role, "content": content}
+        return [{"role": role, "content": content}]
     texts: list[str] = []
+    calls: list[dict] = []
+    results: list[dict] = []
     for block in content:
-        if isinstance(block, dict):
-            if block.get("type") == "text":
-                texts.append(str(block.get("text", "")))
-            elif block.get("type") == "tool_result":
-                texts.append(str(block.get("content", "")))
-            elif block.get("type") == "tool_use":
-                texts.append(f"[called {block.get('name')}({json.dumps(block.get('input', {}))})]")
-        else:
+        if not isinstance(block, dict):
             texts.append(str(block))
-    return {"role": role, "content": "\n".join(texts)}
+        elif block.get("type") == "text":
+            texts.append(str(block.get("text", "")))
+        elif block.get("type") == "tool_use":
+            name = str(block.get("name") or "tool")
+            calls.append(
+                {
+                    "id": str(block.get("id") or ""),
+                    "type": "function",
+                    "function": {
+                        "name": canonical_to_wire.get(name) or sanitize_openai_tool_name(name),
+                        "arguments": json.dumps(block.get("input") or {}, ensure_ascii=False),
+                    },
+                }
+            )
+        elif block.get("type") == "tool_result":
+            results.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": str(block.get("tool_use_id") or ""),
+                    "content": _block_text(block.get("content", "")),
+                }
+            )
+    text = "\n".join(texts)
+    if role == "assistant":
+        msg: dict[str, Any] = {"role": "assistant", "content": text or (None if calls else "")}
+        if calls:
+            msg["tool_calls"] = calls
+        return [msg]
+    out = list(results)
+    if texts or not results:
+        out.append({"role": role, "content": text})
+    return out
