@@ -43,11 +43,15 @@ def _finalize_grounding(answer, citations, chunks, grounds, require_citations):
     citations but ending with none refuses (``no_citations``)."""
     out = list(citations)
     seen = {c.chunk_id for c in out}
-    for c in citations_from_text(answer, chunks):
+    marked = citations_from_text(answer, chunks)
+    for c in marked:
         if c.chunk_id not in seen:
             seen.add(c.chunk_id)
             out.append(c)
-    out.extend(backfill_citations(answer, chunks, out))
+    # Backfill guesses the sources of an answer that marked none. An answer that marked its
+    # sources has attributed itself; word-overlap guesses on top only add unrelated sources.
+    if not marked:
+        out.extend(backfill_citations(answer, chunks, out))
     # Rewrite inline markers to [N] reference numbers aligned with the delivery
     # footer (the platform standard format), rather than stripping them out.
     clean = renumber_citation_markers(answer, out)
